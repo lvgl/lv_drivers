@@ -9,11 +9,9 @@
 #include "XPT2046.h"
 #if USE_XPT2046
 
-#include "hw/per/spi.h"
-#include "hw/per/io.h"
-#include "hw/per/tick.h"
 #include <stddef.h>
-#include <stdbool.h>
+#include LV_DRV_INDEV_INCLUDE
+#include LV_DRV_DELAY_INCLUDE
 
 /*********************
  *      DEFINES
@@ -37,6 +35,7 @@ static void xpt2046_avg(int16_t * x, int16_t * y);
 int16_t avg_buf_x[XPT2046_AVG];
 int16_t avg_buf_y[XPT2046_AVG];
 uint8_t avg_last;
+
 /**********************
  *      MACROS
  **********************/
@@ -44,12 +43,13 @@ uint8_t avg_last;
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
+
 /**
  * Initialize the XPT2046
  */
 void xpt2046_init(void)
 {
-    io_set_pin_dir(XPT2046_IRQ_PORT, XPT2046_IRQ_PIN, IO_DIR_IN);
+
 }
 
 /**
@@ -68,26 +68,22 @@ bool xpt2046_get(int16_t * x, int16_t * y)
     *x = 0;
     *y = 0;
     
-    if(io_get_pin(XPT2046_IRQ_PORT, XPT2046_IRQ_PIN) == 0) {
-        spi_cs_en(XPT2046_SPI_DRV);
+    uint8_t irq = LV_DRV_INDEV_IRQ_READ;
 
-        data = CMD_X_READ;  /*Read x*/
-        spi_xchg(XPT2046_SPI_DRV, &data, NULL, sizeof(data));
+    if(irq == 0) {
+        LV_DRV_INDEV_SPI_CS(0);
+
+        LV_DRV_INDEV_SPI_XCHG_BYTE(CMD_X_READ);         /*Start x read*/
         
-        data = 0;        /*Read x MSB*/
-        spi_xchg(XPT2046_SPI_DRV, &data, &data, sizeof(data));
+        data = LV_DRV_INDEV_SPI_XCHG_BYTE(0);           /*Read x MSB*/
         *x = data << 8;
-        
-        data = CMD_Y_READ; /*Until x LSB converted y command can be sent*/
-        spi_xchg(XPT2046_SPI_DRV, &data, &data, sizeof(data));        
+        data = LV_DRV_INDEV_SPI_XCHG_BYTE(CMD_Y_READ);  /*Until x LSB converted y command can be sent*/
         *x += data;
         
-        data = 0;   /*Read y MSB*/
-        spi_xchg(XPT2046_SPI_DRV, &data, &data, sizeof(data));
+        data =  LV_DRV_INDEV_SPI_XCHG_BYTE(0);   /*Read y MSB*/
         *y = data << 8;
         
-        data = 0;   /*Read y LSB*/
-        spi_xchg(XPT2046_SPI_DRV, &data, &data, sizeof(data));
+        data =  LV_DRV_INDEV_SPI_XCHG_BYTE(0);   /*Read y LSB*/
         *y += data;
         
         /*Normalize Data*/
@@ -98,8 +94,8 @@ bool xpt2046_get(int16_t * x, int16_t * y)
         
         last_x = *x;
         last_y = *y;
-        
-        spi_cs_dis(XPT2046_SPI_DRV);
+
+        LV_DRV_INDEV_SPI_CS(1);
     } else {
         *x = last_x;
         *y = last_y;

@@ -10,10 +10,8 @@
 #if USE_SSD1963
 
 #include <stdbool.h>
-#include "hw/per/par.h"
-#include "hw/per/io.h"
-#include "hw/per/tick.h"
-#include "../lv_misc/lv_color.h"
+#include LV_DRV_DISPLAY_INCLUDE
+#include LV_DRV_DELAY_INCLUDE
 
 /*********************
  *      DEFINES
@@ -59,12 +57,10 @@ void ssd1963_init(void)
     ssd1963_set_tft_spec();
     ssd1963_init_bl();
     
-    
     ssd1963_cmd(0x13);		//SET display on
 
-
     ssd1963_cmd(0x29);		//SET display on
-    tick_wait_ms(30);        
+    LV_DRV_DELAY_MS(30);
     
 }
 
@@ -97,11 +93,14 @@ void ssd1963_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t col
 
     ssd1963_cmd(0x2c);
     
-    uint16_t color16 = lv_color_to16(color);
-
-    uint32_t size = (act_x2 - act_x1 + 1) * (act_y2 - act_y1 + 1);
     ssd1963_data_mode();
-    par_wr_mult(color16, size);
+
+    uint16_t color16 = lv_color_to16(color);
+    uint32_t size = (act_x2 - act_x1 + 1) * (act_y2 - act_y1 + 1);
+    uint32_t i;
+    for(i = 0; i < size; i++) {
+        LV_DRV_DISPLAY_PAR_WR_WORD(color16);
+    }
 }
 
 void ssd1963_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
@@ -134,22 +133,22 @@ void ssd1963_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
 
     ssd1963_cmd(0x2c);
      int16_t i;
-    uint16_t act_w = act_x2 - act_x1 + 1;
-    uint16_t last_w = x2 - x1 + 1;
+    uint16_t full_w = x2 - x1 + 1;
     
     ssd1963_data_mode();
     
 #if LV_COLOR_DEPTH == 16
+    uint16_t act_w = act_x2 - act_x1 + 1;
     for(i = act_y1; i <= act_y2; i++) {
-        par_wr_array((uint16_t*)color_p, act_w);
-        color_p += last_w;
+        LV_DRV_DISPLAY_PAR_WR_ARRAY((uint16_t*)color_p, act_w);
+        color_p += full_w;
     }
 #else
     int16_t j;
     for(i = act_y1; i <= act_y2; i++) {
         for(j = 0; j <= act_x2 - act_x1 + 1; j++) {
-            par_wr(lv_color_to16(color_p[j]));
-            color_p += last_w;
+            LV_DRV_DISPLAY_PAR_WR_WORD(color_p[j]);
+            color_p += full_w;
         }
     }
 #endif
@@ -161,40 +160,35 @@ void ssd1963_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
 
 static void ssd1963_io_init(void)
 {
-    io_set_pin_dir(SSD1963_RST_PORT, SSD1963_RST_PIN, IO_DIR_OUT);   
-    io_set_pin_dir(SSD1963_BL_PORT, SSD1963_BL_PIN, IO_DIR_OUT);
-    io_set_pin_dir(SSD1963_RS_PORT, SSD1963_RS_PIN, IO_DIR_OUT);
-    io_set_pin(SSD1963_RST_PORT, SSD1963_RST_PIN, 1);
-    io_set_pin(SSD1963_BL_PORT, SSD1963_BL_PIN, 0);
-    io_set_pin(SSD1963_RS_PORT, SSD1963_RS_PIN, SSD1963_CMD_MODE);
+    LV_DRV_DISPLAY_CMD_DATA(SSD1963_CMD_MODE);
     cmd_mode = true;
 }
 
 static void ssd1963_reset(void)
 {
     /*Hardware reset*/
-    io_set_pin(SSD1963_RST_PORT, SSD1963_RST_PIN, 1);
-    tick_wait_ms(50);
-    io_set_pin(SSD1963_RST_PORT, SSD1963_RST_PIN, 0);
-    tick_wait_ms(50);
-    io_set_pin(SSD1963_RST_PORT, SSD1963_RST_PIN, 1);
-    tick_wait_ms(50);
+    LV_DRV_DISPLAY_RST(1);
+    LV_DRV_DELAY_MS(50);
+    LV_DRV_DISPLAY_RST(0);
+    LV_DRV_DELAY_MS(50);
+    LV_DRV_DISPLAY_RST(1);
+    LV_DRV_DELAY_MS(50);
 
     /*Chip enable*/
-    par_cs_dis(SSD1963_PAR_CS);
-    tick_wait_ms(10);
-    par_cs_en(SSD1963_PAR_CS);
-    tick_wait_ms(5);
+    LV_DRV_DISPLAY_PAR_CS(0);
+    LV_DRV_DELAY_MS(10);
+    LV_DRV_DISPLAY_PAR_CS(1);
+    LV_DRV_DELAY_MS(5);
     
     /*Software reset*/
     ssd1963_cmd(0x01);
-    tick_wait_ms(20);
+    LV_DRV_DELAY_MS(20);
 
     ssd1963_cmd(0x01);
-    tick_wait_ms(20);
+    LV_DRV_DELAY_MS(20);
 
     ssd1963_cmd(0x01);
-    tick_wait_ms(20);
+    LV_DRV_DELAY_MS(20);
     
 }
 
@@ -209,15 +203,15 @@ static void ssd1963_set_clk(void)
     /*Enable PLL*/
     ssd1963_cmd(0xe0);     
     ssd1963_data(0x01);
-    tick_wait_ms(20);
+    LV_DRV_DELAY_MS(20);
 
     /*Lock PLL*/
     ssd1963_cmd(0xe0);        
     ssd1963_data(0x03);
 
     /*Software reset*/
-    ssd1963_cmd(0x01);    
-    tick_wait_ms(20);
+    ssd1963_cmd(0x01);
+    LV_DRV_DELAY_MS(20);
 
     /*Set PCLK freq*/
     ssd1963_cmd(0xe6); 
@@ -228,7 +222,6 @@ static void ssd1963_set_clk(void)
 
 static void ssd1963_set_tft_spec(void)
 {
-    
     ssd1963_cmd(0xB0);	//LCD SPECIFICATION
     ssd1963_data(0x20);
 
@@ -279,19 +272,16 @@ static void ssd1963_set_tft_spec(void)
 static void ssd1963_init_bl(void)
 {
 
-    ssd1963_cmd(0xBE);// Set PWM configuration for backlight control
+    ssd1963_cmd(0xBE);      /*Set PWM configuration for back light control*/
 
-    ssd1963_data(0x02);			// PWMF[7:0] = 2, PWM base freq = PLL/(256*(1+5))/256 =
-                                                            // 300Hz for a PLL freq = 120MHz
-    ssd1963_data(0x20);		// Set duty cycle, from 0x00 (total pull-down) to 0xFF
-                                                            // (99% pull-up , 255/256)
-    ssd1963_data(0x01);			// PWM enabled and controlled by host (mcu)
+    ssd1963_data(0x02);		/*PWMF[7:0] = 2, PWM base freq = PLL/(256*(1+5))/256 =
+                                                             300Hz for a PLL freq = 120MHz */
+    ssd1963_data(0x20);		/*Set duty cycle, from 0x00 (total pull-down) to 0xFF
+                                                              (99% pull-up , 255/256) */
+    ssd1963_data(0x01);		/*PWM enabled and controlled by host (mcu) */
     ssd1963_data(0x00);
     ssd1963_data(0x00);
     ssd1963_data(0x00);
-
-    io_set_pin(SSD1963_BL_PORT, SSD1963_BL_PIN, 1);
-    
 }
 
 
@@ -301,7 +291,7 @@ static void ssd1963_init_bl(void)
 static inline void ssd1963_cmd_mode(void)
 {
     if(cmd_mode == false) {
-        io_set_pin(SSD1963_RS_PORT, SSD1963_RS_PIN, SSD1963_CMD_MODE);
+        LV_DRV_DISPLAY_CMD_DATA(SSD1963_CMD_MODE);
         cmd_mode = true;
     }
 }
@@ -312,7 +302,7 @@ static inline void ssd1963_cmd_mode(void)
 static inline void ssd1963_data_mode(void)
 {
     if(cmd_mode != false) {
-        io_set_pin(SSD1963_RS_PORT, SSD1963_RS_PIN, SSD1963_DATA_MODE);
+        LV_DRV_DISPLAY_CMD_DATA(SSD1963_DATA_MODE);
         cmd_mode = false;
     }
 }
@@ -324,7 +314,7 @@ static inline void ssd1963_data_mode(void)
 static inline void ssd1963_cmd(uint8_t cmd)
 {    
     ssd1963_cmd_mode();
-    par_wr(cmd);    
+    LV_DRV_DISPLAY_PAR_WR_WORD(cmd);
 }
 
 /**
@@ -334,7 +324,7 @@ static inline void ssd1963_cmd(uint8_t cmd)
 static inline void ssd1963_data(uint8_t data)
 {    
     ssd1963_data_mode();
-    par_wr(data);    
+    LV_DRV_DISPLAY_PAR_WR_WORD(data);
 }
 
 #endif

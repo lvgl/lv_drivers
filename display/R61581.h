@@ -13,8 +13,7 @@
 #if USE_R61581
 
 #include <stdint.h>
-#include "hw/hw.h"
-#include "../lv_misc/lv_color.h"
+#include "lvgl/lv_misc/lv_color.h"
 
 /*********************
  *      DEFINES

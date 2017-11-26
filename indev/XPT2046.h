@@ -12,7 +12,6 @@
 #include "lv_drv_conf.h"
 #if USE_XPT2046 != 0
 
-#include "hw/hw.h"
 #include <stdint.h>
 #include <stdbool.h>
 

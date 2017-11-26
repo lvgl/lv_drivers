@@ -12,10 +12,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
-#include "hw/per/spi.h"
-#include "hw/per/io.h"
-#include "hw/per/tick.h"
-
+#include LV_DRV_DISPLAY_INCLUDE
+#include LV_DRV_DELAY_INCLUDE
 
 /*********************
  *      DEFINES
@@ -97,31 +95,27 @@ static uint8_t pagemap[] = { 7, 6, 5, 4, 3, 2, 1, 0 };
  */
 void st7565_init(void)
 {
-    io_set_pin_dir(ST7565_RST_PORT,ST7565_RST_PIN, IO_DIR_OUT);
-    io_set_pin_dir(ST7565_RS_PORT,ST7565_RS_PIN, IO_DIR_OUT);
-    io_set_pin(ST7565_RST_PORT,ST7565_RST_PIN, 1);   
-    tick_wait_ms(10);   
-    io_set_pin(ST7565_RST_PORT,ST7565_RST_PIN, 0);   
-    tick_wait_ms(10);   
-    io_set_pin(ST7565_RST_PORT,ST7565_RST_PIN, 1);   
-    tick_wait_ms(10);
+    LV_DRV_DISPLAY_RST(1);
+    LV_DRV_DELAY_MS(10);
+    LV_DRV_DISPLAY_RST(0);
+    LV_DRV_DELAY_MS(10);
+    LV_DRV_DISPLAY_RST(1);
+    LV_DRV_DELAY_MS(10);
     
-    spi_set_baud(ST7565_DRV, ST7565_BAUD);
-    
-    spi_cs_en(ST7565_DRV);
+    LV_DRV_DISPLAY_SPI_CS(0);
     
     st7565_command(CMD_SET_BIAS_7);
     st7565_command(CMD_SET_ADC_NORMAL);
     st7565_command(CMD_SET_COM_NORMAL);
     st7565_command(CMD_SET_DISP_START_LINE);
     st7565_command(CMD_SET_POWER_CONTROL | 0x4);
-    tick_wait_ms(50);
+    LV_DRV_DELAY_MS(50);
 
     st7565_command(CMD_SET_POWER_CONTROL | 0x6);
-    tick_wait_ms(50);
+    LV_DRV_DELAY_MS(50);
 
     st7565_command(CMD_SET_POWER_CONTROL | 0x7);
-    tick_wait_ms(10);
+    LV_DRV_DELAY_MS(10);
 
     st7565_command(CMD_SET_RESISTOR_RATIO | 0x6);
  
@@ -131,8 +125,8 @@ void st7565_init(void)
     /*Set brightness*/
     st7565_command(CMD_SET_VOLUME_FIRST);
     st7565_command(CMD_SET_VOLUME_SECOND | (0x18 & 0x3f));
-    
-    spi_cs_dis(ST7565_DRV);   
+
+    LV_DRV_DISPLAY_SPI_CS(1);
     
     memset(lcd_fb, 0x00, sizeof(lcd_fb));
 }
@@ -222,7 +216,8 @@ void st7565_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t * col
  */
 static void st7565_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2)
 {
-    spi_cs_en(ST7565_DRV);   
+
+    LV_DRV_DISPLAY_SPI_CS(0);
     
     uint8_t c, p;
     for(p = y1 / 8; p <= y2 / 8; p++) {
@@ -235,8 +230,8 @@ static void st7565_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2)
             st7565_data(lcd_fb[(ST7565_HOR_RES*p)+c]);
         }
     }
-    
-  spi_cs_dis(ST7565_DRV);   
+
+    LV_DRV_DISPLAY_SPI_CS(1);
 }
 
 /**
@@ -245,8 +240,8 @@ static void st7565_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2)
  */
 static void st7565_command(uint8_t cmd) 
 {
-    io_set_pin(ST7565_RS_PORT, ST7565_RS_PIN, ST7565_CMD_MODE);
-    spi_xchg(ST7565_DRV, &cmd, NULL, sizeof(cmd));
+    LV_DRV_DISPLAY_CMD_DATA(ST7565_CMD_MODE);
+    LV_DRV_DISPLAY_SPI_WR_BYTE(data);
 }
   
 /**
@@ -255,8 +250,8 @@ static void st7565_command(uint8_t cmd)
  */
 static void st7565_data(uint8_t data) 
 {
-    io_set_pin(ST7565_RS_PORT, ST7565_RS_PIN, ST7565_DATA_MODE);
-    spi_xchg(ST7565_DRV, &data, NULL, sizeof(data));
+    LV_DRV_DISPLAY_CMD_DATA(ST7565_DATA_MODE);
+    LV_DRV_DISPLAY_SPI_WR_BYTE(data);
 }
 
 #endif

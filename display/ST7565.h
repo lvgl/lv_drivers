@@ -11,8 +11,9 @@
  *********************/
 #include "lv_drv_conf.h"
 #if USE_ST7565 != 0
+
 #include <stdint.h>
-#include "../lv_misc/lv_color.h"
+#include "lvgl/lv_misc/lv_color.h"
 
 /*********************
  *      DEFINES
