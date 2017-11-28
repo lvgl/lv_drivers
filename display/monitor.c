@@ -41,9 +41,9 @@ static SDL_Window * window;
 static SDL_Renderer * renderer;
 static SDL_Texture * texture;
 static uint32_t tft_fb[MONITOR_HOR_RES * MONITOR_VER_RES];
-static bool sdl_inited = false;
-static bool sdl_refr_qry = false;
-static bool sdl_quit_qry = false;
+static volatile bool sdl_inited = false;
+static volatile bool sdl_refr_qry = false;
+static volatile bool sdl_quit_qry = false;
 
 int quit_filter (void *userdata, SDL_Event * event);
 
@@ -62,7 +62,7 @@ void monitor_init(void)
 {
 	SDL_CreateThread(sdl_refr, "sdl_refr", NULL);
 
-	while(sdl_inited == false);
+	while(sdl_inited == false); /*Wait until 'sdl_refr' initializes the SDL*/
 }
 
 
@@ -163,9 +163,8 @@ static int sdl_refr(void * param)
 
 	/*Initialize the frame buffer to gray (77 is an empirical value) */
 	memset(tft_fb, 77, MONITOR_HOR_RES * MONITOR_VER_RES * sizeof(uint32_t));
-
 	SDL_UpdateTexture(texture, NULL, tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
-
+	sdl_refr_qry = true;
 	sdl_inited = true;
 
 	/*Run until quit event not arrives*/
@@ -173,10 +172,11 @@ static int sdl_refr(void * param)
 
 		/*Refresh handling*/
 		if(sdl_refr_qry != false) {
-			SDL_UpdateTexture(texture, NULL, tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
-			SDL_RenderClear(renderer);
-			SDL_RenderCopy(renderer, texture, NULL, NULL);
-			SDL_RenderPresent(renderer);
+            sdl_refr_qry = false;
+            SDL_UpdateTexture(texture, NULL, tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
+            SDL_RenderClear(renderer);
+            SDL_RenderCopy(renderer, texture, NULL, NULL);
+            SDL_RenderPresent(renderer);
 		}
 
 	    SDL_Event event;
@@ -202,8 +202,6 @@ static int sdl_refr(void * param)
 	exit(0);
 
 	return 0;
-
-
 }
 
 int quit_filter (void *userdata, SDL_Event * event)
