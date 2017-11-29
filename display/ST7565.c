@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
+#include "lvgl/lv_obj/lv_vdb.h"
 #include LV_DRV_DISPLAY_INCLUDE
 #include LV_DRV_DELAY_INCLUDE
 
@@ -72,7 +73,7 @@
 /**********************
  *  STATIC PROTOTYPES
  **********************/
-static void st7565_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2);
+static void st7565_sync(int32_t x1, int32_t y1, int32_t x2, int32_t y2);
 static void st7565_command(uint8_t cmd);
 static void st7565_data(uint8_t data);
 
@@ -131,10 +132,45 @@ void st7565_init(void)
     memset(lcd_fb, 0x00, sizeof(lcd_fb));
 }
 
-/**
- * Fill the previously marked area with a color
- * @param color fill color
- */
+
+void st7565_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t * color_p)
+{
+     /*Return if the area is out the screen*/
+    if(x2 < 0) return;
+    if(y2 < 0) return;
+    if(x1 > ST7565_HOR_RES - 1) return;
+    if(y1 > ST7565_VER_RES - 1) return;
+
+    /*Truncate the area to the screen*/
+    int32_t act_x1 = x1 < 0 ? 0 : x1;
+    int32_t act_y1 = y1 < 0 ? 0 : y1;
+    int32_t act_x2 = x2 > ST7565_HOR_RES - 1 ? ST7565_HOR_RES - 1 : x2;
+    int32_t act_y2 = y2 > ST7565_VER_RES - 1 ? ST7565_VER_RES - 1 : y2;
+
+    int32_t x, y;
+
+    /*Set the first row in */
+
+    /*Refresh frame buffer*/
+    for(y= act_y1; y <= act_y2; y++) {
+        for(x = act_x1; x <= act_x2; x++) {
+            if (lv_color_to1(*color_p) != 0) {
+                lcd_fb[x+ (y/8)*ST7565_HOR_RES] &= ~( 1 << (7-(y%8)));
+            } else {
+                lcd_fb[x+ (y/8)*ST7565_HOR_RES] |= (1 << (7-(y%8)));
+            }
+            color_p ++;
+        }
+
+        color_p += x2 - act_x2; /*Next row*/
+    }
+
+    st7565_sync(act_x1, act_y1, act_x2, act_y2);
+    lv_flush_ready();
+}
+
+
+
 void st7565_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t color)
 {
      /*Return if the area is out the screen*/
@@ -163,13 +199,9 @@ void st7565_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t colo
         }
     }
     
-    st7565_flush(act_x1, act_y1, act_x2, act_y2);
+    st7565_sync(act_x1, act_y1, act_x2, act_y2);
 }
 
-/**
- * Put a pixel map to the previously marked area
- * @param color_p an array of pixels
- */
 void st7565_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t * color_p)
 {
      /*Return if the area is out the screen*/
@@ -202,7 +234,7 @@ void st7565_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t * col
         color_p += x2 - act_x2; /*Next row*/
     }
     
-    st7565_flush(act_x1, act_y1, act_x2, act_y2);
+    st7565_sync(act_x1, act_y1, act_x2, act_y2);
 }
 /**********************
  *   STATIC FUNCTIONS
@@ -214,7 +246,7 @@ void st7565_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t * col
  * @param x2 right coordinate of the area to flush
  * @param y2 bottom coordinate of the area to flush
  */
-static void st7565_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2)
+static void st7565_sync(int32_t x1, int32_t y1, int32_t x2, int32_t y2)
 {
 
     LV_DRV_DISPLAY_SPI_CS(0);

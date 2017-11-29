@@ -14,6 +14,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "lvgl/lv_hal/lv_hal_indev.h"
 
 /*********************
  *      DEFINES
@@ -27,7 +28,7 @@
  * GLOBAL PROTOTYPES
  **********************/
 void ft5406ee8_init(void);
-bool ft5406ee8_get(int16_t * x, int16_t * y);
+bool ft5406ee8_read(lv_indev_data_t * data);
 
 /**********************
  *      MACROS

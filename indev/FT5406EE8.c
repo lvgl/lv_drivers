@@ -73,31 +73,41 @@ void ft5406ee8_init(void)
 
 }
 
-bool ft5406ee8_get(int16_t * x, int16_t * y)
+/**
+ * Get the current position and state of the touchpad
+ * @param data store the read data here
+ * @return false: because no ore data to be read
+ */
+bool ft5406ee8_read(lv_indev_data_t * data)
 {   
     static int16_t x_last;
     static int16_t y_last;
+    int16_t x;
+    int16_t y;
     bool valid = true;   
     
     valid = ft5406ee8_get_touch_num();
     if(valid == true) {
-        valid = ft5406ee8_read_finger1(x, y);
+        valid = ft5406ee8_read_finger1(&x, &y);
     }
      
      if(valid == true) {
-        *x = (uint32_t)((uint32_t)*x * 320) / 2048;
-        *y = (uint32_t)((uint32_t)*y * 240) / 2048; 
+        x = (uint32_t)((uint32_t)x * 320) / 2048;
+        y = (uint32_t)((uint32_t)y * 240) / 2048;
          
          
-        x_last = *x;
-        y_last = *y;
+        x_last = x;
+        y_last = y;
      }
      else {
-        *x = x_last;
-        *y = y_last;
+        x = x_last;
+        y = y_last;
     }
 
-    return valid;
+    data->point.x = x;
+    data->point.y = y;
+    data->state = valid == false ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
+    return false;
 }
 
 /**********************

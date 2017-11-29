@@ -14,6 +14,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "lvgl/lv_hal/lv_hal_indev.h"
 
 /*********************
  *      DEFINES
@@ -27,7 +28,7 @@
  * GLOBAL PROTOTYPES
  **********************/
 void xpt2046_init(void);
-bool xpt2046_get(int16_t * x, int16_t * y);
+bool xpt2046_read(lv_indev_data_t * data);
 
 /**********************
  *      MACROS

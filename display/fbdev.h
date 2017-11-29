@@ -17,7 +17,7 @@ extern "C" {
 #if USE_FBDEV
 
 #include <stdint.h>
-#include "../lv_misc/lv_color.h"
+#include "lvgl/lv_misc/lv_color.h"
 
 /*********************
  *      DEFINES

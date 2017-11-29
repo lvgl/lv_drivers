@@ -10,6 +10,7 @@
 #if USE_R61581 != 0
 
 #include <stdbool.h>
+#include "lvgl/lv_obj/lv_vdb.h"
 #include LV_DRV_DISPLAY_INCLUDE
 #include LV_DRV_DELAY_INCLUDE
 
@@ -71,11 +72,60 @@ void r61581_init(void)
     LV_DRV_DISPLAY_PAR_FAST;
 }
 
+void r61581_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t * color_p)
+{
+     /*Return if the area is out the screen*/
+    if(x2 < 0) return;
+    if(y2 < 0) return;
+    if(x1 > R61581_HOR_RES - 1) return;
+    if(y1 > R61581_VER_RES - 1) return;
 
-/**
- * Fill the previously marked area with a color
- * @param color fill color
- */
+    /*Truncate the area to the screen*/
+    int32_t act_x1 = x1 < 0 ? 0 : x1;
+    int32_t act_y1 = y1 < 0 ? 0 : y1;
+    int32_t act_x2 = x2 > R61581_HOR_RES - 1 ? R61581_HOR_RES - 1 : x2;
+    int32_t act_y2 = y2 > R61581_VER_RES - 1 ? R61581_VER_RES - 1 : y2;
+
+
+    //Set the rectangular area
+    r61581_cmd(0x002A);
+    r61581_data(act_x1 >> 8);
+    r61581_data(0x00FF & act_x1);
+    r61581_data(act_x2 >> 8);
+    r61581_data(0x00FF & act_x2);
+
+    r61581_cmd(0x002B);
+    r61581_data(act_y1 >> 8);
+    r61581_data(0x00FF & act_y1);
+    r61581_data(act_y2 >> 8);
+    r61581_data(0x00FF & act_y2);
+
+    r61581_cmd(0x2c);
+
+    int16_t i;
+    uint16_t full_w = x2 - x1 + 1;
+
+    r61581_data_mode();
+
+#if LV_COLOR_DEPTH == 16
+    uint16_t act_w = act_x2 - act_x1 + 1;
+    for(i = act_y1; i <= act_y2; i++) {
+        LV_DRV_DISPLAY_PAR_WR_ARRAY((uint16_t*)color_p, act_w);
+        color_p += full_w;
+    }
+#else
+    int16_t j;
+    for(i = act_y1; i <= act_y2; i++) {
+        for(j = 0; j <= act_x2 - act_x1 + 1; j++) {
+            LV_DRV_DISPLAY_PAR_WR_WORD(lv_color_to16(color_p[j]));
+            color_p += full_w;
+        }
+    }
+#endif
+
+    lv_flush_ready();
+}
+
 void r61581_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t color)
 {
      /*Return if the area is out the screen*/
@@ -115,10 +165,6 @@ void r61581_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t colo
     }
 }
 
-/**
- * Put a pixel map to the previously marked area
- * @param color_p an array of pixels
- */
 void r61581_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t * color_p)
 {
      /*Return if the area is out the screen*/

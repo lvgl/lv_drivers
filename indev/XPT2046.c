@@ -54,19 +54,18 @@ void xpt2046_init(void)
 
 /**
  * Get the current position and state of the touchpad
- * @param x point to variable, the x coordinate will be stored here
- * @param y point to variable, the y coordinate will be stored here
- * @return true: the touchpad is pressed, false: released
+ * @param data store the read data here
+ * @return false: because no ore data to be read
  */
-bool xpt2046_get(int16_t * x, int16_t * y)
+bool xpt2046_read(lv_indev_data_t * data)
 { 
     static int16_t last_x = 0;
     static int16_t last_y = 0;
     bool valid = true;
-    uint8_t data;
+    uint8_t buf;
     
-    *x = 0;
-    *y = 0;
+    int16_t x = 0;
+    int16_t y = 0;
     
     uint8_t irq = LV_DRV_INDEV_IRQ_READ;
 
@@ -75,34 +74,38 @@ bool xpt2046_get(int16_t * x, int16_t * y)
 
         LV_DRV_INDEV_SPI_XCHG_BYTE(CMD_X_READ);         /*Start x read*/
         
-        data = LV_DRV_INDEV_SPI_XCHG_BYTE(0);           /*Read x MSB*/
-        *x = data << 8;
-        data = LV_DRV_INDEV_SPI_XCHG_BYTE(CMD_Y_READ);  /*Until x LSB converted y command can be sent*/
-        *x += data;
+        buf = LV_DRV_INDEV_SPI_XCHG_BYTE(0);           /*Read x MSB*/
+        x = buf << 8;
+        buf = LV_DRV_INDEV_SPI_XCHG_BYTE(CMD_Y_READ);  /*Until x LSB converted y command can be sent*/
+        x += buf;
         
-        data =  LV_DRV_INDEV_SPI_XCHG_BYTE(0);   /*Read y MSB*/
-        *y = data << 8;
+        buf =  LV_DRV_INDEV_SPI_XCHG_BYTE(0);   /*Read y MSB*/
+        y = buf << 8;
         
-        data =  LV_DRV_INDEV_SPI_XCHG_BYTE(0);   /*Read y LSB*/
-        *y += data;
+        buf =  LV_DRV_INDEV_SPI_XCHG_BYTE(0);   /*Read y LSB*/
+        y += buf;
         
         /*Normalize Data*/
-        *x = *x >> 3;
-        *y = *y >> 3;
-        xpt2046_corr(x, y);
-        xpt2046_avg(x, y);
+        x = x >> 3;
+        y = y >> 3;
+        xpt2046_corr(&x, &y);
+        xpt2046_avg(&x, &y);
         
-        last_x = *x;
-        last_y = *y;
+        last_x = x;
+        last_y = y;
 
         LV_DRV_INDEV_SPI_CS(1);
     } else {
-        *x = last_x;
-        *y = last_y;
+        x = last_x;
+        y = last_y;
         avg_last = 0;
         valid = false;
     }
     
+    data->point.x = x;
+    data->point.y = y;
+    data->state = valid == false ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
+
     return valid;
 }
 
