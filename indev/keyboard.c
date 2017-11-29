@@ -9,6 +9,7 @@
 #include "keyboard.h"
 #if USE_KEYBOARD
 
+#include "lvgl/lv_obj/lv_group.h"
 /*********************
  *      DEFINES
  *********************/
@@ -26,8 +27,7 @@ static uint32_t keycode_to_ascii(uint32_t sdl_key);
  *  STATIC VARIABLES
  **********************/
 static uint32_t last_key;
-static bool is_pressed;
-static bool reported;
+static lv_indev_state_t state;
 
 /**********************
  *      MACROS
@@ -38,7 +38,7 @@ static bool reported;
  **********************/
 
 /**
- * Initialize the eyboard
+ * Initialize the keyboard
  */
 void keyboard_init(void)
 {
@@ -47,20 +47,20 @@ void keyboard_init(void)
 
 /**
  * Get the last pressed or released character from the PC's keyboard
- * @param key point to variable to store the key. (set to 0 if nothing happened)
- * @return true: the left mouse button is pressed, false: released
+ * @param data store the read data here
+ * @return false: because the points are not buffered, so no more data to be read
  */
-bool keyboard_read(uint32_t *key)
+bool keyboard_read(lv_indev_data_t * data)
 {
-    if(reported){
-        *key = 0;
-        return false;
+    data->state = state;
+
+    if(state == LV_INDEV_STATE_REL) {
+        data->key = 0;
+    } else {
+        data->key = keycode_to_ascii(last_key);
     }
 
-    *key = keycode_to_ascii(last_key);
-    reported = true;
-
-    return is_pressed;
+    return false;
 }
 
 
@@ -70,12 +70,10 @@ void keyboard_handler(SDL_Event *event)
     switch( event->type ){
         case SDL_KEYDOWN:
             last_key = event->key.keysym.sym;
-            is_pressed = true;
-            reported = false;
+            state = LV_INDEV_STATE_PR;
             break;
         case SDL_KEYUP:
-            is_pressed = false;
-            reported = false;
+            state = LV_INDEV_STATE_REL;
             break;
         default:
             break;
@@ -89,11 +87,31 @@ void keyboard_handler(SDL_Event *event)
 
 static uint32_t keycode_to_ascii(uint32_t sdl_key)
 {
+    /*Remap some key to LV_GROUP_KEY_... to manage groups*/
     switch(sdl_key) {
-        case SDLK_KP_PLUS: return '+';
-        case SDLK_KP_MINUS: return '-';
-        case SDLK_KP_ENTER: return '\n';
-        case '\r': return '\n';
+        case SDLK_RIGHT:
+        case SDLK_KP_PLUS:
+            return LV_GROUP_KEY_RIGHT;
+
+        case SDLK_LEFT:
+        case SDLK_KP_MINUS:
+            return LV_GROUP_KEY_LEFT;
+
+        case SDLK_UP:
+            return LV_GROUP_KEY_UP;
+
+        case SDLK_DOWN:
+            return LV_GROUP_KEY_DOWN;
+
+        case SDLK_ESCAPE:
+            return LV_GROUP_KEY_ESC;
+
+        case SDLK_KP_ENTER:
+            return LV_GROUP_KEY_ENTER;
+
+        case '\r':
+            return LV_GROUP_KEY_ENTER;
+
         default: return sdl_key;
     }
 }

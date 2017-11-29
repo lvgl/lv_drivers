@@ -15,6 +15,7 @@
 #if USE_MOUSE
 #include <stdint.h>
 #include <stdbool.h>
+#include "lvgl/lv_hal/lv_hal_indev.h"
 
 /*********************
  *      DEFINES
@@ -27,8 +28,18 @@
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
+
+/**
+ * Initialize the mouse
+ */
 void mouse_init(void);
-bool mouse_get(int16_t * x, int16_t * y);
+/**
+ * Get the current position and state of the mouse
+ * @param data store the mouse data here
+ * @return false: because the points are not buffered, so no more data to be read
+ */
+bool mouse_read(lv_indev_data_t * data);
+
 
 /**********************
  *      MACROS

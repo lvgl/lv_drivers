@@ -18,6 +18,7 @@ extern "C" {
 
 #include <stdbool.h>
 #include <SDL2/SDL.h>
+#include "lvgl/lv_hal/lv_hal_indev.h"
 
 /*********************
  *      DEFINES
@@ -30,8 +31,17 @@ extern "C" {
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
-bool keyboard_read(uint32_t *key);
-void keyboard_handler(SDL_Event *event);
+/**
+ * Initialize the keyboard
+ */
+void keyboard_init(void);
+
+/**
+ * Get the last pressed or released character from the PC's keyboard
+ * @param data store the read data here
+ * @return false: because the points are not buffered, so no more data to be read
+ */
+bool keyboard_read(lv_indev_data_t * data);
 
 /**********************
  *      MACROS

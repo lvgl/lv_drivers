@@ -48,17 +48,17 @@ void mouse_init(void)
 
 /**
  * Get the current position and state of the mouse
- * @param x point to variable, the x coordinate will be stored here
- * @param y point to variable, the y coordinate will be stored here
- * @return true: the left mouse button is pressed, false: released
+ * @param data store the mouse data here
+ * @return false: because the points are not buffered, so no more data to be read
  */
-bool mouse_get(int16_t * x, int16_t * y)
+bool mouse_read(lv_indev_data_t * data)
 {
-	*x = last_x;
-	*y = last_y;
+    /*Store the collected data*/
+    data->point.x = last_x;
+    data->point.y = last_y;
+    data->state = left_button_down ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
 
-	return left_button_down;
-
+    return false;
 }
 
 /**
