@@ -85,17 +85,17 @@ void monitor_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
     if(y1 > MONITOR_VER_RES - 1) return;
 
     uint32_t y;
-    uint32_t w = x2 - x1 + 1;
 #if LV_COLOR_DEPTH != 24
-    for(y = act_y1; y <= act_y2; y++) {
-        for(x = act_x1; x <= act_x2; x++) {
+    uint32_t x;
+    for(y = y1; y <= y2; y++) {
+        for(x = x1; x <= x2; x++) {
             tft_fb[y * MONITOR_HOR_RES + x] = lv_color_to24(*color_p) | 0xFF000000;
             color_p++;
         }
 
-        color_p += x2 - act_x2;
     }
 #else
+    uint32_t w = x2 - x1 + 1;
     for(y = y1; y <= y2; y++) {
         memcpy(&tft_fb[y * MONITOR_HOR_RES + x1], color_p, w * sizeof(lv_color_t));
 
