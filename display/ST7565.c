@@ -12,7 +12,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
-#include "lvgl/lv_obj/lv_vdb.h"
+#include "lvgl/lv_core/lv_vdb.h"
 #include LV_DRV_DISPLAY_INCLUDE
 #include LV_DRV_DELAY_INCLUDE
 

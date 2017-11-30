@@ -14,7 +14,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <SDL2/SDL.h>
-#include "lvgl/lv_obj/lv_vdb.h"
+#include "lvgl/lv_core/lv_vdb.h"
 
 /*********************
  *      DEFINES

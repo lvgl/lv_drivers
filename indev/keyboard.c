@@ -9,7 +9,7 @@
 #include "keyboard.h"
 #if USE_KEYBOARD
 
-#include "lvgl/lv_obj/lv_group.h"
+#include "lvgl/lv_core/lv_group.h"
 /*********************
  *      DEFINES
  *********************/

@@ -10,7 +10,7 @@
 #if USE_R61581 != 0
 
 #include <stdbool.h>
-#include "lvgl/lv_obj/lv_vdb.h"
+#include "lvgl/lv_core/lv_vdb.h"
 #include LV_DRV_DISPLAY_INCLUDE
 #include LV_DRV_DELAY_INCLUDE
 
