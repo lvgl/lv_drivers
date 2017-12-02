@@ -84,9 +84,9 @@ void monitor_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
     if(x1 > MONITOR_HOR_RES - 1) return;
     if(y1 > MONITOR_VER_RES - 1) return;
 
-    uint32_t y;
+    int32_t y;
 #if LV_COLOR_DEPTH != 24
-    uint32_t x;
+    int32_t x;
     for(y = y1; y <= y2; y++) {
         for(x = x1; x <= x2; x++) {
             tft_fb[y * MONITOR_HOR_RES + x] = lv_color_to24(*color_p) | 0xFF000000;
@@ -132,8 +132,8 @@ void monitor_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t col
     int32_t act_x2 = x2 > MONITOR_HOR_RES - 1 ? MONITOR_HOR_RES - 1 : x2;
     int32_t act_y2 = y2 > MONITOR_VER_RES - 1 ? MONITOR_VER_RES - 1 : y2;
 
-	uint32_t x;
-	uint32_t y;
+	int32_t x;
+	int32_t y;
 	uint32_t color24 = lv_color_to24(color);
 
 	for(x = act_x1; x <= act_x2; x++) {
@@ -167,8 +167,8 @@ void monitor_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
 	int32_t act_x2 = x2 > MONITOR_HOR_RES - 1 ? MONITOR_HOR_RES - 1 : x2;
 	int32_t act_y2 = y2 > MONITOR_VER_RES - 1 ? MONITOR_VER_RES - 1 : y2;
 
-	uint32_t x;
-	uint32_t y;
+	int32_t x;
+	int32_t y;
 
 	for(y = act_y1; y <= act_y2; y++) {
 		for(x = act_x1; x <= act_x2; x++) {
@@ -192,6 +192,8 @@ void monitor_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
  */
 static int sdl_refr(void * param)
 {
+    (void)param;
+
 	/*Initialize the SDL*/
     SDL_Init(SDL_INIT_VIDEO);
 
@@ -250,6 +252,8 @@ static int sdl_refr(void * param)
 
 int quit_filter (void *userdata, SDL_Event * event)
 {
+    (void)userdata;
+
 	if(event->type == SDL_QUIT) {
 		sdl_quit_qry = true;
 	}
