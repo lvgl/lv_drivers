@@ -84,10 +84,10 @@ void monitor_init(void)
 void monitor_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t *color_p)
 {
     /*Return if the area is out the screen*/
-    if(x2 < 0) return;
-    if(y2 < 0) return;
-    if(x1 > MONITOR_HOR_RES - 1) return;
-    if(y1 > MONITOR_VER_RES - 1) return;
+    if(x2 < 0 || y2 < 0 || x1 > MONITOR_HOR_RES - 1 || y1 > MONITOR_VER_RES - 1) {
+        lv_flush_ready();
+        return;
+    }
 
     int32_t y;
 #if LV_COLOR_DEPTH != 24
