@@ -11,7 +11,7 @@
 
 #include <stdbool.h>
 #include "lvgl/lv_core/lv_vdb.h"
-#include LV_DRV_DISPLAY_INCLUDE
+#include LV_DRV_DISP_INCLUDE
 #include LV_DRV_DELAY_INCLUDE
 
 /*********************
@@ -103,14 +103,14 @@ void ssd1963_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
 #if LV_COLOR_DEPTH == 16
     uint16_t act_w = act_x2 - act_x1 + 1;
     for(i = act_y1; i <= act_y2; i++) {
-        LV_DRV_DISPLAY_PAR_WR_ARRAY((uint16_t*)color_p, act_w);
+        LV_DRV_DISP_PAR_WR_ARRAY((uint16_t*)color_p, act_w);
         color_p += full_w;
     }
 #else
     int16_t j;
     for(i = act_y1; i <= act_y2; i++) {
         for(j = 0; j <= act_x2 - act_x1 + 1; j++) {
-            LV_DRV_DISPLAY_PAR_WR_WORD(color_p[j]);
+            LV_DRV_DISP_PAR_WR_WORD(color_p[j]);
             color_p += full_w;
         }
     }
@@ -154,7 +154,7 @@ void ssd1963_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t col
     uint32_t size = (act_x2 - act_x1 + 1) * (act_y2 - act_y1 + 1);
     uint32_t i;
     for(i = 0; i < size; i++) {
-        LV_DRV_DISPLAY_PAR_WR_WORD(color16);
+        LV_DRV_DISP_PAR_WR_WORD(color16);
     }
 }
 
@@ -195,14 +195,14 @@ void ssd1963_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
 #if LV_COLOR_DEPTH == 16
     uint16_t act_w = act_x2 - act_x1 + 1;
     for(i = act_y1; i <= act_y2; i++) {
-        LV_DRV_DISPLAY_PAR_WR_ARRAY((uint16_t*)color_p, act_w);
+        LV_DRV_DISP_PAR_WR_ARRAY((uint16_t*)color_p, act_w);
         color_p += full_w;
     }
 #else
     int16_t j;
     for(i = act_y1; i <= act_y2; i++) {
         for(j = 0; j <= act_x2 - act_x1 + 1; j++) {
-            LV_DRV_DISPLAY_PAR_WR_WORD(color_p[j]);
+            LV_DRV_DISP_PAR_WR_WORD(color_p[j]);
             color_p += full_w;
         }
     }
@@ -215,24 +215,24 @@ void ssd1963_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
 
 static void ssd1963_io_init(void)
 {
-    LV_DRV_DISPLAY_CMD_DATA(SSD1963_CMD_MODE);
+    LV_DRV_DISP_CMD_DATA(SSD1963_CMD_MODE);
     cmd_mode = true;
 }
 
 static void ssd1963_reset(void)
 {
     /*Hardware reset*/
-    LV_DRV_DISPLAY_RST(1);
+    LV_DRV_DISP_RST(1);
     LV_DRV_DELAY_MS(50);
-    LV_DRV_DISPLAY_RST(0);
+    LV_DRV_DISP_RST(0);
     LV_DRV_DELAY_MS(50);
-    LV_DRV_DISPLAY_RST(1);
+    LV_DRV_DISP_RST(1);
     LV_DRV_DELAY_MS(50);
 
     /*Chip enable*/
-    LV_DRV_DISPLAY_PAR_CS(0);
+    LV_DRV_DISP_PAR_CS(0);
     LV_DRV_DELAY_MS(10);
-    LV_DRV_DISPLAY_PAR_CS(1);
+    LV_DRV_DISP_PAR_CS(1);
     LV_DRV_DELAY_MS(5);
     
     /*Software reset*/
@@ -346,7 +346,7 @@ static void ssd1963_init_bl(void)
 static inline void ssd1963_cmd_mode(void)
 {
     if(cmd_mode == false) {
-        LV_DRV_DISPLAY_CMD_DATA(SSD1963_CMD_MODE);
+        LV_DRV_DISP_CMD_DATA(SSD1963_CMD_MODE);
         cmd_mode = true;
     }
 }
@@ -357,7 +357,7 @@ static inline void ssd1963_cmd_mode(void)
 static inline void ssd1963_data_mode(void)
 {
     if(cmd_mode != false) {
-        LV_DRV_DISPLAY_CMD_DATA(SSD1963_DATA_MODE);
+        LV_DRV_DISP_CMD_DATA(SSD1963_DATA_MODE);
         cmd_mode = false;
     }
 }
@@ -369,7 +369,7 @@ static inline void ssd1963_data_mode(void)
 static inline void ssd1963_cmd(uint8_t cmd)
 {    
     ssd1963_cmd_mode();
-    LV_DRV_DISPLAY_PAR_WR_WORD(cmd);
+    LV_DRV_DISP_PAR_WR_WORD(cmd);
 }
 
 /**
@@ -379,7 +379,7 @@ static inline void ssd1963_cmd(uint8_t cmd)
 static inline void ssd1963_data(uint8_t data)
 {    
     ssd1963_data_mode();
-    LV_DRV_DISPLAY_PAR_WR_WORD(data);
+    LV_DRV_DISP_PAR_WR_WORD(data);
 }
 
 #endif

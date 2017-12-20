@@ -13,7 +13,7 @@
 #include <stddef.h>
 #include <string.h>
 #include "lvgl/lv_core/lv_vdb.h"
-#include LV_DRV_DISPLAY_INCLUDE
+#include LV_DRV_DISP_INCLUDE
 #include LV_DRV_DELAY_INCLUDE
 
 /*********************
@@ -96,14 +96,14 @@ static uint8_t pagemap[] = { 7, 6, 5, 4, 3, 2, 1, 0 };
  */
 void st7565_init(void)
 {
-    LV_DRV_DISPLAY_RST(1);
+    LV_DRV_DISP_RST(1);
     LV_DRV_DELAY_MS(10);
-    LV_DRV_DISPLAY_RST(0);
+    LV_DRV_DISP_RST(0);
     LV_DRV_DELAY_MS(10);
-    LV_DRV_DISPLAY_RST(1);
+    LV_DRV_DISP_RST(1);
     LV_DRV_DELAY_MS(10);
     
-    LV_DRV_DISPLAY_SPI_CS(0);
+    LV_DRV_DISP_SPI_CS(0);
     
     st7565_command(CMD_SET_BIAS_7);
     st7565_command(CMD_SET_ADC_NORMAL);
@@ -127,7 +127,7 @@ void st7565_init(void)
     st7565_command(CMD_SET_VOLUME_FIRST);
     st7565_command(CMD_SET_VOLUME_SECOND | (0x18 & 0x3f));
 
-    LV_DRV_DISPLAY_SPI_CS(1);
+    LV_DRV_DISP_SPI_CS(1);
     
     memset(lcd_fb, 0x00, sizeof(lcd_fb));
 }
@@ -249,7 +249,7 @@ void st7565_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t * col
 static void st7565_sync(int32_t x1, int32_t y1, int32_t x2, int32_t y2)
 {
 
-    LV_DRV_DISPLAY_SPI_CS(0);
+    LV_DRV_DISP_SPI_CS(0);
     
     uint8_t c, p;
     for(p = y1 / 8; p <= y2 / 8; p++) {
@@ -263,7 +263,7 @@ static void st7565_sync(int32_t x1, int32_t y1, int32_t x2, int32_t y2)
         }
     }
 
-    LV_DRV_DISPLAY_SPI_CS(1);
+    LV_DRV_DISP_SPI_CS(1);
 }
 
 /**
@@ -272,8 +272,8 @@ static void st7565_sync(int32_t x1, int32_t y1, int32_t x2, int32_t y2)
  */
 static void st7565_command(uint8_t cmd) 
 {
-    LV_DRV_DISPLAY_CMD_DATA(ST7565_CMD_MODE);
-    LV_DRV_DISPLAY_SPI_WR_BYTE(data);
+    LV_DRV_DISP_CMD_DATA(ST7565_CMD_MODE);
+    LV_DRV_DISP_SPI_WR_BYTE(data);
 }
   
 /**
@@ -282,8 +282,8 @@ static void st7565_command(uint8_t cmd)
  */
 static void st7565_data(uint8_t data) 
 {
-    LV_DRV_DISPLAY_CMD_DATA(ST7565_DATA_MODE);
-    LV_DRV_DISPLAY_SPI_WR_BYTE(data);
+    LV_DRV_DISP_CMD_DATA(ST7565_DATA_MODE);
+    LV_DRV_DISP_SPI_WR_BYTE(data);
 }
 
 #endif
