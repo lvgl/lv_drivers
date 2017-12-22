@@ -8,6 +8,8 @@
 #ifndef LV_DRV_CONF_H
 #define LV_DRV_CONF_H
 
+#include "lv_conf.h"
+
 /*********************
  * DELAY INTERFACE
  *********************/
@@ -78,8 +80,8 @@
  *-------------------*/
 #define USE_MONITOR         0
 #if USE_MONITOR
-#define MONITOR_HOR_RES     800
-#define MONITOR_VER_RES     480
+#define MONITOR_HOR_RES     LV_HOR_RES
+#define MONITOR_VER_RES     LV_HOR_VER
 #endif
 
 /*----------------
@@ -87,8 +89,8 @@
  *--------------*/
 #define USE_SSD1963         0
 #if USE_SSD1963
-#define SSD1963_HOR_RES     480
-#define SSD1963_VER_RES     320
+#define SSD1963_HOR_RES     LV_HOR_RES
+#define SSD1963_VER_RES     LV_VER_RES
 #define SSD1963_HDP         479
 #define SSD1963_HT          531
 #define SSD1963_HPS         43
@@ -110,8 +112,8 @@
  *--------------*/
 #define USE_R61581          0
 #if USE_R61581 != 0
-#define R61581_HOR_RES      480
-#define R61581_VER_RES      320
+#define R61581_HOR_RES      LV_HOR_RES
+#define R61581_VER_RES      LV_VER_RES
 #define R61581_HDP          479
 #define R61581_HT           531
 #define R61581_HPS          43
