@@ -9,7 +9,7 @@
 /*********************
  *      INCLUDES
  *********************/
-#include "lv_drv_conf.h"
+#include "../../lv_drv_conf.h"
 #if USE_R61581
 
 #include <stdint.h>
