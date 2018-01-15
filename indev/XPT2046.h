@@ -9,7 +9,7 @@
 /*********************
  *      INCLUDES
  *********************/
-#include "lv_drv_conf.h"
+#include "../../lv_drv_conf.h"
 #if USE_XPT2046 != 0
 
 #include <stdint.h>
