@@ -283,9 +283,10 @@ static void r61581_set_tft_spec(void)
     r61581_data(0xFF);
     r61581_data(0x18);
 
+    /*Panel Driving Setting*/
     r61581_cmd(0xC0);
     r61581_data(0x02);
-    r61581_data(0x3B);//
+    r61581_data(0x3B);
     r61581_data(0x00);
     r61581_data(0x00);
     r61581_data(0x00);
@@ -293,21 +294,28 @@ static void r61581_set_tft_spec(void)
     r61581_data(0x00);//NW
     r61581_data(0x43);
 
+    /*Display Timing Setting for Normal Mode */
     r61581_cmd(0xC1);
     r61581_data(0x08);
-    r61581_data(0x15);//CLOCK
-    r61581_data(0x08);
-    r61581_data(0x08);
+    r61581_data(0x15);  //CLOCK
+    r61581_data(R61581_VFP);
+    r61581_data(R61581_VBP);
 
+    /*Source/VCOM/Gate Driving Timing Setting*/
     r61581_cmd(0xC4);
     r61581_data(0x15);
     r61581_data(0x03);
     r61581_data(0x03);
     r61581_data(0x01); 
 
+    /*Interface Setting*/
     r61581_cmd(0xC6);
-    r61581_data(0x02); 
+    r61581_data((R61581_DPL << 0) |
+                (R61581_EPL << 1) |
+                (R61581_HSPL << 4) |
+                (R61581_VSPL << 5));  
 
+    /*Gamma Set*/
     r61581_cmd(0xC8);
     r61581_data(0x0c);
     r61581_data(0x05);
@@ -355,14 +363,14 @@ static void r61581_set_tft_spec(void)
     r61581_cmd(0x2A);
     r61581_data(0x00);
     r61581_data(0x00);
-    r61581_data(0x01);
-    r61581_data(0xDF);//480
+    r61581_data(((R61581_HOR_RES - 1) >> 8 ) & 0XFF);
+    r61581_data((R61581_HOR_RES - 1) & 0XFF);
 
     r61581_cmd(0x2B);
     r61581_data(0x00);
     r61581_data(0x00);
-    r61581_data(0x01);
-    r61581_data(0x3F);//320
+    r61581_data(((R61581_VER_RES - 1) >> 8 ) & 0XFF);
+    r61581_data((R61581_VER_RES- 1) & 0XFF);
 
     LV_DRV_DELAY_MS(10);
 
