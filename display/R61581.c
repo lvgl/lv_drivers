@@ -72,7 +72,7 @@ void r61581_init(void)
     LV_DRV_DISP_PAR_FAST;
 }
 
-void r61581_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t * color_p)
+void r61581_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
 {
      /*Return if the area is out the screen*/
     if(x2 < 0) return;
@@ -165,7 +165,7 @@ void r61581_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t colo
     }
 }
 
-void r61581_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t * color_p)
+void r61581_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
 {
      /*Return if the area is out the screen*/
     if(x2 < 0) return;
