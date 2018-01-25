@@ -20,26 +20,6 @@
 /*********************
  *      DEFINES
  *********************/
-#ifndef SSD1306_I2C_SUPPORT
-#define SSD1306_I2C_SUPPORT 1
-#endif
-
-#ifndef SSD1306_SPI4_SUPPORT
-#define SSD1306_SPI4_SUPPORT 1
-#endif
-
-#ifndef SSD1306_SPI3_SUPPORT
-#define SSD1306_SPI3_SUPPORT 1
-#endif
-
-#ifndef SSD1306_MANUAL_DC
-#define SSD1306_MANUAL_DC 1
-#endif
-
-#ifndef SSD1306_MANUAL_CS
-#define SSD1306_MANUAL_CS 1
-#endif
-
 #define SSD1306_I2C_ADDR_0    (0x3C)
 #define SSD1306_I2C_ADDR_1    (0x3D)
 /**********************

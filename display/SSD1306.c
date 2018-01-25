@@ -17,6 +17,25 @@
 /*********************
  *      DEFINES
  *********************/
+#ifndef SSD1306_I2C_SUPPORT
+#define SSD1306_I2C_SUPPORT 1
+#endif
+
+#ifndef SSD1306_SPI4_SUPPORT
+#define SSD1306_SPI4_SUPPORT 1
+#endif
+
+#ifndef SSD1306_SPI3_SUPPORT
+#define SSD1306_SPI3_SUPPORT 1
+#endif
+
+#ifndef SSD1306_MANUAL_DC
+#define SSD1306_MANUAL_DC 1
+#endif
+
+#ifndef SSD1306_MANUAL_CS
+#define SSD1306_MANUAL_CS 1
+#endif
 
 /* SSD1306 commands */
 #define SSD1306_SET_MEM_ADDR_MODE    (0x20)
@@ -467,7 +486,8 @@ int ssd1306_load_frame_buffer(const ssd1306_t *dev, uint8_t buf[])
             }
             else
             {
-                lv_spi_repeat(dev->spi_dev, NULL, len, 1);
+                uint8_t zero = 0;
+                lv_spi_repeat(dev->spi_dev, &zero, len, 1);
             }
         }
         else
@@ -488,7 +508,8 @@ int ssd1306_load_frame_buffer(const ssd1306_t *dev, uint8_t buf[])
                 }
                 else
                 {
-                    lv_spi_repeat(dev->spi_dev, NULL, dev->width, 1);
+                    uint8_t zero = 0;
+                    lv_spi_repeat(dev->spi_dev, &zero, dev->width, 1);
                 }
             }
         }
@@ -514,9 +535,10 @@ int ssd1306_load_frame_buffer(const ssd1306_t *dev, uint8_t buf[])
             }
             else
             {
+                uint8_t zero = 0;
                 for (i = 0; i < len; i++)
                 {
-                    lv_spi_transaction(dev->spi_dev, NULL, NULL, 1, 1);
+                    lv_spi_transaction(dev->spi_dev, NULL, &zero, 1, 1);
                 }
             }
         }
@@ -538,9 +560,10 @@ int ssd1306_load_frame_buffer(const ssd1306_t *dev, uint8_t buf[])
                 }
                 else
                 {
+                    uint8_t zero = 0;
                     for (j = 0; j < dev->width; j++)
                     {
-                        lv_spi_transaction(dev->spi_dev, NULL, NULL, 1, 1);
+                        lv_spi_transaction(dev->spi_dev, NULL, &zero, 1, 1);
                     }
                 }
             }
@@ -731,6 +754,10 @@ int ssd1306_set_whole_display_lighting(const ssd1306_t *dev, bool light)
 
 int ssd1306_stop_scroll(const ssd1306_t *dev)
 {
+    if (dev->screen == SH1106_SCREEN)
+    {
+        return -ENOTSUP;
+    }
     return ssd1306_command(dev, SSD1306_SCROLL_DISABLE);
 }
 
@@ -738,6 +765,10 @@ int ssd1306_start_scroll_hori(const ssd1306_t *dev, bool way, uint8_t start, uin
 {
     int err;
 
+    if (dev->screen == SH1106_SCREEN)
+    {
+        return -ENOTSUP;
+    }
     if (way)
     {
         if ((err = ssd1306_command(dev, SSD1306_SCROLL_HOR_LEFT)))
@@ -749,8 +780,10 @@ int ssd1306_start_scroll_hori(const ssd1306_t *dev, bool way, uint8_t start, uin
             return err;
     }
     if (!ssd1306_command(dev, 0x00) && /* dummy */
-    !ssd1306_command(dev, (start & 0x07)) && !ssd1306_command(dev, frame) && !ssd1306_command(dev, (stop & 0x07))
-        && !ssd1306_command(dev, 0x00) && /* dummy */
+        !ssd1306_command(dev, (start & 0x07)) &&
+        !ssd1306_command(dev, frame) &&
+        !ssd1306_command(dev, (stop & 0x07)) &&
+        !ssd1306_command(dev, 0x00) && /* dummy */
         !ssd1306_command(dev, 0xFF) && /* dummy */
         !ssd1306_command(dev, SSD1306_SCROLL_ENABLE))
     {
@@ -762,6 +795,10 @@ int ssd1306_start_scroll_hori(const ssd1306_t *dev, bool way, uint8_t start, uin
 int ssd1306_start_scroll_hori_vert(const ssd1306_t *dev, bool way, uint8_t start, uint8_t stop, uint8_t dy,
     ssd1306_scroll_t frame)
 {
+    if (dev->screen == SH1106_SCREEN)
+    {
+        return -ENOTSUP;
+    }
     /* this function dont work well if no vertical setting. */
     if ((!dy) || (dy > 63))
         return -EINVAL;
@@ -786,8 +823,11 @@ int ssd1306_start_scroll_hori_vert(const ssd1306_t *dev, bool way, uint8_t start
             return err;
     }
     if (!ssd1306_command(dev, 0x00) && /* dummy */
-    !ssd1306_command(dev, (start & 0x07)) && !ssd1306_command(dev, frame) && !ssd1306_command(dev, (stop & 0x07))
-        && !ssd1306_command(dev, dy) && !ssd1306_command(dev, SSD1306_SCROLL_ENABLE))
+        !ssd1306_command(dev, (start & 0x07)) &&
+        !ssd1306_command(dev, frame) &&
+        !ssd1306_command(dev, (stop & 0x07)) &&
+        !ssd1306_command(dev, dy) &&
+        !ssd1306_command(dev, SSD1306_SCROLL_ENABLE))
     {
         return 0;
     }
