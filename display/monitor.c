@@ -94,7 +94,7 @@ void monitor_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
     int32_t x;
     for(y = y1; y <= y2; y++) {
         for(x = x1; x <= x2; x++) {
-            tft_fb[y * MONITOR_HOR_RES + x] = lv_color_to24(*color_p) | 0xFF000000;
+            tft_fb[y * MONITOR_HOR_RES + x] = lv_color_to24(*color_p);
             color_p++;
         }
 
@@ -143,7 +143,7 @@ void monitor_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t col
 
 	for(x = act_x1; x <= act_x2; x++) {
 		for(y = act_y1; y <= act_y2; y++) {
-			tft_fb[y * MONITOR_HOR_RES + x] = color24 | 0xFF000000;
+			tft_fb[y * MONITOR_HOR_RES + x] = color24;
 		}
 	}
 
@@ -177,7 +177,7 @@ void monitor_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
 
 	for(y = act_y1; y <= act_y2; y++) {
 		for(x = act_x1; x <= act_x2; x++) {
-			tft_fb[y * MONITOR_HOR_RES + x] = lv_color_to24(*color_p) | 0xFF000000;
+			tft_fb[y * MONITOR_HOR_RES + x] = lv_color_to24(*color_p);
 			color_p++;
 		}
 
