@@ -11,66 +11,213 @@
 #include "lv_conf.h"
 
 /*********************
- * DELAY INTERFACE
+ *      INCLUDES
  *********************/
-#define LV_DRV_DELAY_INCLUDE  <stdint.h>            /*Dummy include by default*/
-#define LV_DRV_DELAY_US(us)  /*delay_us(us)*/       /*Delay the given number of microseconds*/
-#define LV_DRV_DELAY_MS(ms)  /*delay_ms(ms)*/       /*Delay the given number of milliseconds*/
 
 /*********************
- * DISPLAY INTERFACE
+ *       OPTION
  *********************/
+#define LV_DRIVER_ENABLE_COMMON 1
+#define LV_DRIVER_ENABLE_DELAY 1
+#define LV_DRIVER_ENABLE_I2C 1
+#define LV_DRIVER_ENABLE_SPI 1
+#define LV_DRIVER_ENABLE_PAR 1
 
+/*********************
+ * 	HAL INTERFACE
+ *********************/
+/*
+ * All used peripherals must be initialized in user application, library only
+ * manipulate them.
+ * You can use a device descriptor from your SDK or  do your own in this file too.
+ * example:
+ * typedef struct lv_spi_dev_t { .... };
+ */
+
+/*------------
+ *  Delay
+ *------------*/
+#if LV_DRIVER_ENABLE_DELAY
+
+/**
+ * Delay the given number of microseconds
+ * @param us Time to wait in us
+ */
+extern inline void lv_delay_us(uint32_t us);
+
+/**
+ * Delay the given number of milliseconds
+ * @param ms Time to wait in ms
+ */
+extern inline void lv_delay_ms(uint32_t ms);
+
+#endif
 /*------------
  *  Common
  *------------*/
-#define LV_DRV_DISP_INCLUDE         <stdint.h>           /*Dummy include by default*/
-#define LV_DRV_DISP_CMD_DATA(val)  /*pin_x_set(val)*/    /*Set the command/data pin to 'val'*/
-#define LV_DRV_DISP_RST(val)       /*pin_x_set(val)*/    /*Set the reset pin to 'val'*/
+#if LV_DRIVER_ENABLE_COMMON
 
-/*---------
- *  SPI
- *---------*/
-#define LV_DRV_DISP_SPI_CS(val)          /*spi_cs_set(val)*/     /*Set the SPI's Chip select to 'val'*/
-#define LV_DRV_DISP_SPI_WR_BYTE(data)    /*spi_wr(data)*/        /*Write a byte the SPI bus*/
-#define LV_DRV_DISP_SPI_WR_ARRAY(adr, n) /*spi_wr_mem(adr, n)*/  /*Write 'n' bytes to SPI bus from 'adr'*/
+/**
+ * Change a pin level
+ * @param pin gpio Number
+ * @param val Level to set
+ */
+extern inline void lv_gpio_write(uint16_t pin, uint8_t val);
 
-/*------------------
- *  Parallel port
- *-----------------*/
-#define LV_DRV_DISP_PAR_CS(val)          /*par_cs_set(val)*/   /*Set the Parallel port's Chip select to 'val'*/
-#define LV_DRV_DISP_PAR_SLOW             /*par_slow()*/        /*Set low speed on the parallel port*/
-#define LV_DRV_DISP_PAR_FAST             /*par_fast()*/        /*Set high speed on the parallel port*/
-#define LV_DRV_DISP_PAR_WR_WORD(data)    /*par_wr(data)*/      /*Write a word to the parallel port*/
-#define LV_DRV_DISP_PAR_WR_ARRAY(adr, n) /*par_wr_mem(adr,n)*/ /*Write 'n' bytes to Parallel ports from 'adr'*/
+/**
+ * Read current level gpio
+ * @param pin gpio to read
+ * @return gpio value
+ */
+extern inline uint8_t lv_gpio_read(uint16_t pin);
 
-/***************************
- * INPUT DEVICE INTERFACE
- ***************************/
-
-/*----------
- *  Common
- *----------*/
-#define LV_DRV_INDEV_INCLUDE     <stdint.h>             /*Dummy include by default*/
-#define LV_DRV_INDEV_RST(val)    /*pin_x_set(val)*/     /*Set the reset pin to 'val'*/
-#define LV_DRV_INDEV_IRQ_READ    0 /*pn_x_read()*/      /*Read the IRQ pin*/
-
-/*---------
- *  SPI
- *---------*/
-#define LV_DRV_INDEV_SPI_CS(val)            /*spi_cs_set(val)*/     /*Set the SPI's Chip select to 'val'*/
-#define LV_DRV_INDEV_SPI_XCHG_BYTE(data)    0 /*spi_xchg(val)*/     /*Write 'val' to SPI and give the read value*/
-
+#endif
 /*---------
  *  I2C
  *---------*/
-#define LV_DRV_INDEV_I2C_START              /*i2c_start()*/       /*Make an I2C start*/
-#define LV_DRV_INDEV_I2C_STOP               /*i2c_stop()*/        /*Make an I2C stop*/
-#define LV_DRV_INDEV_I2C_RESTART            /*i2c_restart()*/     /*Make an I2C restart*/
-#define LV_DRV_INDEV_I2C_WR(data)           /*i2c_wr(data)*/      /*Write a byte to the I1C bus*/
-#define LV_DRV_INDEV_I2C_READ(last_read)    0 /*i2c_rd()*/        /*Read a byte from the I2C bud*/
+#if LV_DRIVER_ENABLE_I2C
+
+/**
+ * Do a I2C write transmission on 8 bits register device.
+ * @param i2c_dev Pointer to i2c device
+ * @param reg Pointer to register address to send if non-null
+ * @param data_out Pointer to data buffer to send if non-null
+ * @param datalen Number of data byte to send
+ * @return Non-Zero if error occured
+ */
+extern inline int lv_i2c_write(void* i2c_dev, const uint8_t* reg, const void* data_out, uint16_t datalen);
+
+/**
+ * Do a I2C read transmission on 8 bits register device.
+ * @param i2c_dev Pointer to i2c device
+ * @param reg Pointer to register address to send if non-null
+ * @param data_out Pointer to data buffer to send if non-null
+ * @param datalen Number of data byte to send
+ * @return Non-Zero if error occured
+ */
+extern inline int lv_i2c_read(void* i2c_dev, const uint8_t* reg, void* data_in, uint16_t datalen);
+
+/**
+ * Do a I2C write transmissionon 16 bits register device
+ * @param i2c_dev Pointer to i2c device
+ * @param reg Pointer to register address to send if non-null
+ * @param data_out Pointer to data buffer to send if non-null
+ * @param datalen Number of data byte to send
+ * @return Non-Zero if error occured
+ */
+extern inline int lv_i2c_write16(void* i2c_dev, const uint16_t* reg, const void* data_out, uint16_t datalen);
+
+/**
+ * Do a I2C write transmissionon 16 bits register device.
+ * @param i2c_dev Pointer to i2c device
+ * @param reg Pointer to register address to send if non-null
+ * @param data_out Pointer to data buffer to send if non-null
+ * @param datalen Number of data byte to send
+ * @return Non-Zero if error occured
+ */
+extern inline int lv_i2c_read16(void* i2c_dev, const uint16_t* reg, void* data_in, uint16_t datalen);
+
+#endif
+/*---------
+ *  SPI
+ *---------*/
+#if LV_DRIVER_ENABLE_SPI
+
+/**
+ * Do a SPI transaction .
+ * @param spi_dev Pointer to spi device
+ * @param data_in Receive buffer. If NULL, received data will be lost.
+ * @param data_out Data to send buffer. If NULL, it will only receive data.
+ * @param len Buffer size in words
+ * @param word_size Size of the word in byte
+ * @return Non-Zero if error occured
+ */
+extern inline int lv_spi_transaction(void* spi_dev, void* data_in, const void* data_out, uint16_t len, uint8_t word_size);
+
+/**
+ * Do a SPI repeat send.
+ * @param spi_dev Pointer to spi device
+ * @param template Pointer toTemplate to send throw spi.
+ * @param repeats Copy number
+ * @param template_size Size of the template in byte
+ * @return Non-Zero if error occured
+ */
+extern inline int lv_spi_repeat(void* spi_dev, const void* template, uint32_t repeats, uint8_t template_size);
+
+/**
+ * Set command to send for spi transaction
+ * @param spi_dev Pointer to spi device
+ * @param value Value
+ * @param bits Bits number
+ * @return Non-Zero if error occured
+ */
+extern inline int lv_spi_set_command(void* spi_dev, uint32_t value, uint8_t bits);
+
+/**
+ * Set address to send for spi transaction
+ * @param spi_dev Pointer to spi device
+ * @param value Value
+ * @param bits Bits number
+ * @return Non-Zero if error occured
+ */
+extern inline int lv_spi_set_address(void* spi_dev, uint32_t value, uint8_t bits);
+
+/**
+ * Set Dummy bits to send for spi transaction
+ * @param spi_dev Pointer to spi device
+ * @param bits Bits number
+ * @return Non-Zero if error occured
+ */
+extern inline int lv_spi_set_dummy(void* spi_dev, uint8_t bits);
+
+/**
+ * Clear spi bus command
+ * @param spi_dev Pointer to spi device
+ * @return Non-Zero if error occured
+ */
+extern inline int lv_spi_clear_command(void* spi_dev);
+
+/**
+ * Clear spi bus address
+ * @param spi_dev Pointer to spi device
+ * @return Non-Zero if error occured
+ */
+extern inline int lv_spi_clear_address(void* spi_dev);
+
+/**
+ * Clear spi bus dummy bits
+ * @param spi_dev Pointer to spi device
+ * @return Non-Zero if error occured
+ */
+extern inline int lv_spi_clear_dummy(void* spi_dev);
+
+#endif
+/*------------------
+ *  Parallel port
+ *-----------------*/
+#if LV_DRIVER_ENABLE_PAR
+/**
+ * Do a Parallel port write.
+ * @param par_dev Pointer to parallel port device
+ * @param data_out Pointer to data buffer to send
+ * @param len Buffer size in words
+ * @param word_size Size of the word in byte
+ * @return Non-Zero if error occured
+ */
+extern inline int lv_par_write(void* par_dev, const void* data_out, uint16_t len, uint8_t word_size);
 
 
+/**
+ * Do a Parallel port read.
+ * @param par_dev Pointer to parallel port device
+ * @param data_in Pointer to data buffer to read
+ * @param len Buffer size in words
+ * @param word_size Size of the word in byte
+ * @return Non-Zero if error occured
+ */
+extern inline int lv_par_read(void* par_dev, void* data_in, uint16_t len, uint8_t word_size);
+
+#endif
 /*********************
  *  DISPLAY DRIVERS
  *********************/
@@ -105,6 +252,20 @@
 #define SSD1963_VS_NEG      0   /*Negative vsync*/
 #define SSD1963_ORI         0   /*0, 90, 180, 270*/
 #define SSD1963_COLOR_DEPTH 16
+#endif
+
+/*----------------
+ *    SSD1306
+ *--------------*/
+#define USE_SSD1306        1
+#if USE_SSD1306
+#define SSD1306_HOR_RES     LV_HOR_RES
+#define SSD1306_VER_RES     LV_VER_RES
+#define SSD1306_I2C_SUPPORT  1
+#define SSD1306_SPI4_SUPPORT 1
+#define SSD1306_SPI3_SUPPORT 1
+#define SSD1306_MANUAL_DC	 1
+#define SSD1306_MANUAL_CS	 1
 #endif
 
 /*----------------

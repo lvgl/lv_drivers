@@ -9,7 +9,7 @@
 /*********************
  *      INCLUDES
  *********************/
-#include "lv_drv_conf.h"
+#include "../../lv_drv_conf.h"
 
 #if USE_MONITOR != 0
 #include "lvgl/lv_misc/lv_color.h"
