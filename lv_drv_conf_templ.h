@@ -91,12 +91,10 @@
 #if USE_SSD1963
 #define SSD1963_HOR_RES     LV_HOR_RES
 #define SSD1963_VER_RES     LV_VER_RES
-#define SSD1963_HDP         479
 #define SSD1963_HT          531
 #define SSD1963_HPS         43
 #define SSD1963_LPS         8
 #define SSD1963_HPW         10
-#define SSD1963_VDP         271
 #define SSD1963_VT          288
 #define SSD1963_VPS         12
 #define SSD1963_FPS         4
