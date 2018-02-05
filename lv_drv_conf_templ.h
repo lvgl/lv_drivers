@@ -129,6 +129,16 @@
 #endif
 
 /*------------------------------
+ *  ILI9340 - parallel interface
+ *-----------------------------*/
+#define USE_ILI9340         0
+#if USE_ILI9340 != 0
+#define ILI9340_HOR_RES     LV_HOR_RES
+#define ILI9340_VER_RES     LV_VER_RES
+#define ILI9340_INTERFACE   0   /*TODO change between parallel and SPI mode*/
+#endif  /*USE_ILI9340*/
+
+/*------------------------------
  *  ST7565 (Monochrome, low res.)
  *-----------------------------*/
 #define USE_ST7565          0
