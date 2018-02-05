@@ -181,6 +181,14 @@
 #define FT5406EE8_I2C_ADR   0x38                  /*7 bit address*/
 #endif
 
+/*---------------
+ *  AD TOUCH
+ *--------------*/
+#define USE_AD_TOUCH   0
+#if USE_AD_TOUCH != 0
+/*No settings*/
+#endif
+
 /*-------------------------------
  *    Mouse or touchpad on PC
  *------------------------------*/
