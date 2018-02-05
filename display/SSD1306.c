@@ -1,6 +1,10 @@
 /**
  * @file SSD1963.c
- * 
+ * @date   2016-2018
+ * @author zaltora  (https://github.com/Zaltora)
+ * @author urx (https://github.com/urx)
+ * @author Ruslan V. Uss (https://github.com/UncleRus)
+ * @copyright MIT License.
  */
 
 /*********************
@@ -8,8 +12,6 @@
  *********************/
 #include "SSD1306.h"
 #if USE_SSD1306 != 0
-
-#include <esp/spi.h>
 
 #include <stdbool.h>
 #include "lvgl/lv_core/lv_vdb.h"

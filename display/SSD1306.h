@@ -1,6 +1,10 @@
 /**
  * @file SSD1306.h
- * 
+ * @date   2016-2018
+ * @author zaltora  (https://github.com/Zaltora)
+ * @author urx (https://github.com/urx)
+ * @author Ruslan V. Uss (https://github.com/UncleRus)
+ * @copyright MIT License.
  */
 
 #ifndef SSD1306_H
@@ -65,10 +69,10 @@ typedef struct
     union
     {
 #if (SSD1306_I2C_SUPPORT)
-        void* i2c_dev;         	//!< I2C device descriptor, used by SSD1306_PROTO_I2C
+        lv_i2c_handle_t i2c_dev;         	//!< I2C device descriptor, used by SSD1306_PROTO_I2C
 #endif
 #if (SSD1306_SPI4_SUPPORT) || (SSD1306_SPI3_SUPPORT)
-        void* spi_dev;
+        lv_spi_handle_t spi_dev;
 #endif
     };
 #if (SSD1306_MANUAL_CS)
