@@ -53,12 +53,7 @@ void keyboard_init(void)
 bool keyboard_read(lv_indev_data_t * data)
 {
     data->state = state;
-
-    if(state == LV_INDEV_STATE_REL) {
-        data->key = 0;
-    } else {
-        data->key = keycode_to_ascii(last_key);
-    }
+    data->key = keycode_to_ascii(last_key);
 
     return false;
 }
