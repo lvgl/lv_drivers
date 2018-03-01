@@ -31,14 +31,6 @@
 #define SSD1306_SPI3_SUPPORT 1
 #endif
 
-#ifndef SSD1306_MANUAL_DC
-#define SSD1306_MANUAL_DC 1
-#endif
-
-#ifndef SSD1306_MANUAL_CS
-#define SSD1306_MANUAL_CS 1
-#endif
-
 /* SSD1306 commands */
 #define SSD1306_SET_MEM_ADDR_MODE    (0x20)
 
@@ -313,29 +305,19 @@ int ssd1306_command(const ssd1306_t *dev, uint8_t cmd)
 #endif
 #if (SSD1306_SPI4_SUPPORT)
     case SSD1306_PROTO_SPI4:
-#if (SSD1306_MANUAL_DC)
-        lv_gpio_write(dev->dc_pin, false); /* command mode */
-#endif
-#if (SSD1306_MANUAL_CS)
-        lv_gpio_write(dev->cs_pin, false);
-#endif
+        lv_spi_wr_dc(dev->spi_dev, false); /* command mode */
+        lv_spi_wr_cs(dev->spi_dev, false);
         err = lv_spi_transaction(dev->spi_dev, NULL, &cmd, 1, 1);
-#if (SSD1306_MANUAL_CS)
-        lv_gpio_write(dev->cs_pin, true);
-#endif
+        lv_spi_wr_cs(dev->spi_dev, true);
         break;
 #endif
 #if (SSD1306_SPI3_SUPPORT)
     case SSD1306_PROTO_SPI3:
-        lv_spi_set_command(dev->spi_dev, 0, 1);
-#if (SSD1306_MANUAL_CS)
-        lv_gpio_write(dev->cs_pin, false);
-#endif
+        lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, 0, 1);
+        lv_spi_wr_cs(dev->spi_dev, false);
         err = lv_spi_transaction(dev->spi_dev, NULL, &cmd, 1, 1);
-#if (SSD1306_MANUAL_CS)
-        lv_gpio_write(dev->cs_pin, true);
-#endif
-        lv_spi_clear_command(dev->spi_dev);
+        lv_spi_wr_cs(dev->spi_dev, true);
+        lv_spi_clr_preemble(dev->spi_dev, LV_SPI_COMMAND);
         break;
 #endif
     default:
@@ -474,14 +456,10 @@ int ssd1306_load_frame_buffer(const ssd1306_t *dev, uint8_t buf[])
 #endif
 #if (SSD1306_SPI4_SUPPORT)
     case SSD1306_PROTO_SPI4:
-#if (SSD1306_MANUAL_CS)
-        lv_gpio_write(dev->cs_pin, false);
-#endif
+        lv_spi_wr_cs(dev->spi_dev, false);
         if (dev->screen == SSD1306_SCREEN)
         {
-#if (SSD1306_MANUAL_DC)
-            lv_gpio_write(dev->dc_pin, true); /* data mode */
-#endif
+            lv_spi_wr_dc(dev->spi_dev, true); /* data mode */
             if (buf)
             {
                 lv_spi_transaction(dev->spi_dev, NULL, buf, len, 1);
@@ -497,13 +475,9 @@ int ssd1306_load_frame_buffer(const ssd1306_t *dev, uint8_t buf[])
             for (i = 0; i < (dev->height / 8); i++)
             {
                 sh1106_go_coordinate(dev, 0, i);
-#if (SSD1306_MANUAL_DC)
                 /* data mode */
-                lv_gpio_write(dev->dc_pin, true);
-#endif
-#if (SSD1306_MANUAL_CS)
-                lv_gpio_write(dev->cs_pin, false); /* sh1106 coordinate will set CS to 1 */
-#endif
+                lv_spi_wr_dc(dev->spi_dev, true);
+                lv_spi_wr_cs(dev->spi_dev, false); /* sh1106 coordinate will set CS to 1 */
                 if (buf)
                 {
                     lv_spi_transaction(dev->spi_dev, NULL, &buf[dev->width * i], dev->width, 1);
@@ -515,19 +489,15 @@ int ssd1306_load_frame_buffer(const ssd1306_t *dev, uint8_t buf[])
                 }
             }
         }
-#if (SSD1306_MANUAL_CS)
-        lv_gpio_write(dev->cs_pin, true);
-#endif
+        lv_spi_wr_cs(dev->spi_dev, true);
         break;
 #endif
 #if (SSD1306_SPI3_SUPPORT)
     case SSD1306_PROTO_SPI3:
-#if (SSD1306_MANUAL_CS)
-        lv_gpio_write(dev->cs_pin, false);
-#endif
+        lv_spi_wr_cs(dev->spi_dev, false);
         if (dev->screen == SSD1306_SCREEN)
         {
-            lv_spi_set_command(dev->spi_dev, 1, 1);
+            lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, 1, 1);
             if (buf)
             {
                 for (i = 0; i < len; i++)
@@ -549,10 +519,8 @@ int ssd1306_load_frame_buffer(const ssd1306_t *dev, uint8_t buf[])
             for (i = 0; i < (dev->height / 8); i++)
             {
                 sh1106_go_coordinate(dev, 0, i);
-                lv_spi_set_command(dev->spi_dev, 1, 1); /* data mode */
-#if (SSD1306_MANUAL_CS)
-                lv_gpio_write(dev->cs_pin, false); /* sh1106 coordinate will set CS to 1 */
-#endif
+                lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, 1, 1); /* data mode */
+                lv_spi_wr_cs(dev->spi_dev, false); /* sh1106 coordinate will set CS to 1 */
                 if (buf)
                 {
                     for (j = 0; j < dev->width; j++)
@@ -570,10 +538,8 @@ int ssd1306_load_frame_buffer(const ssd1306_t *dev, uint8_t buf[])
                 }
             }
         }
-        lv_spi_clear_command(dev->spi_dev);
-#if (SSD1306_MANUAL_CS)
-        lv_gpio_write(dev->cs_pin, true);
-#endif
+        lv_spi_clr_preemble(dev->spi_dev, LV_SPI_COMMAND);
+        lv_spi_wr_cs(dev->spi_dev, true);
         break;
 #endif
     default:

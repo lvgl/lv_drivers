@@ -25,6 +25,9 @@
 #define LV_DRIVER_ENABLE_SPI 1
 #define LV_DRIVER_ENABLE_PAR 1
 
+/* use this macro if you want ignore a gpio write/read. e.g: spi.cs = LV_DRIVER_NOPIN */
+#define LV_DRIVER_NOPIN (0xFFFF)
+
 /**********************
  *      TYPEDEFS
  **********************/
@@ -32,10 +35,10 @@
  * e.g: typedef const uint8_t lv_gpio_handle_t if you need just a bus id
  * You can use device descriptor from your sdk too.
  */
-typedef const void* lv_gpio_handle_t
-typedef const void* lv_i2c_handle_t
-typedef const void* lv_spi_handle_t
-typedef const void* lv_par_handle_t
+typedef const void* lv_gpio_handle_t;
+typedef const void* lv_i2c_handle_t;
+typedef const void* lv_spi_handle_t;
+typedef const void* lv_par_handle_t;
 
 /*********************
  * 	HAL INTERFACE
@@ -57,13 +60,19 @@ typedef const void* lv_par_handle_t
  * Delay the given number of microseconds
  * @param us Time to wait in us
  */
-extern inline void lv_delay_us(const uint32_t us);
+static inline void lv_delay_us(const uint32_t us)
+{
+    //Do the dependant port here
+}
 
 /**
  * Delay the given number of milliseconds
  * @param ms Time to wait in ms
  */
-extern inline void lv_delay_ms(const uint32_t ms);
+static inline void lv_delay_ms(const uint32_t ms)
+{
+    //Do the dependant port here
+}
 
 #endif
 /*------------
@@ -76,14 +85,20 @@ extern inline void lv_delay_ms(const uint32_t ms);
  * @param pin gpio Number
  * @param val Level to set
  */
-extern inline void lv_gpio_write(lv_gpio_handle_t gpio, const uint8_t val);
+static inline void lv_gpio_write(lv_gpio_handle_t gpio, const uint8_t val)
+{
+    //Do the dependant port here
+}
 
 /**
  * Read current level gpio
  * @param pin gpio to read
  * @return gpio value
  */
-extern inline uint8_t lv_gpio_read(lv_gpio_handle_t gpio);
+static inline uint8_t lv_gpio_read(lv_gpio_handle_t gpio)
+{
+    //Do the dependant port here
+}
 
 #endif
 /*---------
@@ -99,7 +114,10 @@ extern inline uint8_t lv_gpio_read(lv_gpio_handle_t gpio);
  * @param datalen Number of data byte to send
  * @return Non-Zero if error occured
  */
-extern inline int lv_i2c_write(lv_i2c_handle_t i2c_dev, const uint8_t* reg, const void* data_out, uint16_t datalen);
+static inline int lv_i2c_write(lv_i2c_handle_t i2c_dev, const uint8_t* reg, const void* data_out, uint16_t datalen)
+{
+    //Do the dependant port here
+}
 
 /**
  * Do a I2C read transmission on 8 bits register device.
@@ -109,7 +127,10 @@ extern inline int lv_i2c_write(lv_i2c_handle_t i2c_dev, const uint8_t* reg, cons
  * @param datalen Number of data byte to send
  * @return Non-Zero if error occured
  */
-extern inline int lv_i2c_read(lv_i2c_handle_t i2c_dev, const uint8_t* reg, void* data_in, uint16_t datalen);
+static inline int lv_i2c_read(lv_i2c_handle_t i2c_dev, const uint8_t* reg, void* data_in, uint16_t datalen)
+{
+    //Do the dependant port here
+}
 
 /**
  * Do a I2C write transmissionon 16 bits register device
@@ -119,7 +140,10 @@ extern inline int lv_i2c_read(lv_i2c_handle_t i2c_dev, const uint8_t* reg, void*
  * @param datalen Number of data byte to send
  * @return Non-Zero if error occured
  */
-extern inline int lv_i2c_write16(lv_i2c_handle_t i2c_dev, const uint16_t* reg, const void* data_out, uint16_t datalen);
+static inline int lv_i2c_write16(lv_i2c_handle_t i2c_dev, const uint16_t* reg, const void* data_out, uint16_t datalen)
+{
+    //Do the dependant port here
+}
 
 /**
  * Do a I2C write transmissionon 16 bits register device.
@@ -129,13 +153,42 @@ extern inline int lv_i2c_write16(lv_i2c_handle_t i2c_dev, const uint16_t* reg, c
  * @param datalen Number of data byte to send
  * @return Non-Zero if error occured
  */
-extern inline int lv_i2c_read16(lv_i2c_handle_t i2c_dev, const uint16_t* reg, void* data_in, uint16_t datalen);
+static inline int lv_i2c_read16(lv_i2c_handle_t i2c_dev, const uint16_t* reg, void* data_in, uint16_t datalen)
+{
+    //Do the dependant port here
+}
 
 #endif
 /*---------
  *  SPI
  *---------*/
 #if LV_DRIVER_ENABLE_SPI
+
+typedef enum {
+  LV_SPI_COMMAND,
+  LV_SPI_ADDRESS,
+  LV_SPI_DUMMY,
+} lv_spi_reg_t;
+
+/**
+ * Control SPI cs pin.
+ * @param spi_dev Pointer to spi device
+ * @param lvl Gpio Level
+ */
+static inline void lv_spi_wr_cs(lv_spi_handle_t spi_dev, uint8_t lvl)
+{
+    //Do the dependant port here
+}
+
+/**
+ * Control SPI dc pin.
+ * @param spi_dev Pointer to spi device
+ * @param lvl Gpio Level
+ */
+static inline void lv_spi_wr_dc(lv_spi_handle_t spi_dev, uint8_t lvl)
+{
+    //Do the dependant port here
+}
 
 /**
  * Do a SPI transaction .
@@ -146,7 +199,10 @@ extern inline int lv_i2c_read16(lv_i2c_handle_t i2c_dev, const uint16_t* reg, vo
  * @param word_size Size of the word in byte
  * @return Non-Zero if error occured
  */
-extern inline int lv_spi_transaction(lv_spi_handle_t spi_dev, void* data_in, const void* data_out, uint16_t len, uint8_t word_size);
+static inline int lv_spi_transaction(lv_spi_handle_t spi_dev, void* data_in, const void* data_out, uint16_t len, uint8_t word_size)
+{
+    //Do the dependant port here
+}
 
 /**
  * Do a SPI repeat send.
@@ -156,60 +212,60 @@ extern inline int lv_spi_transaction(lv_spi_handle_t spi_dev, void* data_in, con
  * @param template_size Size of the template in byte
  * @return Non-Zero if error occured
  */
-extern inline int lv_spi_repeat(lv_spi_handle_t spi_dev, const void* template, uint32_t repeats, uint8_t template_size);
+static inline int lv_spi_repeat(lv_spi_handle_t spi_dev, const void* template, uint32_t repeats, uint8_t template_size)
+{
+    //Do the dependant port here
+}
 
 /**
  * Set command to send for spi transaction
  * @param spi_dev Pointer to spi device
+ * @param reg SPI register to set (dummy/command/address)
  * @param value Value
  * @param bits Bits number
  * @return Non-Zero if error occured
  */
-extern inline int lv_spi_set_command(lv_spi_handle_t spi_dev, uint32_t value, uint8_t bits);
-
-/**
- * Set address to send for spi transaction
- * @param spi_dev Pointer to spi device
- * @param value Value
- * @param bits Bits number
- * @return Non-Zero if error occured
- */
-extern inline int lv_spi_set_address(lv_spi_handle_t spi_dev, uint32_t value, uint8_t bits);
-
-/**
- * Set Dummy bits to send for spi transaction
- * @param spi_dev Pointer to spi device
- * @param bits Bits number
- * @return Non-Zero if error occured
- */
-extern inline int lv_spi_set_dummy(lv_spi_handle_t spi_dev, uint8_t bits);
+static inline int lv_drv_spi_set_preemble(lv_spi_handle_t spi_dev, lv_spi_reg_t reg, uint32_t value, uint8_t bits)
+{
+    //Do the dependant port here
+}
 
 /**
  * Clear spi bus command
  * @param spi_dev Pointer to spi device
+ * @param reg SPI register to clear (dummy/command/address)
  * @return Non-Zero if error occured
  */
-extern inline int lv_spi_clear_command(lv_spi_handle_t spi_dev);
-
-/**
- * Clear spi bus address
- * @param spi_dev Pointer to spi device
- * @return Non-Zero if error occured
- */
-extern inline int lv_spi_clear_address(lv_spi_handle_t spi_dev);
-
-/**
- * Clear spi bus dummy bits
- * @param spi_dev Pointer to spi device
- * @return Non-Zero if error occured
- */
-extern inline int lv_spi_clear_dummy(lv_spi_handle_t spi_dev);
+static inline int lv_spi_clr_preemble(lv_spi_handle_t spi_dev, lv_spi_reg_t reg)
+{
+    //Do the dependant port here
+}
 
 #endif
 /*------------------
  *  Parallel port
  *-----------------*/
 #if LV_DRIVER_ENABLE_PAR
+/**
+ * Control Parallel cs pin.
+ * @param par_dev Pointer to parallel device
+ * @param lvl Gpio Level
+ */
+static inline void lv_par_wr_cs(lv_par_handle_t par_dev, uint8_t lvl)
+{
+    //Do the dependant port here
+}
+
+/**
+ * Control Parallel dc pin.
+ * @param par_dev Pointer to parallel device
+ * @param lvl Gpio Level
+ */
+static inline void lv_par_wr_dc(lv_par_handle_t par_dev, uint8_t lvl)
+{
+    //Do the dependant port here
+}
+
 /**
  * Do a Parallel port write.
  * @param par_dev Pointer to parallel port device
@@ -218,8 +274,10 @@ extern inline int lv_spi_clear_dummy(lv_spi_handle_t spi_dev);
  * @param word_size Size of the word in byte
  * @return Non-Zero if error occured
  */
-extern inline int lv_par_write(lv_par_handle_t par_dev, const void* data_out, uint16_t len, uint8_t word_size);
-
+static inline int lv_par_write(lv_par_handle_t par_dev, const void* data_out, uint16_t len, uint8_t word_size)
+{
+    //Do the dependant port here
+}
 
 /**
  * Do a Parallel port read.
@@ -229,7 +287,10 @@ extern inline int lv_par_write(lv_par_handle_t par_dev, const void* data_out, ui
  * @param word_size Size of the word in byte
  * @return Non-Zero if error occured
  */
-extern inline int lv_par_read(lv_par_handle_t par_dev, void* data_in, uint16_t len, uint8_t word_size);
+static inline int lv_par_read(lv_par_handle_t par_dev, void* data_in, uint16_t len, uint8_t word_size)
+{
+    //Do the dependant port here
+}
 
 #endif
 /*********************
@@ -278,8 +339,6 @@ extern inline int lv_par_read(lv_par_handle_t par_dev, void* data_in, uint16_t l
 #define SSD1306_I2C_SUPPORT  1
 #define SSD1306_SPI4_SUPPORT 1
 #define SSD1306_SPI3_SUPPORT 1
-#define SSD1306_MANUAL_DC	 1
-#define SSD1306_MANUAL_CS	 1
 #endif
 
 /*----------------

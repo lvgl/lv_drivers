@@ -75,12 +75,6 @@ typedef struct
         lv_spi_handle_t spi_dev;
 #endif
     };
-#if (SSD1306_MANUAL_CS)
-		uint8_t cs_pin;
-#endif
-#if (SSD1306_SPI4_SUPPORT) && (SSD1306_MANUAL_DC)
-    uint8_t dc_pin;               //!< Data/Command GPIO pin, used by SSD1306_PROTO_SPI4
-#endif
     uint8_t width;                //!< Screen width, currently supported 128px, 96px
     uint8_t height;               //!< Screen height, currently supported 16px, 32px, 64px
     uint8_t* buffer;
