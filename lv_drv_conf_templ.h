@@ -187,19 +187,27 @@
 /*No settings*/
 #endif
 
-/*-------------------------------
- *    Mouse or touchpad on PC
- *------------------------------*/
-#define USE_MOUSE           0
+
+/*---------------------------------------
+ * Mouse or touchpad on PC (using SDL)
+ *-------------------------------------*/
+#define USE_MOUSE       0
 #if USE_MOUSE
 /*No settings*/
 #endif
 
+/*-------------------------------------------------
+ * Mouse as HID device (for Linux based systems)
+ *------------------------------------------------*/
+#define USE_MOUSE_HID    0
+#if USE_MOUSE_HID
+#define MOUSE_HID_DEV   "/dev/input/event0"
+#endif
 
 /*-------------------------------
- *   Keyboard of a PC
+ *   Keyboard of a PC (using SDL)
  *------------------------------*/
-#define USE_KEYBOARD        0
+#define USE_KEYBOARD    0
 #if USE_KEYBOARD
 /*No settings*/
 #endif
