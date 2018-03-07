@@ -81,7 +81,7 @@
 #define USE_MONITOR         0
 #if USE_MONITOR
 #define MONITOR_HOR_RES     LV_HOR_RES
-#define MONITOR_VER_RES     LV_HOR_VER
+#define MONITOR_VER_RES     LV_VER_RES
 #endif
 
 /*----------------
@@ -108,7 +108,7 @@
 /*----------------
  *    R61581
  *--------------*/
-#define USE_R61581          1
+#define USE_R61581          0
 #if USE_R61581 != 0
 #define R61581_HOR_RES      LV_HOR_RES
 #define R61581_VER_RES      LV_VER_RES
@@ -125,16 +125,6 @@
 #define R61581_ORI          0       /*0, 180*/
 #define R61581_LV_COLOR_DEPTH 16    /*Fix 16 bit*/
 #endif
-
-/*------------------------------
- *  ILI9340 - parallel interface
- *-----------------------------*/
-#define USE_ILI9340         0
-#if USE_ILI9340 != 0
-#define ILI9340_HOR_RES     LV_HOR_RES
-#define ILI9340_VER_RES     LV_VER_RES
-#define ILI9340_INTERFACE   0   /*TODO change between parallel and SPI mode*/
-#endif  /*USE_ILI9340*/
 
 /*------------------------------
  *  ST7565 (Monochrome, low res.)
