@@ -14,6 +14,7 @@
 #if USE_SSD1306 != 0
 
 #include <stdbool.h>
+#include <stdlib.h>
 #include "lvgl/lv_core/lv_vdb.h"
 
 /*********************
@@ -96,8 +97,7 @@
 /**********************
  *  STATIC VARIABLES
  **********************/
-static uint8_t* _selected_buffer;
-static uint8_t _flag_redraw;
+static uint8_t* _buffer;
 
 /**********************
  *      MACROS
@@ -121,7 +121,7 @@ void ssd1306_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
         lv_flush_ready();
         return;
     }
-    if (!_selected_buffer)
+    if (!_buffer)
     {
         lv_flush_ready();
         return;
@@ -147,16 +147,15 @@ void ssd1306_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
             p += x;
             if (lv_color_to1(*color_p) != 0)
             {
-                _selected_buffer[p] &= ~(1 << (y % 8));
+                _buffer[p] &= ~(1 << (y % 8));
             }
             else
             {
-                _selected_buffer[p] |= 1 << (y % 8);
+                _buffer[p] |= 1 << (y % 8);
             }
             color_p++;
         }
     }
-    _flag_redraw = 1;
     lv_flush_ready();
 }
 
@@ -169,7 +168,7 @@ void ssd1306_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t col
     {
         return;
     }
-    if (!_selected_buffer)
+    if (!_buffer)
     {
         return;
     }
@@ -194,7 +193,7 @@ void ssd1306_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t col
                 p = y >> 3; /* :8 */
                 p = p << 7; /* *128 */
                 p += x;
-                _selected_buffer[p] &= ~(1 << (y % 8));
+                _buffer[p] &= ~(1 << (y % 8));
             }
         }
     }
@@ -208,11 +207,10 @@ void ssd1306_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t col
                 p = y >> 3; /* :8 */
                 p = p << 7; /* *128 */
                 p += x;
-                _selected_buffer[p] |= 1 << (y % 8);
+                _buffer[p] |= 1 << (y % 8);
             }
         }
     }
-    _flag_redraw = 1;
 }
 
 void ssd1306_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
@@ -222,7 +220,7 @@ void ssd1306_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
     {
         return;
     }
-    if (!_selected_buffer)
+    if (!_buffer)
     {
         return;
     }
@@ -247,35 +245,15 @@ void ssd1306_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
             p += x;
             if (lv_color_to1(*color_p) != 0)
             {
-                _selected_buffer[p] &= ~(1 << (y % 8));
+                _buffer[p] &= ~(1 << (y % 8));
             }
             else
             {
-                _selected_buffer[p] |= 1 << (y % 8);
+                _buffer[p] |= 1 << (y % 8);
             }
             color_p++;
         }
     }
-    _flag_redraw = 1;
-}
-
-int ssd1306_select_buffer(uint8_t buf[])
-{
-    if (!buf)
-    {
-        return -EINVAL;
-    }
-    if (_flag_redraw && (_selected_buffer != buf))
-    {
-        return -EBUSY;
-    }
-    _selected_buffer = buf;
-    return 0;
-}
-
-bool ssd1306_need_redraw(void)
-{
-    return _flag_redraw;
 }
 
 #if (SSD1306_I2C_SUPPORT)
@@ -331,6 +309,17 @@ int ssd1306_command(const ssd1306_t *dev, uint8_t cmd)
  * to SSD1306 datasheet from adafruit.com */
 int ssd1306_init(const ssd1306_t *dev)
 {
+    if (_buffer)
+    {
+       free((void*)_buffer);
+       _buffer = NULL;
+    }
+    _buffer = malloc(dev->height*dev->width/8);
+    if (!_buffer)
+    {
+        return -ENOMEM;
+    }
+
     uint8_t pin_cfg;
     switch (dev->height)
     {
@@ -412,6 +401,22 @@ int ssd1306_init(const ssd1306_t *dev)
     return -EIO;
 }
 
+int ssd1306_deinit(const ssd1306_t *dev)
+{
+    int err;
+    if (_buffer)
+    {
+       free((void*)_buffer);
+       _buffer = NULL;
+    }
+    err = ssd1306_display_on(dev, false);
+    if(err)
+    {
+        return err;
+    }
+    return 0;
+}
+
 static int sh1106_go_coordinate(const ssd1306_t *dev, uint8_t x, uint8_t y)
 {
     if (x >= dev->width || y >= (dev->height / 8))
@@ -425,7 +430,7 @@ static int sh1106_go_coordinate(const ssd1306_t *dev, uint8_t x, uint8_t y)
     return ssd1306_command(dev, SH1106_SET_HIGH_COL_ADDR | (x >> 4)); /* Set higher column address */
 }
 
-int ssd1306_load_frame_buffer(const ssd1306_t *dev, uint8_t buf[])
+int ssd1306_load_frame_buffer(const ssd1306_t *dev, bool empty)
 {
     uint16_t i;
     uint8_t j;
@@ -449,7 +454,7 @@ int ssd1306_load_frame_buffer(const ssd1306_t *dev, uint8_t buf[])
         {
             if (dev->screen == SH1106_SCREEN && i % dev->width == 0)
                 sh1106_go_coordinate(dev, 0, i / dev->width);
-            i2c_send(dev, 0x40, buf ? &buf[i] : tab, 16);
+            i2c_send(dev, 0x40, _buffer ? &_buffer[i] : tab, 16);
             i += 15;
         }
         break;
@@ -460,9 +465,9 @@ int ssd1306_load_frame_buffer(const ssd1306_t *dev, uint8_t buf[])
         if (dev->screen == SSD1306_SCREEN)
         {
             lv_spi_wr_dc(dev->spi_dev, true); /* data mode */
-            if (buf)
+            if (!empty)
             {
-                lv_spi_transaction(dev->spi_dev, NULL, buf, len, 1);
+                lv_spi_transaction(dev->spi_dev, NULL, _buffer, len, 1);
             }
             else
             {
@@ -478,9 +483,9 @@ int ssd1306_load_frame_buffer(const ssd1306_t *dev, uint8_t buf[])
                 /* data mode */
                 lv_spi_wr_dc(dev->spi_dev, true);
                 lv_spi_wr_cs(dev->spi_dev, false); /* sh1106 coordinate will set CS to 1 */
-                if (buf)
+                if (!empty)
                 {
-                    lv_spi_transaction(dev->spi_dev, NULL, &buf[dev->width * i], dev->width, 1);
+                    lv_spi_transaction(dev->spi_dev, NULL, &_buffer[dev->width * i], dev->width, 1);
                 }
                 else
                 {
@@ -498,11 +503,11 @@ int ssd1306_load_frame_buffer(const ssd1306_t *dev, uint8_t buf[])
         if (dev->screen == SSD1306_SCREEN)
         {
             lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, 1, 1);
-            if (buf)
+            if (!empty)
             {
                 for (i = 0; i < len; i++)
                 {
-                    lv_spi_transaction(dev->spi_dev, NULL, &buf[i], 1, 1);
+                    lv_spi_transaction(dev->spi_dev, NULL, &_buffer[i], 1, 1);
                 }
             }
             else
@@ -521,11 +526,11 @@ int ssd1306_load_frame_buffer(const ssd1306_t *dev, uint8_t buf[])
                 sh1106_go_coordinate(dev, 0, i);
                 lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, 1, 1); /* data mode */
                 lv_spi_wr_cs(dev->spi_dev, false); /* sh1106 coordinate will set CS to 1 */
-                if (buf)
+                if (!empty)
                 {
                     for (j = 0; j < dev->width; j++)
                     {
-                        lv_spi_transaction(dev->spi_dev, NULL, &buf[dev->width * i + j], 1, 1);
+                        lv_spi_transaction(dev->spi_dev, NULL, &_buffer[dev->width * i + j], 1, 1);
                     }
                 }
                 else

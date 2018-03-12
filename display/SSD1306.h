@@ -77,7 +77,6 @@ typedef struct
     };
     uint8_t width;                //!< Screen width, currently supported 128px, 96px
     uint8_t height;               //!< Screen height, currently supported 16px, 32px, 64px
-    uint8_t* buffer;
 } ssd1306_t;
 
 /**
@@ -114,21 +113,6 @@ typedef enum
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
-
-/**
- * Ask if the screen need be redraw.
- * @return true if the screen need to be updated
- */
-bool ssd1306_need_redraw(void);
-
-/**
- * Select the Buffer used by the library to draw (Size: HEIGHT*WIDTH/8)
- * You can change the buffer only if the screen don't need to be redraw
- * @param buf Pointer to screen array buffer
- * @return Non-zero if error occured
- */
-int ssd1306_select_buffer(uint8_t buf[]);
-
 /* Flush the content of the internal buffer the specific area on the display
  * This function is required only when LV_VDB_SIZE != 0 in lv_conf.h
  * @param x1 First x point coordinate
@@ -175,12 +159,19 @@ int ssd1306_command(const ssd1306_t *dev, uint8_t cmd);
 int ssd1306_init(const ssd1306_t *dev);
 
 /**
- * Load local framebuffer into the SSD1306 RAM.
+ * Default deinit for SSD1306
  * @param dev Pointer to device descriptor
- * @param buf Pointer to framebuffer or NULL for clear RAM. Framebuffer size = width * height / 8
  * @return Non-zero if error occured
  */
-int ssd1306_load_frame_buffer(const ssd1306_t *dev, uint8_t buf[]);
+int ssd1306_deinit(const ssd1306_t *dev)
+
+/**
+ * Load local framebuffer into the SSD1306 RAM.
+ * @param dev Pointer to device descriptor
+ * @param empty send framebuffer if false, otherwise send 0
+ * @return Non-zero if error occured
+ */
+int ssd1306_load_frame_buffer(const ssd1306_t *dev, bool empty);
 
 /**
  * Clear SSD1306 RAM.
@@ -189,7 +180,7 @@ int ssd1306_load_frame_buffer(const ssd1306_t *dev, uint8_t buf[]);
  */
 inline int ssd1306_clear_screen(const ssd1306_t *dev)
 {
-    return ssd1306_load_frame_buffer(dev, NULL);
+    return ssd1306_load_frame_buffer(dev, true);
 }
 
 /**
