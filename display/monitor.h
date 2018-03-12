@@ -6,6 +6,10 @@
 #ifndef MONITOR_H
 #define MONITOR_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*********************
  *      INCLUDES
  *********************/
@@ -34,6 +38,10 @@ void monitor_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
  *      MACROS
  **********************/
 
+#endif /* USE_MONITOR */
+
+#ifdef __cplusplus
+} /* extern "C" */
 #endif
 
-#endif
+#endif /* MONITOR_H */

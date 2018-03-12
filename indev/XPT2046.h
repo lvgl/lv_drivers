@@ -6,6 +6,10 @@
 #ifndef XPT2046_H
 #define XPT2046_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*********************
  *      INCLUDES
  *********************/
@@ -34,6 +38,10 @@ bool xpt2046_read(lv_indev_data_t * data);
  *      MACROS
  **********************/
 
+#endif /* USE_XPT2046 */
+
+#ifdef __cplusplus
+} /* extern "C" */
 #endif
 
-#endif
+#endif /* XPT2046_H */
