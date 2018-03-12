@@ -320,6 +320,14 @@ int ssd1306_init(const ssd1306_t *dev)
         return -ENOMEM;
     }
 
+    //Reset pin setup if needed
+    if(dev->rst_pin != LV_DRIVER_NOPIN)
+    {
+        lv_gpio_write(dev->rst_pin, 0);
+        lv_delay_us(10);
+        lv_gpio_write(dev->rst_pin, 1);
+    }
+
     uint8_t pin_cfg;
     switch (dev->height)
     {
@@ -409,6 +417,16 @@ int ssd1306_deinit(const ssd1306_t *dev)
        free((void*)_buffer);
        _buffer = NULL;
     }
+
+    //Reset pin to clear all configs
+    if(dev->rst_pin != LV_DRIVER_NOPIN)
+    {
+        lv_gpio_write(dev->rst_pin, 0);
+        lv_delay_us(10);
+        lv_gpio_write(dev->rst_pin, 1);
+    }
+
+    //Display off
     err = ssd1306_display_on(dev, false);
     if(err)
     {

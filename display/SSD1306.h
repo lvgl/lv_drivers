@@ -75,6 +75,7 @@ typedef struct
         lv_spi_handle_t spi_dev;
 #endif
     };
+    lv_gpio_handle_t rst_pin;
     uint8_t width;                //!< Screen width, currently supported 128px, 96px
     uint8_t height;               //!< Screen height, currently supported 16px, 32px, 64px
 } ssd1306_t;
