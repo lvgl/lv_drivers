@@ -7,6 +7,10 @@
 #ifndef AD_TOUCH_H
 #define AD_TOUCH_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*********************
  *      INCLUDES
  *********************/
@@ -99,6 +103,10 @@ void ad_touch_init(void);
 bool ad_touch_read(lv_indev_data_t *data);
 int16_t ad_touch_handler(void);
 
+#endif /* USE_AD_TOUCH */
+
+#ifdef __cplusplus
+} /* extern "C" */
 #endif
 
-#endif
+#endif /* AD_TOUCH_H */

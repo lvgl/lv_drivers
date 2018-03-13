@@ -6,6 +6,10 @@
 #ifndef R61581_H
 #define R61581_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*********************
  *      INCLUDES
  *********************/
@@ -34,6 +38,10 @@ void r61581_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t
  *      MACROS
  **********************/
 
+#endif /* USE_R61581 */
+
+#ifdef __cplusplus
+} /* extern "C" */
 #endif
 
-#endif
+#endif /* R61581_H */

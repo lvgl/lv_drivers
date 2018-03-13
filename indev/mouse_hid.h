@@ -6,6 +6,10 @@
 #ifndef MOUSE_HID_H
 #define MOUSE_HID_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*********************
  *      INCLUDES
  *********************/
@@ -45,6 +49,10 @@ bool mouse_hid_read(lv_indev_data_t * data);
  *      MACROS
  **********************/
 
+#endif /* USE_MOUSE_HID */
+
+#ifdef __cplusplus
+} /* extern "C" */
 #endif
 
-#endif
+#endif /* MOUSE_HID_H */
