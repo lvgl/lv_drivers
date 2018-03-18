@@ -9,7 +9,9 @@
 
 #ifndef SSD1306_H
 #define SSD1306_H
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 /*********************
  *      INCLUDES
  *********************/
@@ -114,6 +116,12 @@ typedef enum
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
+/**
+ * Ask if the screen need be redraw.
+ * @return true if the screen need to be updated
+ */
+bool ssd1306_need_redraw(void);
+
 /* Flush the content of the internal buffer the specific area on the display
  * This function is required only when LV_VDB_SIZE != 0 in lv_conf.h
  * @param x1 First x point coordinate
@@ -164,25 +172,21 @@ int ssd1306_init(const ssd1306_t *dev);
  * @param dev Pointer to device descriptor
  * @return Non-zero if error occured
  */
-int ssd1306_deinit(const ssd1306_t *dev)
+int ssd1306_deinit(const ssd1306_t *dev);
 
 /**
  * Load local framebuffer into the SSD1306 RAM.
  * @param dev Pointer to device descriptor
- * @param empty send framebuffer if false, otherwise send 0
  * @return Non-zero if error occured
  */
-int ssd1306_load_frame_buffer(const ssd1306_t *dev, bool empty);
+int ssd1306_load_frame_buffer(const ssd1306_t *dev);
 
 /**
  * Clear SSD1306 RAM.
  * @param dev Pointer to device descriptor
  * @return Non-zero if error occured
  */
-inline int ssd1306_clear_screen(const ssd1306_t *dev)
-{
-    return ssd1306_load_frame_buffer(dev, true);
-}
+int ssd1306_clear_screen(const ssd1306_t *dev);
 
 /**
  * Turn display on or off.
@@ -392,7 +396,8 @@ int ssd1306_start_scroll_hori(const ssd1306_t *dev, bool way, uint8_t start, uin
  */
 int ssd1306_start_scroll_hori_vert(const ssd1306_t *dev, bool way, uint8_t start, uint8_t stop, uint8_t dy, ssd1306_scroll_t frame);
 
-
+#ifdef __cplusplus
+}
 #endif
-
-#endif
+#endif /* USE_SSD1306 */
+#endif /* SSD1306_H */

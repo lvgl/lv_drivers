@@ -15,6 +15,7 @@
 
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #include "lvgl/lv_core/lv_vdb.h"
 
 /*********************
@@ -93,11 +94,14 @@
 /**********************
  *  STATIC PROTOTYPES
  **********************/
+static int inline _i2c_send(const ssd1306_t *dev, uint8_t reg, uint8_t* data, uint8_t len);
+static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y1,  uint8_t x2, uint8_t y2);
 
 /**********************
  *  STATIC VARIABLES
  **********************/
-static uint8_t* _buffer;
+static uint8_t* _buffer; //FIXME: To remove when pixel by bit will be released  (5.2)
+static uint8_t _flag_redraw; //FIXME: Used to optimize the screen update, need to be remove.
 
 /**********************
  *      MACROS
@@ -156,6 +160,7 @@ void ssd1306_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
             color_p++;
         }
     }
+     _flag_redraw = 1;
     lv_flush_ready();
 }
 
@@ -211,6 +216,7 @@ void ssd1306_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t col
             }
         }
     }
+     _flag_redraw = 1;
 }
 
 void ssd1306_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
@@ -254,14 +260,13 @@ void ssd1306_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
             color_p++;
         }
     }
+     _flag_redraw = 1;
 }
 
-#if (SSD1306_I2C_SUPPORT)
-static int inline i2c_send(const ssd1306_t *dev, uint8_t reg, uint8_t* data, uint8_t len)
+bool ssd1306_need_redraw(void)
 {
-    return lv_i2c_write(dev->i2c_dev, &reg, data, len);
+    return _flag_redraw;
 }
-#endif
 
 /* Issue a command to SSD1306 device
  * I2C proto format:
@@ -278,7 +283,7 @@ int ssd1306_command(const ssd1306_t *dev, uint8_t cmd)
     {
 #if (SSD1306_I2C_SUPPORT)
     case SSD1306_PROTO_I2C:
-        err = i2c_send(dev, 0x00, &cmd, 1);
+        err = _i2c_send(dev, 0x00, &cmd, 1);
         break;
 #endif
 #if (SSD1306_SPI4_SUPPORT)
@@ -412,12 +417,15 @@ int ssd1306_init(const ssd1306_t *dev)
 int ssd1306_deinit(const ssd1306_t *dev)
 {
     int err;
+    if(!dev)
+    {
+        return -ENXIO;
+    }
     if (_buffer)
     {
        free((void*)_buffer);
        _buffer = NULL;
     }
-
     //Reset pin to clear all configs
     if(dev->rst_pin != LV_DRIVER_NOPIN)
     {
@@ -448,129 +456,15 @@ static int sh1106_go_coordinate(const ssd1306_t *dev, uint8_t x, uint8_t y)
     return ssd1306_command(dev, SH1106_SET_HIGH_COL_ADDR | (x >> 4)); /* Set higher column address */
 }
 
-int ssd1306_load_frame_buffer(const ssd1306_t *dev, bool empty)
+int ssd1306_load_frame_buffer(const ssd1306_t *dev)
 {
-    uint16_t i;
-    uint8_t j;
-#if (SSD1306_I2C_SUPPORT)
-    uint8_t tab[16] =
-    {
-        0 };
-#endif
-    size_t len = dev->width * dev->height / 8;
-    if (dev->screen == SSD1306_SCREEN)
-    {
-        ssd1306_set_column_addr(dev, 0, dev->width - 1);
-        ssd1306_set_page_addr(dev, 0, dev->height / 8 - 1);
-    }
+    return _load_frame_buffer(dev, 0, 0,  dev->width-1, dev->height-1);
+}
 
-    switch (dev->protocol)
-    {
-#if (SSD1306_I2C_SUPPORT)
-    case SSD1306_PROTO_I2C:
-        for (i = 0; i < len; i++)
-        {
-            if (dev->screen == SH1106_SCREEN && i % dev->width == 0)
-                sh1106_go_coordinate(dev, 0, i / dev->width);
-            i2c_send(dev, 0x40, _buffer ? &_buffer[i] : tab, 16);
-            i += 15;
-        }
-        break;
-#endif
-#if (SSD1306_SPI4_SUPPORT)
-    case SSD1306_PROTO_SPI4:
-        lv_spi_wr_cs(dev->spi_dev, false);
-        if (dev->screen == SSD1306_SCREEN)
-        {
-            lv_spi_wr_dc(dev->spi_dev, true); /* data mode */
-            if (!empty)
-            {
-                lv_spi_transaction(dev->spi_dev, NULL, _buffer, len, 1);
-            }
-            else
-            {
-                uint8_t zero = 0;
-                lv_spi_repeat(dev->spi_dev, &zero, len, 1);
-            }
-        }
-        else
-        {
-            for (i = 0; i < (dev->height / 8); i++)
-            {
-                sh1106_go_coordinate(dev, 0, i);
-                /* data mode */
-                lv_spi_wr_dc(dev->spi_dev, true);
-                lv_spi_wr_cs(dev->spi_dev, false); /* sh1106 coordinate will set CS to 1 */
-                if (!empty)
-                {
-                    lv_spi_transaction(dev->spi_dev, NULL, &_buffer[dev->width * i], dev->width, 1);
-                }
-                else
-                {
-                    uint8_t zero = 0;
-                    lv_spi_repeat(dev->spi_dev, &zero, dev->width, 1);
-                }
-            }
-        }
-        lv_spi_wr_cs(dev->spi_dev, true);
-        break;
-#endif
-#if (SSD1306_SPI3_SUPPORT)
-    case SSD1306_PROTO_SPI3:
-        lv_spi_wr_cs(dev->spi_dev, false);
-        if (dev->screen == SSD1306_SCREEN)
-        {
-            lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, 1, 1);
-            if (!empty)
-            {
-                for (i = 0; i < len; i++)
-                {
-                    lv_spi_transaction(dev->spi_dev, NULL, &_buffer[i], 1, 1);
-                }
-            }
-            else
-            {
-                uint8_t zero = 0;
-                for (i = 0; i < len; i++)
-                {
-                    lv_spi_transaction(dev->spi_dev, NULL, &zero, 1, 1);
-                }
-            }
-        }
-        else
-        {
-            for (i = 0; i < (dev->height / 8); i++)
-            {
-                sh1106_go_coordinate(dev, 0, i);
-                lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, 1, 1); /* data mode */
-                lv_spi_wr_cs(dev->spi_dev, false); /* sh1106 coordinate will set CS to 1 */
-                if (!empty)
-                {
-                    for (j = 0; j < dev->width; j++)
-                    {
-                        lv_spi_transaction(dev->spi_dev, NULL, &_buffer[dev->width * i + j], 1, 1);
-                    }
-                }
-                else
-                {
-                    uint8_t zero = 0;
-                    for (j = 0; j < dev->width; j++)
-                    {
-                        lv_spi_transaction(dev->spi_dev, NULL, &zero, 1, 1);
-                    }
-                }
-            }
-        }
-        lv_spi_clr_preemble(dev->spi_dev, LV_SPI_COMMAND);
-        lv_spi_wr_cs(dev->spi_dev, true);
-        break;
-#endif
-    default:
-        debug("Unsupported protocol");
-        return -EPROTONOSUPPORT;
-    }
-
-    return 0;
+int ssd1306_clear_screen(const ssd1306_t *dev)
+{
+    memset((void*)_buffer,0,dev->width*dev->height/8);
+    return _load_frame_buffer(dev, 0, 0,  dev->width-1, dev->height-1);
 }
 
 int ssd1306_display_on(const ssd1306_t *dev, bool on)
@@ -828,5 +722,144 @@ int ssd1306_start_scroll_hori_vert(const ssd1306_t *dev, bool way, uint8_t start
 /**********************
  *   STATIC FUNCTIONS
  **********************/
+#if (SSD1306_I2C_SUPPORT)
+static int inline _i2c_send(const ssd1306_t *dev, uint8_t reg, uint8_t* data, uint8_t len)
+{
+    return lv_i2c_write(dev->i2c_dev, &reg, data, len);
+}
+#endif
+
+static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y1,  uint8_t x2, uint8_t y2)
+{
+    uint16_t i;
+    uint16_t j;
+
+    //convert to page
+    y1 = y1 >> 3;
+    y2 = y2 >> 3;
+    //if(y1 != 0) y1/=8;
+    //if(y2 != 0) y2/=8;
+
+    if (dev->screen == SSD1306_SCREEN)
+    {
+        ssd1306_set_column_addr(dev, x1, x2); // Update x1 to x2
+        ssd1306_set_page_addr(dev, y1, y2); // Update y1 to y2
+    }
+
+    switch (dev->protocol)
+    {
+#if (SSD1306_I2C_SUPPORT)
+    case SSD1306_PROTO_I2C:
+//        for (i = 0; i < len; i++)
+//        {
+//            if (dev->screen == SH1106_SCREEN && i % dev->width == 0)
+//                sh1106_go_coordinate(dev, 0, i / dev->width);
+//            _i2c_send(dev, 0x40, _buffer ? &_buffer[i] : tab, 16);
+//            i += 15;
+//        }
+        if (dev->screen == SSD1306_SCREEN)
+        {
+            for (j = y1; j <= y2; j++)
+            {
+                for (i = x1; i <= x2 ; ) //column
+                {
+                    if((x2-i) >= 16)
+                    {
+                        _i2c_send(dev, 0x40, &_buffer[j*dev->width+i], 16);
+                        i+=16;
+                    }
+                    else
+                    {
+                        _i2c_send(dev, 0x40, &_buffer[j*dev->width+i], x2-i);
+                        i+=(x2-i);
+                    }
+                }
+            }
+        }
+        else
+        {
+            for (j = y1; j <= y2; j++)
+            {
+                sh1106_go_coordinate(dev, x1, j);
+                for (i = x1; i <= x2 ; ) //column
+                {
+                    if((x2-i) >= 16)
+                    {
+                        _i2c_send(dev, 0x40, &_buffer[j*dev->width+i], 16);
+                        i+=16;
+                    }
+                    else
+                    {
+                        _i2c_send(dev, 0x40, &_buffer[j*dev->width+i], x2-i);
+                        i+=(x2-i);
+                    }
+                }
+            }
+        }
+        break;
+#endif
+#if (SSD1306_SPI4_SUPPORT)
+    case SSD1306_PROTO_SPI4:
+        lv_spi_wr_cs(dev->spi_dev, false);
+        if (dev->screen == SSD1306_SCREEN)
+        {
+            lv_spi_wr_dc(dev->spi_dev, true); /* data mode */
+            for(j = y1;  j <= y2 ; j++) //page
+            {
+                lv_spi_transaction(dev->spi_dev, NULL, &_buffer[j*dev->width+x1], x2-x1, 1);
+            }
+        }
+        else
+        {
+            for (j = y1; j <= y2; j++)
+            {
+                sh1106_go_coordinate(dev, x1, j);
+                /* data mode */
+                lv_spi_wr_dc(dev->spi_dev, true);
+                lv_spi_wr_cs(dev->spi_dev, false); /* sh1106 coordinate will set CS to 1 */
+                lv_spi_transaction(dev->spi_dev, NULL, &_buffer[dev->width * x1], x2-x1, 1);
+            }
+        }
+        lv_spi_wr_cs(dev->spi_dev, true);
+        break;
+#endif
+#if (SSD1306_SPI3_SUPPORT)
+    case SSD1306_PROTO_SPI3:
+        lv_spi_wr_cs(dev->spi_dev, false);
+        if (dev->screen == SSD1306_SCREEN)
+        {
+            lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, 1, 1);
+            for(j = y1;  j <= y2 ; j++) //page
+            {
+                for (i = x1; i <= x2; i++) //column
+                {
+                    lv_spi_transaction(dev->spi_dev, NULL, &_buffer[j*dev->width+i], 1, 1);
+                }
+            }
+        }
+        else
+        {
+            for (j = y1; j <= y2; j++)
+            {
+                sh1106_go_coordinate(dev, x1, j);
+                lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, 1, 1); /* data mode */
+                lv_spi_wr_cs(dev->spi_dev, false); /* sh1106 coordinate will set CS to 1 */
+                for (i = x1; i <= x2; i++) //column
+                {
+                    lv_spi_transaction(dev->spi_dev, NULL, &_buffer[j*dev->width+i], 1, 1);
+                }
+            }
+        }
+        lv_spi_clr_preemble(dev->spi_dev, LV_SPI_COMMAND);
+        lv_spi_wr_cs(dev->spi_dev, true);
+        break;
+#endif
+    default:
+        debug("Unsupported protocol");
+        return -EPROTONOSUPPORT;
+    }
+    _flag_redraw = 0;
+    return 0;
+}
 
 #endif
