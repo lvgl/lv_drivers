@@ -8,13 +8,10 @@
 #ifndef ILI9341_H
 #define ILI9341_H
 
-//TODO: remove this
-#define USE_ILI9341 1
-
 /*********************
  *      INCLUDES
  *********************/
-//#include "../../lv_drv_conf.h"
+#include "../../lv_drv_conf.h"
 #if USE_ILI9341 != 0
 
 #include <stdint.h>
@@ -53,19 +50,14 @@ typedef struct
     union
     {
 #if (ILI9341_PAR_SUPPORT)
-        void* par_dev;
+        lv_par_handle_t par_dev;
 #endif
 #if (ILI9341_SPI4_SUPPORT) || (ILI9341_SPI3_SUPPORT)
-        void* spi_dev;
+        lv_spi_handle_t spi_dev;
 #endif
     };
-
-#if (ILI9341_MANUAL_CS)
-		uint8_t cs_pin;
-#endif
-#if (ILI9341_SPI4_SUPPORT) && (ILI9341_MANUAL_DC)
-    uint8_t dc_pin;               //!< Data/Command GPIO pin, used by ILI9341_PROTO_SPI4
-#endif
+    lv_gpio_handle_t rst_pin;
+    lv_gpio_handle_t backlight_pin;
     uint16_t width;                //!< Screen width, 320 or 240
     uint16_t height;               //!< Screen height, 240 or 320
 } ili9341_t;
@@ -232,6 +224,61 @@ typedef struct
 
 } ili9341_gamma_cor_t;
 
+////
+typedef struct
+{
+    uint8_t id1 ; ///> LCD module's manufacturer ID
+    uint8_t id2 ; ///> LCD module/driver version ID
+    uint8_t id3 ; ///> LCD module/driver ID
+} ili9341_id_t;
+
+typedef struct
+{
+    union
+    {
+        uint8_t data0 ;
+        struct
+        {
+            uint8_t : 1;
+            uint8_t hori_refresh_order : 1 ; //0: Left to right, 1: Right to left
+            uint8_t rgb_bgr_order : 1 ; //0: RGB, 1: BGR
+            uint8_t vert_refresh : 1 ; //0: Top to bottom, 1: Bottom to top
+            uint8_t row_column_exchange : 1 ; // 0: Normal mode, 1: Reverse mode
+            uint8_t column_addr_order : 1 ; // 0: Left to right, 1: Right to left
+            uint8_t row_addr_order : 1 ;   // 0: Top to bottom, 1: Bottom to top
+            uint8_t booster_voltage_status : 1 ; //0 : off ; 1 : on
+        };
+    };
+    union
+    {
+        uint8_t data1 ;
+        struct
+        {
+            uint8_t display_mode : 1 ;
+            uint8_t sleep : 1 ;
+            uint8_t partial_mode : 1 ;
+            uint8_t idle_mode : 1 ;
+            uint8_t int_color_pxl_fmt : 3 ;
+            uint8_t : 1;
+        };
+    };
+    union
+    {
+        uint16_t data2 ;  // H : 4th parameter  // L: 5th parameters
+        struct
+        {
+            uint16_t : 5;
+            uint16_t tearing_effect_mode : 1 ;
+            uint16_t gamma_curve_select : 3 ;
+            uint16_t tearing_effect : 1 ;
+            uint16_t display_pwr : 1 ;
+            uint16_t : 5;
+        };
+    };
+
+} ili9341_dis_status_t;
+
+
 typedef enum {
     ili9341_gamma_pos,
     ili9341_gamma_neg,
@@ -282,12 +329,12 @@ void ili9341_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
  * @param dev Pointer to device descriptor
  * @return Non-zero if error occured
  */
-int ili9341_init(const ili9341_t *dev);
+int ili9341_init(ili9341_t *dev);
 
 
 
 
-//Command
+//Order Command
 int ili9341_unknow(const ili9341_t *dev);
 int ili9341_power_control_b(const ili9341_t *dev, ili9341_pwr_ctrl_b_t config);
 int ili9341_power_on_seq_ctrl(const ili9341_t *dev, ili9341_pwr_seq_ctrl_t config);
@@ -309,10 +356,28 @@ int ili9341_gamma_set(const ili9341_t *dev, ili9341_gamma_set_t config);
 int ili9341_gamma_cor(const ili9341_t *dev, ili9341_gamma_type_e type, ili9341_gamma_cor_t config);
 
 //No parameters commands
-int ili9341_sleep_out(const ili9341_t *dev);
-int ili9341_displat_on(const ili9341_t *dev);
+int ili9341_nope(const ili9341_t *dev);
+int ili9341_rst(const ili9341_t *dev, bool hard);
+int ili9341_sleep(const ili9341_t *dev, bool state);
+int ili9341_idle(const ili9341_t *dev, bool state);
+int ili9341_display_pwr(const ili9341_t *dev, bool state);
+int ili9341_inversion(const ili9341_t *dev, bool state);
+int ili9341_display_mode(const ili9341_t *dev, bool partial);
+int ili9341_memory_write(const ili9341_t *dev);
+
+//Read Command
+int ili9341_read_id(const ili9341_t *dev, ili9341_id_t *result);
+int ili9341_read_display_status(const ili9341_t *dev, ili9341_dis_status_t *result);
+
+
+//
+int ili9341_set_column_addr(const ili9341_t *dev, int32_t start, int32_t stop);
+int ili9341_set_page_addr(const ili9341_t *dev, int32_t start, int32_t stop);
+
+
 
 ///////////////////////////////////////////////////////////////////////////
+//API
 
 
 #endif

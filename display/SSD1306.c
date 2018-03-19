@@ -817,7 +817,7 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y
                 /* data mode */
                 lv_spi_wr_dc(dev->spi_dev, true);
                 lv_spi_wr_cs(dev->spi_dev, false); /* sh1106 coordinate will set CS to 1 */
-                lv_spi_transaction(dev->spi_dev, NULL, &_buffer[dev->width * x1], x2-x1, 1);
+                lv_spi_transaction(dev->spi_dev, NULL, &_buffer[j*dev->width + x1], x2-x1, 1);
             }
         }
         lv_spi_wr_cs(dev->spi_dev, true);

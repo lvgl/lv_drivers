@@ -3,8 +3,6 @@
  * @author zaltora  (https://github.com/Zaltora)
  * @copyright MIT License.
  */
-//TODO: remove this
-#define USE_ILI9341 1
 /*********************
  *      INCLUDES
  *********************/
@@ -13,10 +11,6 @@
 
 #include <stdbool.h>
 #include "lvgl/lv_core/lv_vdb.h"
-
-
-//TODO: remove this
-#define ILI9341_DEBUG 1
 
 /*********************
  *      DEFINES
@@ -29,16 +23,9 @@
 #define ILI9341_SPI3_SUPPORT 1
 #endif
 
-#ifndef ILI9341_MANUAL_DC
-#define ILI9341_MANUAL_DC 1
-#endif
-
-#ifndef ILI9341_MANUAL_CS
-#define ILI9341_MANUAL_CS 1
-#endif
-
 /* utility */
 #define BIT_MASK(a, b) (((unsigned) -1 >> (31 - (b))) & ~((1U << (a)) - 1))
+#define SWAPBYTES(i) ((i>>8) | (i<<8))
 
 /* ILI9341 regular commands */
 #define ILI9341_NO_OPERATION            (0x00)
@@ -141,13 +128,15 @@
 /**********************
  *  STATIC PROTOTYPES
  **********************/
-static int _sendCommand(uint8_t cmd);
-static int _sendCommandData(uint8_t cmd, uint8_t* data, uint8_t len);
+static int _sendCommand(const ili9341_t *dev, uint8_t cmd);
+static int _sendCommandData(const ili9341_t *dev, uint8_t cmd, uint8_t* data_out, uint32_t len);
+static int _sendData(const ili9341_t *dev, uint8_t* data_out, uint32_t len);
+static int _receiveData(const ili9341_t *dev, uint8_t cmd, uint8_t* data_in, uint32_t len);
 
 /**********************
  *  STATIC VARIABLES
  **********************/
-
+static ili9341_t* _device; //FIXME: To remove when multi-display will be supported.
 
 /**********************
  *      MACROS
@@ -162,6 +151,7 @@ static int _sendCommandData(uint8_t cmd, uint8_t* data, uint8_t len);
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
+//lvgl don't check error
 
 void ili9341_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
 {
@@ -173,11 +163,25 @@ void ili9341_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
     }
 
     /*Truncate the area to the screen*/
-    int32_t act_x1 = x1 < 0 ? 0 : x1;
-    int32_t act_y1 = y1 < 0 ? 0 : y1;
-    int32_t act_x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
-    int32_t act_y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
+    //int32_t act_x1 = x1 < 0 ? 0 : x1;
+    //int32_t act_y1 = y1 < 0 ? 0 : y1;
+    //int32_t act_x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
+    //int32_t act_y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
 
+    ili9341_set_column_addr(_device, x1, x2);
+    ili9341_set_page_addr(_device, y1, y2);
+    ili9341_memory_write(_device);
+
+    uint32_t size = (x2 - x1 + 1) * (y2 - y1 + 1);
+    uint32_t i;
+    while(size > _device->width) {
+
+        _sendData(color_p, _device->width * 2);
+        //vTaskDelay(10 / portTICK_PERIOD_MS);
+        size -= _device->width;
+        color_p += _device->width;
+    }
+    _sendData(color_p, size * 2); /*Send the remaining data*/
 
     lv_flush_ready();
 }
@@ -193,10 +197,14 @@ void ili9341_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t col
     }
 
     /*Truncate the area to the screen*/
-    int32_t act_x1 = x1 < 0 ? 0 : x1;
-    int32_t act_y1 = y1 < 0 ? 0 : y1;
-    int32_t act_x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
-    int32_t act_y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
+    //int32_t act_x1 = x1 < 0 ? 0 : x1;
+    //int32_t act_y1 = y1 < 0 ? 0 : y1;
+    //int32_t act_x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
+    //int32_t act_y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
+
+    ili9341_set_column_addr(_device, x1, x2);
+    ili9341_set_page_addr(_device, y1, y2);
+    ili9341_memory_write(_device);
 
 }
 
@@ -209,17 +217,29 @@ void ili9341_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
     }
 
     /*Truncate the area to the screen*/
-    int32_t act_x1 = x1 < 0 ? 0 : x1;
-    int32_t act_y1 = y1 < 0 ? 0 : y1;
-    int32_t act_x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
-    int32_t act_y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
+    //int32_t act_x1 = x1 < 0 ? 0 : x1;
+    //int32_t act_y1 = y1 < 0 ? 0 : y1;
+    //int32_t act_x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
+    //int32_t act_y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
+
+    ili9341_set_column_addr(_device, x1, x2);
+    ili9341_set_page_addr(_device, y1, y2);
+    ili9341_memory_write(_device);
 
 }
 
 /* Perform default init routine according */
-int ili9341_init(const ili9341_t *dev)
+//TODO: don't forget to make it constant again
+int ili9341_init(ili9341_t *dev)
 {
     int err;
+
+    if(_device)
+    {
+       return -1; //A screen was already initialized.
+    }
+    _device = dev; //Save current screen
+    //Portrait or paysage check
     switch (dev->height)
     {
     case 240:
@@ -230,22 +250,6 @@ int ili9341_init(const ili9341_t *dev)
         debug("Unsupported screen height");
         return -ENOTSUP;
     }
-
-    switch (dev->protocol)
-    {
-#if (ILI9341_SPI4_SUPPORT)
-    case ILI9341_PROTO_SERIAL_8BIT:
-        break;
-#endif
-#if (ILI9341_SPI3_SUPPORT)
-    case ILI9341_PROTO_SERIAL_9BIT:
-        break;
-#endif
-    default:
-        debug("Unsupported protocol");
-        return -EPROTONOSUPPORT;
-    }
-
 
     if((err = ili9341_unknow(dev)))
         return err;
@@ -391,8 +395,8 @@ int ili9341_init(const ili9341_t *dev)
         return err;
 
     //TODO: can we swap order for them ? to wait only 120 ms
-    ili9341_sleep_out(dev);
-    ili9341_displat_on(dev);
+    ili9341_sleep(dev, false);
+    ili9341_display_pwr(dev, true);
 
     return 0;
 }
@@ -401,7 +405,7 @@ int ili9341_init(const ili9341_t *dev)
 int ili9341_unknow(const ili9341_t *dev)
 {
     uint8_t data[3] = { 0x03, 0x80, 0x02  };
-    return _sendCommandData(ILI9341_UNKNOW, data, sizeof(data));
+    return _sendCommandData(dev, ILI9341_UNKNOW, data, sizeof(data));
 }
 
 /**
@@ -414,7 +418,7 @@ int ili9341_power_control_b(const ili9341_t *dev, ili9341_pwr_ctrl_b_t config)
     data[1] = 0x81 | config.power_ctrl << 3 | config.drv_ena << 5 | config.pceq << 6 ;
     data[2] = 0x20 | config.drv_vmh | (config.drv_vml & BIT_MASK(0,0)) << 3  |
         (config.drv_vml & BIT_MASK(1,2)) << 5 | config.dc_ena << 4;
-    return _sendCommandData(ILI9341_PWR_CTR_B, data, sizeof(data));
+    return _sendCommandData(dev, ILI9341_PWR_CTR_B, data, sizeof(data));
 }
 
 /**
@@ -427,7 +431,7 @@ int ili9341_power_on_seq_ctrl(const ili9341_t *dev, ili9341_pwr_seq_ctrl_t confi
     data[1] = config.en_ddvdh | config.en_vcl << 4 ;
     data[2] = config.en_vgl | config.en_vgh << 4 ;
     data[3] = 0x01 | config.ddvdh_enh << 7 ;
-    return _sendCommandData(ILI9341_PWR_ON_SEQ_CTR, data, sizeof(data));
+    return _sendCommandData(dev, ILI9341_PWR_ON_SEQ_CTR, data, sizeof(data));
 }
 
 /**
@@ -439,7 +443,7 @@ int ili9341_timing_ctrl_a(const ili9341_t *dev, ili9341_timing_ctrl_a_t config)
     data[0] = 0x84 | config.now ;
     data[1] = config.cr | config.eq <<4 ;
     data[2] = 0x78 | config.pc ;
-    return _sendCommandData(ILI9341_TIMING_CTR_A, data, sizeof(data));
+    return _sendCommandData(dev, ILI9341_TIMING_CTR_A, data, sizeof(data));
 }
 
 /**
@@ -453,7 +457,7 @@ int ili9341_pwr_ctrl_a(const ili9341_t *dev, ili9341_pwr_ctrl_a_t config)
     data[2] = 0x00 ;
     data[3] = 0x30 | config.reg_vd ;
     data[4] = config.vbc ;
-    return _sendCommandData(ILI9341_PWR_CTR_A, data, sizeof(data));
+    return _sendCommandData(dev, ILI9341_PWR_CTR_A, data, sizeof(data));
 }
 
 /**
@@ -467,7 +471,7 @@ int ili9341_pump_ratio_ctrl(const ili9341_t *dev, ili9341_pump_ratio_ctrl_t conf
     }
     uint8_t data[1] = { 0 };
     data[0] = config.ratio << 4;
-    return _sendCommandData(ILI9341_PUMP_RATIO_CTR, data, sizeof(data));
+    return _sendCommandData(dev, ILI9341_PUMP_RATIO_CTR, data, sizeof(data));
 }
 
 /**
@@ -477,7 +481,7 @@ int ili9341_timing_ctrl_b(const ili9341_t *dev, ili9341_timing_ctrl_b_t config)
 {
     uint8_t data[2] = { 0 };
     data[0] = *(uint8_t*)&config;
-    return _sendCommandData(ILI9341_TIMING_CTR_B, data, sizeof(data));
+    return _sendCommandData(dev, ILI9341_TIMING_CTR_B, data, sizeof(data));
 }
 
 /**
@@ -487,7 +491,7 @@ int ili9341_pwr_ctrl_1(const ili9341_t *dev, ili9341_pwr_ctrl_1_t config)
 {
     uint8_t data[1] = { 0 };
     data[0] = config.vrh ;
-    return _sendCommandData(ILI9341_PWR_CTR_1, data, sizeof(data));
+    return _sendCommandData(dev, ILI9341_PWR_CTR_1, data, sizeof(data));
 }
 
 /**
@@ -497,7 +501,7 @@ int ili9341_pwr_ctrl_2(const ili9341_t *dev, ili9341_pwr_ctrl_2_t config)
 {
     uint8_t data[1] = { 0 };
     data[0] = 0x10 | config.bt ;
-    return _sendCommandData(ILI9341_PWR_CTR_2, data, sizeof(data));
+    return _sendCommandData(dev, ILI9341_PWR_CTR_2, data, sizeof(data));
 }
 
 /**
@@ -508,7 +512,7 @@ int ili9341_vcom_ctrl_1(const ili9341_t *dev, ili9341_vcom_ctrl_1_t config)
     uint8_t data[2] = { 0 };
     data[0] = config.vmh ;
     data[1] = config.vml ;
-    return _sendCommandData(ILI9341_VCOM_CTR_1, data, sizeof(data));
+    return _sendCommandData(dev, ILI9341_VCOM_CTR_1, data, sizeof(data));
 }
 
 /**
@@ -518,14 +522,14 @@ int ili9341_vcom_ctrl_2(const ili9341_t *dev, ili9341_vcom_ctrl_2_t config)
 {
     uint8_t data[1] = { 0 };
     data[0] = *(uint8_t*)&config ;
-    return _sendCommandData(ILI9341_VCOM_CTR_2, data, sizeof(data));
+    return _sendCommandData(dev, ILI9341_VCOM_CTR_2, data, sizeof(data));
 }
 
 int ili9341_mem_ctrl(const ili9341_t *dev, ili9341_mem_ctrl_t config)
 {
     uint8_t data[1] = { 0 };
     data[0] = *(uint8_t*)&config & BIT_MASK(2,7);
-    return _sendCommandData(ILI9341_MEMORY_ACCES_CTR, data, sizeof(data));
+    return _sendCommandData(dev, ILI9341_MEMORY_ACCES_CTR, data, sizeof(data));
 }
 
 int ili9341_vert_scroll_start(const ili9341_t *dev, ili9341_vert_scroll_start_t config)
@@ -533,7 +537,7 @@ int ili9341_vert_scroll_start(const ili9341_t *dev, ili9341_vert_scroll_start_t 
     uint8_t data[2] = { 0 };
     data[0] = config.vsp >> 8 ;
     data[1] = config.vsp & 0x0F ;
-    return _sendCommandData(ILI9341_VERT_SCROLL_START_ADDR, data, sizeof(data));
+    return _sendCommandData(dev, ILI9341_VERT_SCROLL_START_ADDR, data, sizeof(data));
 }
 
 int ili9341_pixel_fmt(const ili9341_t *dev, ili9341_px_fmt_t config)
@@ -548,7 +552,7 @@ int ili9341_pixel_fmt(const ili9341_t *dev, ili9341_px_fmt_t config)
     }
     uint8_t data[1] = { 0 };
     data[0] = config.dbi | config.dpi << 4 ;
-    return _sendCommandData(ILI9341_PIXEL_FMT_SET, data, sizeof(data));
+    return _sendCommandData(dev, ILI9341_PIXEL_FMT_SET, data, sizeof(data));
 }
 
 int ili9341_frame_rate_ctrl(const ili9341_t *dev, ili9341_frame_rate_ctrl_t config)
@@ -556,7 +560,7 @@ int ili9341_frame_rate_ctrl(const ili9341_t *dev, ili9341_frame_rate_ctrl_t conf
     uint8_t data[2] = { 0 };
     data[0] = config.diva ;
     data[1] = config.rtna ;
-    return _sendCommandData(ILI9341_FRAME_CTR_NORMAL, data, sizeof(data));
+    return _sendCommandData(dev, ILI9341_FRAME_CTR_NORMAL, data, sizeof(data));
 }
 
 int ili9341_display_fn_ctrl(const ili9341_t *dev, ili9341_dis_fn_ctrl_t config)
@@ -567,7 +571,7 @@ int ili9341_display_fn_ctrl(const ili9341_t *dev, ili9341_dis_fn_ctrl_t config)
         config.gs << 6 | config.rev << 7 ;
     data[2] = config.nl ;
     //data[3] = config.pcdiv ;  //FIXME: This data is needed ? datasheet said no ?
-    return _sendCommandData(ILI9341_DIS_FUNCTION_CTR, data, sizeof(data));
+    return _sendCommandData(dev, ILI9341_DIS_FUNCTION_CTR, data, sizeof(data));
 }
 
 /**
@@ -577,14 +581,14 @@ int ili9341_enable_3g(const ili9341_t *dev, ili9341_ena_3g_t config)
 {
     uint8_t data[1] = { 0 };
     data[0] = 0x02 | config.ena_3g ;
-    return _sendCommandData(ILI9341_ENABLE_3G, data, sizeof(data));
+    return _sendCommandData(dev, ILI9341_ENABLE_3G, data, sizeof(data));
 }
 
 int ili9341_gamma_set(const ili9341_t *dev, ili9341_gamma_set_t config)
 {
     uint8_t data[1] = { 0 };
     data[0] = config.gamma_set ;
-    return _sendCommandData(ILI9341_GAMMA_SET, data, sizeof(data));
+    return _sendCommandData(dev, ILI9341_GAMMA_SET, data, sizeof(data));
 }
 
 int ili9341_gamma_cor(const ili9341_t *dev, ili9341_gamma_type_e type, ili9341_gamma_cor_t config)
@@ -606,40 +610,232 @@ int ili9341_gamma_cor(const ili9341_t *dev, ili9341_gamma_type_e type, ili9341_g
     data[13] = config.v1 ;
     data[14] = config.v0 ;
 
-    return _sendCommandData( type == ili9341_gamma_pos ?
+    return _sendCommandData(dev,  type == ili9341_gamma_pos ?
         ILI9341_POS_GAMMA_COR : ILI9341_NEG_GAMMA_COR,   data, sizeof(data));
 }
 
-int ili9341_sleep_out(const ili9341_t *dev)
+int ili9341_sleep(const ili9341_t *dev, bool state)
 {
-    //TODO: Wait 120 ms ? (what is the best way to do it ?
-    return _sendCommand(ILI9341_SLEEP_OFF);
+    if(state)
+    {
+        return _sendCommand(dev, ILI9341_SLEEP_ON);
+    }
+    else
+    {
+        //TODO: Wait 120 ms ? (what is the best way to do it ?
+        return _sendCommand(dev, ILI9341_SLEEP_OFF);
+    }
 }
 
-int ili9341_displat_on(const ili9341_t *dev)
+int ili9341_display_pwr(const ili9341_t *dev, bool state)
 {
-    return _sendCommand(ILI9341_DIS_ON);
+    if (state)
+    {
+        return _sendCommand(dev, ILI9341_DIS_ON);
+    }
+    else
+    {
+        return _sendCommand(dev, ILI9341_DIS_OFF);
+    }
+}
+
+int ili9341_inversion(const ili9341_t *dev, bool state)
+{
+    if (state)
+    {
+        return _sendCommand(dev, ILI9341_INVERSION_ON);
+    }
+    else
+    {
+        return _sendCommand(dev, ILI9341_INVERSION_OFF);
+    }
+}
+
+int ili9341_nope(const ili9341_t *dev)
+{
+    return _sendCommand(dev, ILI9341_NO_OPERATION);
+}
+
+int ili9341_rst(const ili9341_t *dev, bool hard)
+{
+    int err;
+    if(hard)
+    {
+        //TODO: switch protocol to call hardware pin
+    }
+    else
+    {
+        err = _sendCommand(dev, ILI9341_SOFT_RESET);
+        //TODO: Wait 120 ms ? (what is the best way to do it ?
+
+    }
+    return err;
+}
+
+int ili9341_display_mode(const ili9341_t *dev, bool partial)
+{
+    if(partial)
+    {
+        return _sendCommand(dev, ILI9341_PARTIAL_MODE);
+    }
+    else
+    {
+        return _sendCommand(dev, ILI9341_NORMAL_MODE);
+    }
+}
+
+int ili9341_idle(const ili9341_t *dev, bool state)
+{
+    if(state)
+    {
+        return _sendCommand(dev, ILI9341_IDLE_MODE_ON);
+    }
+    else
+    {
+        return _sendCommand(dev, ILI9341_IDLE_MODE_OFF);
+    }
+}
+
+int ili9341_memory_write(const ili9341_t *dev)
+{
+    return _sendCommand(dev, ILI9341_MEMORY_WRITE);
+}
+
+///Read function
+int ili9341_read_id(const ili9341_t *dev, ili9341_id_t *result)
+{
+    uint8_t data[4] = { 0 };
+    int err = _receiveData(dev, ILI9341_DIS_INFOS, data, sizeof(data));
+    if (err)
+    {
+        return err;
+    }
+    result->id1 = data[1] ;
+    result->id2 = data[2] ;
+    result->id3 = data[3] ;
+    return 0;
+}
+
+//
+int ili9341_read_display_status(const ili9341_t *dev, ili9341_dis_status_t *result)
+{
+    uint8_t data[5] = { 0 };
+    int err = _receiveData(dev, ILI9341_DIS_STATUS, data, sizeof(data));
+    if (err)
+    {
+        return err;
+    }
+    result->data0 = data[1];
+    result->data1 = data[2];
+    result->data2 = ((data[3] << 8) & 0xF0) | data[4] ;
+    return 0;
+}
+
+
+//Other
+int ili9341_set_column_addr(const ili9341_t *dev, int32_t start, int32_t stop)
+{
+    uint8_t data[4] = { start >> 8,  (uint8_t)start, stop >> 8, (uint8_t)stop };
+    return _sendCommandData(dev, ILI9341_COLUMN_ADDR_SET, data, sizeof(data));
+}
+
+int ili9341_set_page_addr(const ili9341_t *dev, int32_t start, int32_t stop)
+{
+    uint8_t data[4] = { start >> 8,  (uint8_t)start, stop >> 8, (uint8_t)stop };
+    return _sendCommandData(dev, ILI9341_PAGE_ADDR_SET, data, sizeof(data));
 }
 
 /**********************
  *   STATIC FUNCTIONS
  **********************/
-static int _sendCommand(uint8_t cmd)
+static int _sendCommand(const ili9341_t *dev, uint8_t cmd)
 {
+    int err;
     debug("cmd: %02X",cmd);
-    return -EIO;
+    switch(dev->protocol)
+    {
+#if (ILI9341_SPI4_SUPPORT)
+    case ILI9341_PROTO_SERIAL_8BIT:
+        lv_spi_wr_dc(dev->spi_dev, false); /* command mode */
+        lv_spi_wr_cs(dev->spi_dev, false);
+        err = lv_spi_transaction(dev->spi_dev, NULL, &cmd, 1, 1);
+        lv_spi_wr_cs(dev->spi_dev, true);
+        break;
+#endif
+#if (ILI9341_SPI3_SUPPORT)
+    case ILI9341_PROTO_SERIAL_9BIT:
+        lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, 0, 1);
+        lv_spi_wr_cs(dev->spi_dev, false);
+        err = lv_spi_transaction(dev->spi_dev, NULL, &cmd, 1, 1);
+        lv_spi_wr_cs(dev->spi_dev, true);
+        lv_spi_clr_preemble(dev->spi_dev, LV_SPI_COMMAND);
+        break;
+#endif
+    default:
+        break;
+    }
+    return err;
 }
 
-static int _sendCommandData(uint8_t cmd, uint8_t* data, uint8_t len)
+static int _sendData(const ili9341_t *dev, uint8_t* data_out, uint32_t len)
 {
+    int err;
+    debug("cmd: %02X",cmd);
+    switch(dev->protocol)
+    {
+#if (ILI9341_SPI4_SUPPORT)
+    case ILI9341_PROTO_SERIAL_8BIT:
+        lv_spi_wr_cs(dev->spi_dev, false);
+        lv_spi_wr_dc(dev->spi_dev, true); /* data mode */
+        err = lv_spi_transaction(dev->spi_dev, NULL, data_out, len, 1);
+        lv_spi_wr_cs(dev->spi_dev, true);
+        break;
+#endif
+#if (ILI9341_SPI3_SUPPORT)
+    case ILI9341_PROTO_SERIAL_9BIT:
+        lv_spi_wr_cs(dev->spi_dev, false);
+        lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, 1, 1);
+        for (uint32_t i = 0; i <= len; i++) //column
+        {
+            err = lv_spi_transaction(dev->spi_dev, NULL, &data_out[i], 1, 1);
+            if(err)
+            {
+                break;
+            }
+        }
+        lv_spi_clr_preemble(dev->spi_dev, LV_SPI_COMMAND);
+        lv_spi_wr_cs(dev->spi_dev, true);
+        break;
+#endif
+    default:
+        break;
+    }
+    return err;
+}
+
+//FIXME: this function will be removed
+static int _sendCommandData(const ili9341_t *dev, uint8_t cmd, uint8_t* data_out, uint32_t len)
+{
+    int err;
 #if ILI9341_DEBUG
     printf("ILI9341: cmd: %02X data: ", cmd);
     for (uint8_t i = 0 ; i < len ; i++)
     {
-        printf("%02X ",data[i]);
+        printf("%02X ",data_out[i]);
     }
     printf("\n");
 #endif
+    if((err = _sendCommand(dev, cmd)))
+    {
+        return err;
+    }
+    err = _sendData(dev, data_out, len);
+    return err ;
+}
+
+static int _receiveData(const ili9341_t *dev, uint8_t cmd, uint8_t* data_in, uint32_t len)
+{
+    debug("cmd: %02X",cmd);
     return -EIO;
 }
 
