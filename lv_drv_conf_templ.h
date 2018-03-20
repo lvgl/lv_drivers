@@ -187,11 +187,11 @@
 #endif
 
 /*-------------------------------------------------
- * Mouse as HID device (for Linux based systems)
+ * Mouse or touchpad as evdev interface (for Linux based systems)
  *------------------------------------------------*/
-#define USE_MOUSE_HID    0
-#if USE_MOUSE_HID
-#define MOUSE_HID_DEV   "/dev/input/event0"
+#define USE_EVDEV    0
+#if USE_EVDEV
+#define EVDEV_NAME   "/dev/input/event0"
 #endif
 
 /*-------------------------------
