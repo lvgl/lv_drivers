@@ -56,8 +56,8 @@ typedef struct
         lv_spi_handle_t spi_dev;
 #endif
     };
-    lv_gpio_handle_t rst_pin;
-    lv_gpio_handle_t backlight_pin;
+    lv_gpio_handle_t rst_pin;      //!< Reset pin
+    lv_gpio_handle_t bl_pin;       //!< Backlight pin
     uint16_t width;                //!< Screen width, 320 or 240
     uint16_t height;               //!< Screen height, 240 or 320
 } ili9341_t;

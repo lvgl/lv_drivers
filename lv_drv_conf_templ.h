@@ -345,6 +345,7 @@ static inline int lv_par_read(lv_par_handle_t par_dev, void* data_in, uint16_t l
 #if USE_SSD1306
 #define SSD1306_HOR_RES     LV_HOR_RES
 #define SSD1306_VER_RES     LV_VER_RES
+#define SSD1306_TRANSMISSION_CHECK 0
 #define SSD1306_I2C_SUPPORT  1
 #define SSD1306_SPI4_SUPPORT 1
 #define SSD1306_SPI3_SUPPORT 1

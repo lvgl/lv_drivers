@@ -251,6 +251,17 @@ int ili9341_init(ili9341_t *dev)
         return -ENOTSUP;
     }
 
+    if(dev->rst_pin != LV_DRIVER_NOPIN)
+    {
+        lv_gpio_write(dev->rst_pin, 0);
+        lv_delay_us(5000); //FIXME: Test it with 10 us
+        lv_gpio_write(dev->rst_pin, 1);
+    }
+    if(dev->bl_pin != LV_DRIVER_NOPIN)
+    {
+        lv_gpio_write(dev->bl_pin, 1);
+    }
+
     if((err = ili9341_unknow(dev)))
         return err;
 
@@ -616,14 +627,18 @@ int ili9341_gamma_cor(const ili9341_t *dev, ili9341_gamma_type_e type, ili9341_g
 
 int ili9341_sleep(const ili9341_t *dev, bool state)
 {
+    int err;
     if(state)
     {
-        return _sendCommand(dev, ILI9341_SLEEP_ON);
+        err = _sendCommand(dev, ILI9341_SLEEP_ON);
+        lv_delay_us(5000); //Normal wait mode (5ms)
+        return err;
     }
     else
     {
+        err = _sendCommand(dev, ILI9341_SLEEP_OFF);
         //TODO: Wait 120 ms ? (what is the best way to do it ?
-        return _sendCommand(dev, ILI9341_SLEEP_OFF);
+        return err;
     }
 }
 
@@ -661,13 +676,22 @@ int ili9341_rst(const ili9341_t *dev, bool hard)
     int err;
     if(hard)
     {
-        //TODO: switch protocol to call hardware pin
+        if(dev->rst_pin != LV_DRIVER_NOPIN)
+        {
+            lv_gpio_write(dev->rst_pin, 0);
+            lv_delay_us(10);
+            lv_gpio_write(dev->rst_pin, 1);
+        }
+        else
+        {
+          return -EIO;
+        }
     }
     else
     {
         err = _sendCommand(dev, ILI9341_SOFT_RESET);
-        //TODO: Wait 120 ms ? (what is the best way to do it ?
-
+        lv_delay_us(5000); //Normal wait mode (5ms)
+        //TODO: Wait 120 ms when in sleep mode (what is the best way to do it ?)
     }
     return err;
 }

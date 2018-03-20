@@ -113,6 +113,11 @@ static uint8_t _flag_redraw; //FIXME: Used to optimize the screen update, need t
 #define debug(fmt, ...)
 #endif
 
+#if SSD1306_TRANSMISSION_CHECK
+#define verify_send(fn) do { int err; if((err = fn)) return err; } while (0)
+#else
+#define verify_send(fn)
+#endif
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
@@ -278,19 +283,18 @@ bool ssd1306_need_redraw(void)
 int ssd1306_command(const ssd1306_t *dev, uint8_t cmd)
 {
     debug("Command: 0x%02x", cmd);
-    int err = 0;
     switch (dev->protocol)
     {
 #if (SSD1306_I2C_SUPPORT)
     case SSD1306_PROTO_I2C:
-        err = _i2c_send(dev, 0x00, &cmd, 1);
+        verify_send(_i2c_send(dev, 0x00, &cmd, 1));
         break;
 #endif
 #if (SSD1306_SPI4_SUPPORT)
     case SSD1306_PROTO_SPI4:
         lv_spi_wr_dc(dev->spi_dev, false); /* command mode */
         lv_spi_wr_cs(dev->spi_dev, false);
-        err = lv_spi_transaction(dev->spi_dev, NULL, &cmd, 1, 1);
+        verify_send(lv_spi_transaction(dev->spi_dev, NULL, &cmd, 1, 1));
         lv_spi_wr_cs(dev->spi_dev, true);
         break;
 #endif
@@ -298,7 +302,7 @@ int ssd1306_command(const ssd1306_t *dev, uint8_t cmd)
     case SSD1306_PROTO_SPI3:
         lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, 0, 1);
         lv_spi_wr_cs(dev->spi_dev, false);
-        err = lv_spi_transaction(dev->spi_dev, NULL, &cmd, 1, 1);
+        verify_send(lv_spi_transaction(dev->spi_dev, NULL, &cmd, 1, 1));
         lv_spi_wr_cs(dev->spi_dev, true);
         lv_spi_clr_preemble(dev->spi_dev, LV_SPI_COMMAND);
         break;
@@ -733,7 +737,6 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y
 {
     uint16_t i;
     uint16_t j;
-
     //convert to page
     y1 = y1 >> 3;
     y2 = y2 >> 3;
@@ -742,8 +745,16 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y
 
     if (dev->screen == SSD1306_SCREEN)
     {
-        ssd1306_set_column_addr(dev, x1, x2); // Update x1 to x2
-        ssd1306_set_page_addr(dev, y1, y2); // Update y1 to y2
+        verify_send(ssd1306_set_column_addr(dev, x1, x2));
+        verify_send(ssd1306_set_page_addr(dev, y1, y2));
+        //if ((err = ssd1306_set_column_addr(dev, x1, x2))) // Update x1 to x2
+        //{
+        //  return err;
+        //}
+        //if ((err = ssd1306_set_page_addr(dev, y1, y2))) // Update y1 to y2
+        //{
+        //    return err;
+        //}
     }
 
     switch (dev->protocol)
@@ -765,12 +776,12 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y
                 {
                     if((x2-i) >= 16)
                     {
-                        _i2c_send(dev, 0x40, &_buffer[j*dev->width+i], 16);
+                        verify_send(_i2c_send(dev, 0x40, &_buffer[j*dev->width+i], 16));
                         i+=16;
                     }
                     else
                     {
-                        _i2c_send(dev, 0x40, &_buffer[j*dev->width+i], x2-i);
+                        verify_send(_i2c_send(dev, 0x40, &_buffer[j*dev->width+i], x2-i));
                         i+=(x2-i);
                     }
                 }
@@ -780,17 +791,17 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y
         {
             for (j = y1; j <= y2; j++)
             {
-                sh1106_go_coordinate(dev, x1, j);
+                verify_send(sh1106_go_coordinate(dev, x1, j));
                 for (i = x1; i <= x2 ; ) //column
                 {
-                    if((x2-i) >= 16)
+                     if((x2-i) >= 16)
                     {
-                        _i2c_send(dev, 0x40, &_buffer[j*dev->width+i], 16);
+                        verify_send(_i2c_send(dev, 0x40, &_buffer[j*dev->width+i], 16));
                         i+=16;
                     }
                     else
                     {
-                        _i2c_send(dev, 0x40, &_buffer[j*dev->width+i], x2-i);
+                        verify_send(_i2c_send(dev, 0x40, &_buffer[j*dev->width+i], x2-i));
                         i+=(x2-i);
                     }
                 }
@@ -806,18 +817,18 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y
             lv_spi_wr_dc(dev->spi_dev, true); /* data mode */
             for(j = y1;  j <= y2 ; j++) //page
             {
-                lv_spi_transaction(dev->spi_dev, NULL, &_buffer[j*dev->width+x1], x2-x1, 1);
+                verify_send(lv_spi_transaction(dev->spi_dev, NULL, &_buffer[j*dev->width+x1], x2-x1, 1));
             }
         }
         else
         {
             for (j = y1; j <= y2; j++)
             {
-                sh1106_go_coordinate(dev, x1, j);
+                verify_send(sh1106_go_coordinate(dev, x1, j));
                 /* data mode */
                 lv_spi_wr_dc(dev->spi_dev, true);
                 lv_spi_wr_cs(dev->spi_dev, false); /* sh1106 coordinate will set CS to 1 */
-                lv_spi_transaction(dev->spi_dev, NULL, &_buffer[j*dev->width + x1], x2-x1, 1);
+                verify_send(lv_spi_transaction(dev->spi_dev, NULL, &_buffer[j*dev->width + x1], x2-x1, 1));
             }
         }
         lv_spi_wr_cs(dev->spi_dev, true);
@@ -833,7 +844,7 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y
             {
                 for (i = x1; i <= x2; i++) //column
                 {
-                    lv_spi_transaction(dev->spi_dev, NULL, &_buffer[j*dev->width+i], 1, 1);
+                    verify_send(lv_spi_transaction(dev->spi_dev, NULL, &_buffer[j*dev->width+i], 1, 1));
                 }
             }
         }
@@ -841,12 +852,12 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y
         {
             for (j = y1; j <= y2; j++)
             {
-                sh1106_go_coordinate(dev, x1, j);
+                verify_send(sh1106_go_coordinate(dev, x1, j));
                 lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, 1, 1); /* data mode */
                 lv_spi_wr_cs(dev->spi_dev, false); /* sh1106 coordinate will set CS to 1 */
                 for (i = x1; i <= x2; i++) //column
                 {
-                    lv_spi_transaction(dev->spi_dev, NULL, &_buffer[j*dev->width+i], 1, 1);
+                    verify_send(lv_spi_transaction(dev->spi_dev, NULL, &_buffer[j*dev->width+i], 1, 1));
                 }
             }
         }
