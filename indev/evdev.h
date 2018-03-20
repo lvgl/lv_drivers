@@ -1,10 +1,10 @@
 /**
- * @file mouse.h
+ * @file evdev.h
  *
  */
 
-#ifndef MOUSE_HID_H
-#define MOUSE_HID_H
+#ifndef EVDEV_H
+#define EVDEV_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,7 +16,7 @@ extern "C" {
 
 #include "lv_drv_conf.h"
 
-#if USE_MOUSE_HID
+#if USE_EVDEV
 #include <stdint.h>
 #include <stdbool.h>
 #include "lvgl/lv_hal/lv_hal_indev.h"
@@ -34,25 +34,25 @@ extern "C" {
  **********************/
 
 /**
- * Initialize the mouse
+ * Initialize the evdev
  */
-void mouse_hid_init(void);
+void evdev_init(void);
 /**
- * Get the current position and state of the mouse
- * @param data store the mouse data here
+ * Get the current position and state of the evdev
+ * @param data store the evdev data here
  * @return false: because the points are not buffered, so no more data to be read
  */
-bool mouse_hid_read(lv_indev_data_t * data);
+bool evdev_read(lv_indev_data_t * data);
 
 
 /**********************
  *      MACROS
  **********************/
 
-#endif /* USE_MOUSE_HID */
+#endif /* USE_EVDEV */
 
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
 
-#endif /* MOUSE_HID_H */
+#endif /* EVDEV_H */
