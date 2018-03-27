@@ -42,6 +42,8 @@ static struct fb_fix_screeninfo finfo;
 static char *fbp = 0;
 static long int screensize = 0;
 static int fbfd = 0;
+static uint32_t xres = 0;
+static uint32_t yres = 0;
 
 /**********************
  *      MACROS
@@ -86,6 +88,24 @@ void fbdev_init(void)
     }
     printf("The framebuffer device was mapped to memory successfully.\n");
 
+    /*Correct color depth?*/
+    if(vinfo.bits_per_pixel == 8 && LV_COLOR_DEPTH != 8) {
+        perror("Error: frame buffer color depth mismatch. (Should be 8 to match with LV_COLOR_DEPTH)");
+        return;
+    }
+    if(vinfo.bits_per_pixel == 16 && LV_COLOR_DEPTH != 16) {
+       perror("Error: frame buffer color depth mismatch. (Should be 16 to match with LV_COLOR_DEPTH)");
+       return;
+    }
+    if((vinfo.bits_per_pixel == 24 || vinfo.bits_per_pixel == 32) && LV_COLOR_DEPTH != 24) {
+       perror("Error: frame buffer color depth mismatch. (Should be 24 or 32 to match with LV_COLOR_DEPTH)");
+       return;
+    }
+
+    xres = finfo.line_length / (vinfo.bits_per_pixel / 8);
+    yres = vinfo.yres;
+
+    printf("Frame buffer hor. res: %d, ver. res: %d\n", xres, yres);
 }
 
 /**
@@ -100,17 +120,18 @@ void fbdev_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
 {
     if(fbp == NULL) return;
 
+
     /*Return if the area is out the screen*/
     if(x2 < 0) return;
     if(y2 < 0) return;
-    if(x1 > vinfo.xres - 1) return;
-    if(y1 > vinfo.yres - 1) return;
+    if(x1 > xres - 1) return;
+    if(y1 > yres - 1) return;
 
     /*Truncate the area to the screen*/
     int32_t act_x1 = x1 < 0 ? 0 : x1;
     int32_t act_y1 = y1 < 0 ? 0 : y1;
-    int32_t act_x2 = x2 > vinfo.xres - 1 ? vinfo.xres - 1 : x2;
-    int32_t act_y2 = y2 > vinfo.yres - 1 ? vinfo.yres - 1 : y2;
+    int32_t act_x2 = x2 > xres - 1 ? xres - 1 : x2;
+    int32_t act_y2 = y2 > yres - 1 ? yres - 1 : y2;
 
     long int location = 0;
 
@@ -121,7 +142,7 @@ void fbdev_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
         uint32_t y;
         for(y = act_y1; y <= act_y2; y++) {
             for(x = act_x1; x <= act_x2; x++) {
-                location = (x+vinfo.xoffset) + (y+vinfo.yoffset) * vinfo.xres;
+                location = (x+vinfo.xoffset) + (y+vinfo.yoffset) * xres;
                 fbp32[location] = color_p->full;
                 color_p++;
             }
@@ -136,7 +157,7 @@ void fbdev_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
         uint32_t y;
         for(y = act_y1; y <= act_y2; y++) {
             for(x = act_x1; x <= act_x2; x++) {
-                location = (x+vinfo.xoffset) + (y+vinfo.yoffset) * vinfo.xres;
+                location = (x+vinfo.xoffset) + (y+vinfo.yoffset) * xres;
                 fbp16[location] = color_p->full;
                 color_p++;
             }
@@ -151,7 +172,7 @@ void fbdev_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
         uint32_t y;
         for(y = act_y1; y <= act_y2; y++) {
             for(x = act_x1; x <= act_x2; x++) {
-                location = (x+vinfo.xoffset) + (y+vinfo.yoffset) * vinfo.xres;
+                location = (x+vinfo.xoffset) + (y+vinfo.yoffset) * xres;
                 fbp8[location] = color_p->full;
                 color_p++;
             }
@@ -189,8 +210,8 @@ void fbdev_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t color
     /*Truncate the area to the screen*/
     int32_t act_x1 = x1 < 0 ? 0 : x1;
     int32_t act_y1 = y1 < 0 ? 0 : y1;
-    int32_t act_x2 = x2 > vinfo.xres - 1 ? vinfo.xres - 1 : x2;
-    int32_t act_y2 = y2 > vinfo.yres - 1 ? vinfo.yres - 1 : y2;
+    int32_t act_x2 = x2 > xres - 1 ? xres - 1 : x2;
+    int32_t act_y2 = y2 > yres - 1 ? yres - 1 : y2;
 
     uint32_t x;
     uint32_t y;
@@ -202,7 +223,7 @@ void fbdev_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t color
         uint32_t *fbp32 = (uint32_t*)fbp;
         for(x = act_x1; x <= act_x2; x++) {
             for(y = act_y1; y <= act_y2; y++) {
-                location = (x+vinfo.xoffset) + (y+vinfo.yoffset) * vinfo.xres;
+                location = (x+vinfo.xoffset) + (y+vinfo.yoffset) * xres;
                 fbp32[location] = color.full;
             }
         }
@@ -211,7 +232,7 @@ void fbdev_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t color
         uint16_t *fbp16 = (uint16_t*)fbp;
         for(x = act_x1; x <= act_x2; x++) {
             for(y = act_y1; y <= act_y2; y++) {
-                location = (x+vinfo.xoffset) + (y+vinfo.yoffset) * vinfo.xres;
+                location = (x+vinfo.xoffset) + (y+vinfo.yoffset) * xres;
                 fbp16[location] = color.full;
             }
         }
@@ -220,7 +241,7 @@ void fbdev_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t color
         uint8_t *fbp8 = (uint8_t*)fbp;
         for(x = act_x1; x <= act_x2; x++) {
             for(y = act_y1; y <= act_y2; y++) {
-                location = (x+vinfo.xoffset) + (y+vinfo.yoffset) * vinfo.xres;
+                location = (x+vinfo.xoffset) + (y+vinfo.yoffset) * xres;
                 fbp8[location] = color.full;
             }
         }
@@ -249,14 +270,14 @@ void fbdev_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t 
     /*Return if the area is out the screen*/
     if(x2 < 0) return;
     if(y2 < 0) return;
-    if(x1 > vinfo.xres - 1) return;
-    if(y1 > vinfo.yres - 1) return;
+    if(x1 > xres - 1) return;
+    if(y1 > yres - 1) return;
 
     /*Truncate the area to the screen*/
     int32_t act_x1 = x1 < 0 ? 0 : x1;
     int32_t act_y1 = y1 < 0 ? 0 : y1;
-    int32_t act_x2 = x2 > vinfo.xres - 1 ? vinfo.xres - 1 : x2;
-    int32_t act_y2 = y2 > vinfo.yres - 1 ? vinfo.yres - 1 : y2;
+    int32_t act_x2 = x2 > xres - 1 ? xres - 1 : x2;
+    int32_t act_y2 = y2 > yres - 1 ? yres - 1 : y2;
 
     long int location = 0;
 
@@ -267,7 +288,7 @@ void fbdev_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t 
         uint32_t y;
         for(y = act_y1; y <= act_y2; y++) {
             for(x = act_x1; x <= act_x2; x++) {
-                location = (x+vinfo.xoffset) + (y+vinfo.yoffset) * vinfo.xres;
+                location = (x+vinfo.xoffset) + (y+vinfo.yoffset) * xres;
                 fbp32[location] = color_p->full;
                 color_p++;
             }
@@ -282,7 +303,7 @@ void fbdev_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t 
         uint32_t y;
         for(y = act_y1; y <= act_y2; y++) {
             for(x = act_x1; x <= act_x2; x++) {
-                location = (x+vinfo.xoffset) + (y+vinfo.yoffset) * vinfo.xres;
+                location = (x+vinfo.xoffset) + (y+vinfo.yoffset) * xres;
                 fbp16[location] = color_p->full;
                 color_p++;
             }
@@ -297,7 +318,7 @@ void fbdev_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t 
         uint32_t y;
         for(y = act_y1; y <= act_y2; y++) {
             for(x = act_x1; x <= act_x2; x++) {
-                location = (x+vinfo.xoffset) + (y+vinfo.yoffset) * vinfo.xres;
+                location = (x+vinfo.xoffset) + (y+vinfo.yoffset) * xres;
                 fbp8[location] = color_p->full;
                 color_p++;
             }
