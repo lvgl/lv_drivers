@@ -46,14 +46,14 @@ typedef enum
  */
 typedef struct
 {
-    ili9341_protocol_t protocol;
+    ili9341_protocol_t protocol;   //!< Protocol used
     union
     {
 #if (ILI9341_PAR_SUPPORT)
-        lv_par_handle_t par_dev;
+        lv_par_handle_t par_dev;   //!< Parallel device descriptor
 #endif
 #if (ILI9341_SPI4_SUPPORT) || (ILI9341_SPI3_SUPPORT)
-        lv_spi_handle_t spi_dev;
+        lv_spi_handle_t spi_dev;   //!< SPI device descriptor
 #endif
     };
     lv_gpio_handle_t rst_pin;      //!< Reset pin

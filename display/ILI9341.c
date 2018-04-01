@@ -120,7 +120,6 @@
 #define ILI9341_ENABLE_3G               (0xF2)
 #define ILI9341_PUMP_RATIO_CTR          (0xF7)
 
-
 /**********************
  *      TYPEDEFS
  **********************/
@@ -130,7 +129,7 @@
  **********************/
 static int _sendCommand(const ili9341_t *dev, uint8_t cmd);
 static int _sendCommandData(const ili9341_t *dev, uint8_t cmd, uint8_t* data_out, uint32_t len);
-static int _sendData(const ili9341_t *dev, uint8_t* data_out, uint32_t len);
+static int _sendData(const ili9341_t *dev, uint8_t* data_out, uint32_t len, uint8_t wordsize);
 static int _receiveData(const ili9341_t *dev, uint8_t cmd, uint8_t* data_in, uint32_t len);
 
 /**********************
@@ -143,7 +142,7 @@ static ili9341_t* _device; //FIXME: To remove when multi-display will be support
  **********************/
 #if ILI9341_DEBUG
 #include <stdio.h>
-#define debug(fmt, ...) printf("%s: " fmt "\n", "ILI9341", ## __VA_ARGS__)
+#define debug(fmt, ...) printf("%s: " fmt "\n", __FUNCTION__, ## __VA_ARGS__)
 #else
 #define debug(fmt, ...)
 #endif
@@ -155,6 +154,7 @@ static ili9341_t* _device; //FIXME: To remove when multi-display will be support
 
 void ili9341_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
 {
+    debug("flush usage");
     /*Return if the area is out the screen*/
     if (x2 < 0 || y2 < 0 || x1 > LV_HOR_RES - 1 || y1 > LV_VER_RES - 1)
     {
@@ -163,26 +163,42 @@ void ili9341_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
     }
 
     /*Truncate the area to the screen*/
-    //int32_t act_x1 = x1 < 0 ? 0 : x1;
-    //int32_t act_y1 = y1 < 0 ? 0 : y1;
-    //int32_t act_x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
-    //int32_t act_y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
+    int32_t act_x1 = x1 < 0 ? 0 : x1;
+    int32_t act_y1 = y1 < 0 ? 0 : y1;
+    int32_t act_x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
+    int32_t act_y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
 
     ili9341_set_column_addr(_device, x1, x2);
     ili9341_set_page_addr(_device, y1, y2);
     ili9341_memory_write(_device);
 
     uint32_t size = (x2 - x1 + 1) * (y2 - y1 + 1);
-    uint32_t i;
-    while(size > _device->width) {
 
-        _sendData(color_p, _device->width * 2);
-        //vTaskDelay(10 / portTICK_PERIOD_MS);
-        size -= _device->width;
-        color_p += _device->width;
+#if ILI9341_SPI_BYTESWAP
+    uint16_t buf[ILI9341_SPI_MAX_SAMPLE];
+    for(uint16_t i= size/ILI9341_SPI_MAX_SAMPLE ; i > 0 ; i--)
+    {
+        for(uint16_t u = 0 ; u < ILI9341_SPI_MAX_SAMPLE ; u++)
+        {
+            buf[u] = SWAPBYTES(color_p->full);
+            color_p++;
+        }
+        _sendData(_device, (uint8_t*)buf, ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t));
     }
-    _sendData(color_p, size * 2); /*Send the remaining data*/
-
+    for(uint16_t u = 0 ; u < size % ILI9341_SPI_MAX_SAMPLE ; u++)
+    {
+        buf[u] = SWAPBYTES(color_p->full);
+        color_p++;
+    }
+    _sendData(_device, (uint8_t*)buf, size % ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
+#else
+    for(uint16_t i= size/ILI9341_SPI_MAX_SAMPLE ; i > 0 ; i--)
+    {
+        _sendData(_device, (uint8_t*)color_p, ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t));
+        color_p += ILI9341_SPI_MAX_SAMPLE;
+    }
+    _sendData(_device, (uint8_t*)color_p, size % ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
+#endif
     lv_flush_ready();
 }
 
@@ -197,15 +213,30 @@ void ili9341_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t col
     }
 
     /*Truncate the area to the screen*/
-    //int32_t act_x1 = x1 < 0 ? 0 : x1;
-    //int32_t act_y1 = y1 < 0 ? 0 : y1;
-    //int32_t act_x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
-    //int32_t act_y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
+    int32_t act_x1 = x1 < 0 ? 0 : x1;
+    int32_t act_y1 = y1 < 0 ? 0 : y1;
+    int32_t act_x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
+    int32_t act_y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
 
     ili9341_set_column_addr(_device, x1, x2);
     ili9341_set_page_addr(_device, y1, y2);
     ili9341_memory_write(_device);
 
+    uint32_t size = (x2 - x1 + 1) * (y2 - y1 + 1);
+    uint16_t buf[ILI9341_SPI_MAX_SAMPLE];
+    for(uint16_t i = 0; i < ILI9341_SPI_MAX_SAMPLE; i++)
+    {
+#if ILI9341_SPI_BYTESWAP
+        buf[i] = SWAPBYTES(color.full);
+#else
+        buf[i] = color.full;
+#endif
+    }
+    for(uint16_t i= size/ILI9341_SPI_MAX_SAMPLE ; i > 0 ; i--)
+    {
+        _sendData(_device, (uint8_t*)buf, ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t));
+    }
+    _sendData(_device, (uint8_t*)buf, size % ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
 }
 
 void ili9341_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
@@ -217,14 +248,42 @@ void ili9341_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
     }
 
     /*Truncate the area to the screen*/
-    //int32_t act_x1 = x1 < 0 ? 0 : x1;
-    //int32_t act_y1 = y1 < 0 ? 0 : y1;
-    //int32_t act_x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
-    //int32_t act_y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
+    int32_t act_x1 = x1 < 0 ? 0 : x1;
+    int32_t act_y1 = y1 < 0 ? 0 : y1;
+    int32_t act_x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
+    int32_t act_y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
 
     ili9341_set_column_addr(_device, x1, x2);
     ili9341_set_page_addr(_device, y1, y2);
     ili9341_memory_write(_device);
+
+    uint32_t size = (x2 - x1 + 1) * (y2 - y1 + 1);
+
+#if ILI9341_SPI_BYTESWAP
+    uint16_t buf[ILI9341_SPI_MAX_SAMPLE];
+    for(uint16_t i= size/ILI9341_SPI_MAX_SAMPLE ; i > 0 ; i--)
+    {
+        for(uint16_t u = 0 ; u < ILI9341_SPI_MAX_SAMPLE ; u++)
+        {
+            buf[u] = SWAPBYTES(color_p->full);
+            color_p++;
+        }
+        _sendData(_device, (uint8_t*)buf, ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t));
+    }
+    for(uint16_t u = 0 ; u < size % ILI9341_SPI_MAX_SAMPLE ; u++)
+    {
+        buf[u] = SWAPBYTES(color_p->full);
+        color_p++;
+    }
+    _sendData(_device, (uint8_t*)buf, size % ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
+#else
+    for(uint16_t i= size/ILI9341_SPI_MAX_SAMPLE ; i > 0 ; i--)
+    {
+        _sendData(_device, (uint8_t*)color_p, ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t));
+        color_p += ILI9341_SPI_MAX_SAMPLE;
+    }
+    _sendData(_device, (uint8_t*)color_p, size % ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
+#endif
 
 }
 
@@ -262,14 +321,28 @@ int ili9341_init(ili9341_t *dev)
         lv_gpio_write(dev->bl_pin, 1);
     }
 
-    if((err = ili9341_unknow(dev)))
+    //if((err = ili9341_unknow(dev)))
+    //    return err;
+
+    ili9341_pwr_ctrl_a_t power_ctrl_a_config = { 0 };
+    power_ctrl_a_config.reg_vd = 4 ;
+    power_ctrl_a_config.vbc = 2 ;
+    if((err = ili9341_pwr_ctrl_a(dev, power_ctrl_a_config)))
         return err;
 
     ili9341_pwr_ctrl_b_t pwr_ctrl_b_config = { 0 };
     pwr_ctrl_b_config.dc_ena = 1 ;
     pwr_ctrl_b_config.pceq = 1 ;
-
     if((err = ili9341_power_control_b(dev, pwr_ctrl_b_config)))
+        return err;
+
+    ili9341_timing_ctrl_a_t timing_ctrl_a_config = { 0 };
+    timing_ctrl_a_config.now = 1 ;
+    if((err = ili9341_timing_ctrl_a(dev, timing_ctrl_a_config)))
+        return err;
+
+    ili9341_timing_ctrl_b_t timing_ctrl_b_config = { 0 };
+    if((err = ili9341_timing_ctrl_b(dev, timing_ctrl_b_config)))
         return err;
 
     ili9341_pwr_seq_ctrl_t pwr_seq_ctrl_config  = { 0 };
@@ -279,31 +352,13 @@ int ili9341_init(ili9341_t *dev)
     pwr_seq_ctrl_config.en_vgh = 1 ;
     pwr_seq_ctrl_config.en_vgl = 2 ;
     pwr_seq_ctrl_config.ddvdh_enh = 1;
-
     if((err = ili9341_power_on_seq_ctrl(dev, pwr_seq_ctrl_config)))
-        return err;
-
-    ili9341_timing_ctrl_a_t timing_ctrl_a_config = { 0 };
-    timing_ctrl_a_config.now = 1 ;
-
-    if((err = ili9341_timing_ctrl_a(dev, timing_ctrl_a_config)))
-        return err;
-
-    ili9341_pwr_ctrl_a_t power_ctrl_a_config = { 0 };
-    power_ctrl_a_config.reg_vd = 4 ;
-    power_ctrl_a_config.vbc = 2 ;
-
-    if((err = ili9341_pwr_ctrl_a(dev, power_ctrl_a_config)))
         return err;
 
     ili9341_pump_ratio_ctrl_t pump_ration_ctrl_config = { 0 };
     pump_ration_ctrl_config.ratio = 2 ;
 
     if((err = ili9341_pump_ratio_ctrl(dev, pump_ration_ctrl_config)))
-        return err;
-
-    ili9341_timing_ctrl_b_t timing_ctrl_b_config = { 0 };
-    if((err = ili9341_timing_ctrl_b(dev, timing_ctrl_b_config)))
         return err;
 
     ili9341_pwr_ctrl_1_t pwr_ctrl_1_config = { 0 } ;
@@ -333,9 +388,9 @@ int ili9341_init(ili9341_t *dev)
     if((err = ili9341_mem_ctrl(dev, ili9341_mem_ctrl_config)))
         return err;
 
-    ili9341_vert_scroll_start_t ili9341_vert_scroll_start_config = { 0 };
-    if((err = ili9341_vert_scroll_start(dev, ili9341_vert_scroll_start_config)))
-        return err;
+    //ili9341_vert_scroll_start_t ili9341_vert_scroll_start_config = { 0 };
+    //if((err = ili9341_vert_scroll_start(dev, ili9341_vert_scroll_start_config)))
+    //    return err;
 
     ili9341_px_fmt_t ili9341_pixel_fmt_config = { 0 };
     ili9341_pixel_fmt_config.dbi = 0b101 ;
@@ -673,7 +728,7 @@ int ili9341_nope(const ili9341_t *dev)
 
 int ili9341_rst(const ili9341_t *dev, bool hard)
 {
-    int err;
+    int err = 0;
     if(hard)
     {
         if(dev->rst_pin != LV_DRIVER_NOPIN)
@@ -801,17 +856,24 @@ static int _sendCommand(const ili9341_t *dev, uint8_t cmd)
     return err;
 }
 
-static int _sendData(const ili9341_t *dev, uint8_t* data_out, uint32_t len)
+static int _sendData(const ili9341_t *dev, uint8_t* data_out, uint32_t len, uint8_t wordsize)
 {
     int err;
-    debug("cmd: %02X",cmd);
+#if ILI9341_DEBUG
+    printf("%s: ",__FUNCTION__);
+    for (uint8_t i = 0 ; i < len ; i++)
+    {
+        printf("%02X ",data_out[i]);
+    }
+    printf("\n");
+#endif
     switch(dev->protocol)
     {
 #if (ILI9341_SPI4_SUPPORT)
     case ILI9341_PROTO_SERIAL_8BIT:
         lv_spi_wr_cs(dev->spi_dev, false);
         lv_spi_wr_dc(dev->spi_dev, true); /* data mode */
-        err = lv_spi_transaction(dev->spi_dev, NULL, data_out, len, 1);
+        err = lv_spi_transaction(dev->spi_dev, NULL, data_out, len, wordsize);
         lv_spi_wr_cs(dev->spi_dev, true);
         break;
 #endif
@@ -819,7 +881,7 @@ static int _sendData(const ili9341_t *dev, uint8_t* data_out, uint32_t len)
     case ILI9341_PROTO_SERIAL_9BIT:
         lv_spi_wr_cs(dev->spi_dev, false);
         lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, 1, 1);
-        for (uint32_t i = 0; i <= len; i++) //column
+        for (uint32_t i = 0; i <= len*wordsize; i++)
         {
             err = lv_spi_transaction(dev->spi_dev, NULL, &data_out[i], 1, 1);
             if(err)
@@ -841,19 +903,11 @@ static int _sendData(const ili9341_t *dev, uint8_t* data_out, uint32_t len)
 static int _sendCommandData(const ili9341_t *dev, uint8_t cmd, uint8_t* data_out, uint32_t len)
 {
     int err;
-#if ILI9341_DEBUG
-    printf("ILI9341: cmd: %02X data: ", cmd);
-    for (uint8_t i = 0 ; i < len ; i++)
-    {
-        printf("%02X ",data_out[i]);
-    }
-    printf("\n");
-#endif
     if((err = _sendCommand(dev, cmd)))
     {
         return err;
     }
-    err = _sendData(dev, data_out, len);
+    err = _sendData(dev, data_out, len, 1);
     return err ;
 }
 

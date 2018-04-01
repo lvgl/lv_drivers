@@ -311,8 +311,11 @@ static inline int lv_par_read(lv_par_handle_t par_dev, void* data_in, uint16_t l
  *--------------*/
 #define USE_ILI9341        1
 #if USE_ILI9341
-#define ILI9341_SPI4_SUPPORT 1
-#define ILI9341_SPI3_SUPPORT 1
+#define ILI9341_DEBUG          (0)
+#define ILI9341_SPI4_SUPPORT   (1)
+#define ILI9341_SPI3_SUPPORT   (1)
+#define ILI9341_SPI_MAX_SAMPLE (64) //half sample size send throw SPI (pixel = 2 byte)
+#define ILI9341_SPI_BYTESWAP   (0)  //Set Endiannes here if SPI don't support it
 #endif
 
 /*----------------
