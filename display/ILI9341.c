@@ -15,12 +15,12 @@
 /*********************
  *      DEFINES
  *********************/
-#ifndef ILI9341_SPI4_SUPPORT
-#define ILI9341_SPI4_SUPPORT 1
+#ifndef ILI9341_SPI3WIRE_SUPPORT
+#define ILI9341_SPI3WIRE_SUPPORT 1
 #endif
 
-#ifndef ILI9341_SPI3_SUPPORT
-#define ILI9341_SPI3_SUPPORT 1
+#ifndef ILI9341_SPI4WIRE_SUPPORT
+#define ILI9341_SPI4WIRE_SUPPORT 1
 #endif
 
 /* utility */
@@ -123,10 +123,22 @@
 /**********************
  *      TYPEDEFS
  **********************/
+typedef struct {
+    uint8_t red;
+    uint8_t green;
+    uint8_t blue;
+} ili9341_color24_t;
 
 /**********************
  *  STATIC PROTOTYPES
  **********************/
+#if (ILI9341_SPI3WIRE_SUPPORT)
+static int inline _spi3wire_send(const ili9341_t *dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize);
+#endif
+#if (ILI9341_SPI4WIRE_SUPPORT)
+static int inline _spi4wire_send(const ili9341_t *dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize);
+#endif
+
 static int _sendCommand(const ili9341_t *dev, uint8_t cmd);
 static int _sendCommandData(const ili9341_t *dev, uint8_t cmd, uint8_t* data_out, uint32_t len);
 static int _sendData(const ili9341_t *dev, uint8_t* data_out, uint32_t len, uint8_t wordsize);
@@ -147,6 +159,11 @@ static ili9341_t* _device; //FIXME: To remove when multi-display will be support
 #define debug(fmt, ...)
 #endif
 
+#if ILI9341_ERR_CHECK
+#define err_control(fn) do { int err; if((err = fn)) return err; } while (0)
+#else
+#define err_control(fn) (fn)
+#endif
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
@@ -163,10 +180,10 @@ void ili9341_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
     }
 
     /*Truncate the area to the screen*/
-    int32_t act_x1 = x1 < 0 ? 0 : x1;
-    int32_t act_y1 = y1 < 0 ? 0 : y1;
-    int32_t act_x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
-    int32_t act_y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
+    x1 = x1 < 0 ? 0 : x1;
+    y1 = y1 < 0 ? 0 : y1;
+    x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
+    y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
 
     ili9341_set_column_addr(_device, x1, x2);
     ili9341_set_page_addr(_device, y1, y2);
@@ -174,31 +191,57 @@ void ili9341_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
 
     uint32_t size = (x2 - x1 + 1) * (y2 - y1 + 1);
 
-#if ILI9341_SPI_BYTESWAP
-    uint16_t buf[ILI9341_SPI_MAX_SAMPLE];
-    for(uint16_t i= size/ILI9341_SPI_MAX_SAMPLE ; i > 0 ; i--)
+#if ILI9341_COLOR == 65
+#if ILI9341_BYTESWAP
+    uint16_t buf[ILI9341_MAX_SAMPLE];
+    for(uint16_t i= size/ILI9341_MAX_SAMPLE ; i > 0 ; i--)
     {
-        for(uint16_t u = 0 ; u < ILI9341_SPI_MAX_SAMPLE ; u++)
+        for(uint16_t u = 0 ; u < ILI9341_MAX_SAMPLE ; u++)
         {
             buf[u] = SWAPBYTES(color_p->full);
             color_p++;
         }
-        _sendData(_device, (uint8_t*)buf, ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t));
+        _sendData(_device, (uint8_t*)buf, ILI9341_MAX_SAMPLE, sizeof(lv_color_t));
     }
-    for(uint16_t u = 0 ; u < size % ILI9341_SPI_MAX_SAMPLE ; u++)
+    for(uint16_t u = 0 ; u < size % ILI9341_MAX_SAMPLE ; u++)
     {
         buf[u] = SWAPBYTES(color_p->full);
         color_p++;
     }
-    _sendData(_device, (uint8_t*)buf, size % ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
+    _sendData(_device, (uint8_t*)buf, size % ILI9341_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
 #else
-    for(uint16_t i= size/ILI9341_SPI_MAX_SAMPLE ; i > 0 ; i--)
+    for(uint16_t i= size/ILI9341_MAX_SAMPLE ; i > 0 ; i--)
     {
-        _sendData(_device, (uint8_t*)color_p, ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t));
-        color_p += ILI9341_SPI_MAX_SAMPLE;
+        _sendData(_device, (uint8_t*)color_p, ILI9341_MAX_SAMPLE, sizeof(lv_color_t));
+        color_p += ILI9341_MAX_SAMPLE;
     }
-    _sendData(_device, (uint8_t*)color_p, size % ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
+    _sendData(_device, (uint8_t*)color_p, size % ILI9341_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
 #endif
+#else
+    //FIXME: Color conversion good ? Protocol from datasheet said to shift it but it is don't work as expected
+    ili9341_color24_t buf[ILI9341_MAX_SAMPLE];
+    for(uint16_t i= size/ILI9341_MAX_SAMPLE ; i > 0 ; i--)
+    {
+        for(uint16_t u = 0 ; u < ILI9341_MAX_SAMPLE ; u++)
+        {
+            buf[u].red = color_p->red;//<< 2;
+            buf[u].green = color_p->green;//<< 2;
+            buf[u].blue = color_p->blue;//<< 2;
+            color_p++;
+        }
+        _sendData(_device, (uint8_t*)buf, ILI9341_MAX_SAMPLE*3, 1);
+    }
+    for(uint16_t u = 0 ; u < size % ILI9341_MAX_SAMPLE ; u++)
+    {
+        buf[u].red = color_p->red;//<< 2;
+        buf[u].green = color_p->green;//<< 2;
+        buf[u].blue = color_p->blue;//<< 2;
+        color_p++;
+    }
+    _sendData(_device, (uint8_t*)buf, size % ILI9341_MAX_SAMPLE*3, 1); /*Send the remaining data*/
+#endif
+
+
     lv_flush_ready();
 }
 
@@ -213,30 +256,46 @@ void ili9341_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t col
     }
 
     /*Truncate the area to the screen*/
-    int32_t act_x1 = x1 < 0 ? 0 : x1;
-    int32_t act_y1 = y1 < 0 ? 0 : y1;
-    int32_t act_x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
-    int32_t act_y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
+    x1 = x1 < 0 ? 0 : x1;
+    y1 = y1 < 0 ? 0 : y1;
+    x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
+    y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
 
     ili9341_set_column_addr(_device, x1, x2);
     ili9341_set_page_addr(_device, y1, y2);
     ili9341_memory_write(_device);
 
     uint32_t size = (x2 - x1 + 1) * (y2 - y1 + 1);
-    uint16_t buf[ILI9341_SPI_MAX_SAMPLE];
-    for(uint16_t i = 0; i < ILI9341_SPI_MAX_SAMPLE; i++)
+
+#if ILI9341_COLOR == 65
+    uint16_t buf[ILI9341_MAX_SAMPLE];
+    for(uint16_t i = 0; i < ILI9341_MAX_SAMPLE; i++)
     {
-#if ILI9341_SPI_BYTESWAP
+#if ILI9341_BYTESWAP
         buf[i] = SWAPBYTES(color.full);
 #else
         buf[i] = color.full;
 #endif
     }
-    for(uint16_t i= size/ILI9341_SPI_MAX_SAMPLE ; i > 0 ; i--)
+    for(uint16_t i= size/ILI9341_MAX_SAMPLE ; i > 0 ; i--)
     {
-        _sendData(_device, (uint8_t*)buf, ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t));
+        _sendData(_device, (uint8_t*)buf, ILI9341_MAX_SAMPLE, sizeof(lv_color_t));
     }
-    _sendData(_device, (uint8_t*)buf, size % ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
+    _sendData(_device, (uint8_t*)buf, size % ILI9341_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
+#else
+    ili9341_color24_t buf[ILI9341_MAX_SAMPLE];
+    for(uint16_t i = 0; i < ILI9341_MAX_SAMPLE; i++)
+    {
+        buf[i].red = color.red;
+        buf[i].green = color.green;
+        buf[i].blue = color.blue;
+    }
+    for(uint16_t i= size/ILI9341_MAX_SAMPLE ; i > 0 ; i--)
+    {
+        _sendData(_device, (uint8_t*)buf, ILI9341_MAX_SAMPLE*3, sizeof(lv_color_t));
+    }
+    _sendData(_device, (uint8_t*)buf, size % ILI9341_MAX_SAMPLE*3, sizeof(lv_color_t)); /*Send the remaining data*/
+#endif
 }
 
 void ili9341_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
@@ -248,10 +307,10 @@ void ili9341_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
     }
 
     /*Truncate the area to the screen*/
-    int32_t act_x1 = x1 < 0 ? 0 : x1;
-    int32_t act_y1 = y1 < 0 ? 0 : y1;
-    int32_t act_x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
-    int32_t act_y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
+    x1 = x1 < 0 ? 0 : x1;
+    y1 = y1 < 0 ? 0 : y1;
+    x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
+    y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
 
     ili9341_set_column_addr(_device, x1, x2);
     ili9341_set_page_addr(_device, y1, y2);
@@ -259,30 +318,53 @@ void ili9341_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
 
     uint32_t size = (x2 - x1 + 1) * (y2 - y1 + 1);
 
-#if ILI9341_SPI_BYTESWAP
-    uint16_t buf[ILI9341_SPI_MAX_SAMPLE];
-    for(uint16_t i= size/ILI9341_SPI_MAX_SAMPLE ; i > 0 ; i--)
+#if ILI9341_COLOR == 65
+#if ILI9341_BYTESWAP
+    uint16_t buf[ILI9341_MAX_SAMPLE];
+    for(uint16_t i= size/ILI9341_MAX_SAMPLE ; i > 0 ; i--)
     {
-        for(uint16_t u = 0 ; u < ILI9341_SPI_MAX_SAMPLE ; u++)
+        for(uint16_t u = 0 ; u < ILI9341_MAX_SAMPLE ; u++)
         {
             buf[u] = SWAPBYTES(color_p->full);
             color_p++;
         }
-        _sendData(_device, (uint8_t*)buf, ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t));
+        _sendData(_device, (uint8_t*)buf, ILI9341_MAX_SAMPLE, sizeof(lv_color_t));
     }
-    for(uint16_t u = 0 ; u < size % ILI9341_SPI_MAX_SAMPLE ; u++)
+    for(uint16_t u = 0 ; u < size % ILI9341_MAX_SAMPLE ; u++)
     {
         buf[u] = SWAPBYTES(color_p->full);
         color_p++;
     }
-    _sendData(_device, (uint8_t*)buf, size % ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
+    _sendData(_device, (uint8_t*)buf, size % ILI9341_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
 #else
-    for(uint16_t i= size/ILI9341_SPI_MAX_SAMPLE ; i > 0 ; i--)
+    for(uint16_t i= size/ILI9341_MAX_SAMPLE ; i > 0 ; i--)
     {
-        _sendData(_device, (uint8_t*)color_p, ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t));
-        color_p += ILI9341_SPI_MAX_SAMPLE;
+        _sendData(_device, (uint8_t*)color_p, ILI9341_MAX_SAMPLE, sizeof(lv_color_t));
+        color_p += ILI9341_MAX_SAMPLE;
     }
-    _sendData(_device, (uint8_t*)color_p, size % ILI9341_SPI_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
+    _sendData(_device, (uint8_t*)color_p, size % ILI9341_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
+#endif
+#else
+    ili9341_color24_t buf[ILI9341_MAX_SAMPLE];
+    for(uint16_t i= size/ILI9341_MAX_SAMPLE ; i > 0 ; i--)
+    {
+        for(uint16_t u = 0 ; u < ILI9341_MAX_SAMPLE ; u++)
+        {
+            buf[u].red = color_p->red;//<< 2;
+            buf[u].green = color_p->green;//<< 2;
+            buf[u].blue = color_p->blue;//<< 2;
+            color_p++;
+        }
+        _sendData(_device, (uint8_t*)buf, ILI9341_MAX_SAMPLE*3, 1);
+    }
+    for(uint16_t u = 0 ; u < size % ILI9341_MAX_SAMPLE ; u++)
+    {
+        buf[u].red = color_p->red;//<< 2;
+        buf[u].green = color_p->green;//<< 2;
+        buf[u].blue = color_p->blue;//<< 2;
+        color_p++;
+    }
+    _sendData(_device, (uint8_t*)buf, size % ILI9341_MAX_SAMPLE*3, 1); /*Send the remaining data*/
 #endif
 
 }
@@ -324,64 +406,6 @@ int ili9341_init(ili9341_t *dev)
     //if((err = ili9341_unknow(dev)))
     //    return err;
 
-    ili9341_pwr_ctrl_a_t power_ctrl_a_config = { 0 };
-    power_ctrl_a_config.reg_vd = 4 ;
-    power_ctrl_a_config.vbc = 2 ;
-    if((err = ili9341_pwr_ctrl_a(dev, power_ctrl_a_config)))
-        return err;
-
-    ili9341_pwr_ctrl_b_t pwr_ctrl_b_config = { 0 };
-    pwr_ctrl_b_config.dc_ena = 1 ;
-    pwr_ctrl_b_config.pceq = 1 ;
-    if((err = ili9341_power_control_b(dev, pwr_ctrl_b_config)))
-        return err;
-
-    ili9341_timing_ctrl_a_t timing_ctrl_a_config = { 0 };
-    timing_ctrl_a_config.now = 1 ;
-    if((err = ili9341_timing_ctrl_a(dev, timing_ctrl_a_config)))
-        return err;
-
-    ili9341_timing_ctrl_b_t timing_ctrl_b_config = { 0 };
-    if((err = ili9341_timing_ctrl_b(dev, timing_ctrl_b_config)))
-        return err;
-
-    ili9341_pwr_seq_ctrl_t pwr_seq_ctrl_config  = { 0 };
-    pwr_seq_ctrl_config.cp23_soft_start = 0 ;
-    pwr_seq_ctrl_config.cp1_soft_start = 2 ;
-    pwr_seq_ctrl_config.en_ddvdh = 3 ;
-    pwr_seq_ctrl_config.en_vgh = 1 ;
-    pwr_seq_ctrl_config.en_vgl = 2 ;
-    pwr_seq_ctrl_config.ddvdh_enh = 1;
-    if((err = ili9341_power_on_seq_ctrl(dev, pwr_seq_ctrl_config)))
-        return err;
-
-    ili9341_pump_ratio_ctrl_t pump_ration_ctrl_config = { 0 };
-    pump_ration_ctrl_config.ratio = 2 ;
-
-    if((err = ili9341_pump_ratio_ctrl(dev, pump_ration_ctrl_config)))
-        return err;
-
-    ili9341_pwr_ctrl_1_t pwr_ctrl_1_config = { 0 } ;
-    pwr_ctrl_1_config.vrh = 0b100011;
-    if((err = ili9341_pwr_ctrl_1(dev, pwr_ctrl_1_config)))
-        return err;
-
-    ili9341_pwr_ctrl_2_t pwr_ctrl_2_config = { 0 } ;
-    if((err = ili9341_pwr_ctrl_2(dev, pwr_ctrl_2_config)))
-        return err;
-
-    ili9341_vcom_ctrl_1_t vcom_ctrl_1_config = { 0 } ;
-    vcom_ctrl_1_config.vmh = 0b00111110;
-    vcom_ctrl_1_config.vml = 0b00101000;
-    if((err = ili9341_vcom_ctrl_1(dev, vcom_ctrl_1_config)))
-        return err;
-
-    ili9341_vcom_ctrl_2_t vcom_ctrl_2_config = { 0 } ;
-    vcom_ctrl_2_config.vmf = 6 ;
-    vcom_ctrl_2_config.nvm = 1 ;
-    if((err = ili9341_vcom_ctrl_2(dev, vcom_ctrl_2_config)))
-        return err;
-
     ili9341_mem_ctrl_t ili9341_mem_ctrl_config = { 0 } ;
     ili9341_mem_ctrl_config.mx = 1 ;
     ili9341_mem_ctrl_config.bgr = 1 ;
@@ -393,27 +417,16 @@ int ili9341_init(ili9341_t *dev)
     //    return err;
 
     ili9341_px_fmt_t ili9341_pixel_fmt_config = { 0 };
+#if ILI9341_COLOR == 65
     ili9341_pixel_fmt_config.dbi = 0b101 ;
     ili9341_pixel_fmt_config.dpi = 0b101 ;
+#else
+    ili9341_pixel_fmt_config.dbi = 0b110 ;
+    ili9341_pixel_fmt_config.dpi = 0b110 ;
+#endif
     if((err = ili9341_pixel_fmt(dev, ili9341_pixel_fmt_config)))
         return err;
 
-    ili9341_frame_rate_ctrl_t ili9341_frame_rate_ctrl_config = { 0 };
-    ili9341_frame_rate_ctrl_config.rtna = 0b11000 ;
-    if((err = ili9341_frame_rate_ctrl(dev, ili9341_frame_rate_ctrl_config)))
-        return err;
-
-    ili9341_dis_fn_ctrl_t ili9341_dis_fn_ctrl_config = { 0 };
-    ili9341_dis_fn_ctrl_config.ptg = 0b10 ;
-    ili9341_dis_fn_ctrl_config.isc = 0b0010 ;
-    ili9341_dis_fn_ctrl_config.rev = 0b1 ;
-    ili9341_dis_fn_ctrl_config.nl = 0b100111;
-    if((err = ili9341_display_fn_ctrl(dev, ili9341_dis_fn_ctrl_config)))
-        return err;
-
-    ili9341_ena_3g_t ili9341_ena_3g_config = { 0 };
-    if((err = ili9341_enable_3g(dev, ili9341_ena_3g_config)))
-        return err;
 
     ili9341_gamma_set_t ili9341_gamma_set_config = { 0 };
     ili9341_gamma_set_config.gamma_set = 0x01 ;
@@ -460,6 +473,89 @@ int ili9341_init(ili9341_t *dev)
     if((err = ili9341_gamma_cor(dev, ili9341_gamma_neg, ili9341_gamma_config)))
         return err;
 
+#if ILI9341_EXTC_SUPPORT
+    ili9341_frame_rate_ctrl_t ili9341_frame_rate_ctrl_config = { 0 };
+    ili9341_frame_rate_ctrl_config.rtna = 0b11000 ;
+    if((err = ili9341_frame_rate_ctrl(dev, ili9341_frame_rate_ctrl_config)))
+        return err;
+
+    ili9341_dis_fn_ctrl_t ili9341_dis_fn_ctrl_config = { 0 };
+    ili9341_dis_fn_ctrl_config.ptg = 0b10 ;
+    ili9341_dis_fn_ctrl_config.isc = 0b0010 ;
+    ili9341_dis_fn_ctrl_config.rev = 0b1 ;
+    ili9341_dis_fn_ctrl_config.nl = 0b100111;
+    if((err = ili9341_display_fn_ctrl(dev, ili9341_dis_fn_ctrl_config)))
+        return err;
+
+    ili9341_pump_ratio_ctrl_t pump_ration_ctrl_config = { 0 };
+    pump_ration_ctrl_config.ratio = 2 ;
+    if((err = ili9341_pump_ratio_ctrl(dev, pump_ration_ctrl_config)))
+        return err;
+
+    ili9341_pwr_ctrl_a_t power_ctrl_a_config = { 0 };
+    power_ctrl_a_config.reg_vd = 4 ;
+    power_ctrl_a_config.vbc = 2 ;
+    if((err = ili9341_pwr_ctrl_a(dev, power_ctrl_a_config)))
+        return err;
+
+    ili9341_pwr_ctrl_b_t pwr_ctrl_b_config = { 0 };
+    pwr_ctrl_b_config.dc_ena = 1 ;
+    pwr_ctrl_b_config.pceq = 1 ;
+    if((err = ili9341_pwr_ctrl_b(dev, pwr_ctrl_b_config)))
+        return err;
+
+    ili9341_pwr_ctrl_1_t pwr_ctrl_1_config = { 0 } ;
+    pwr_ctrl_1_config.vrh = 0b100011;
+    if((err = ili9341_pwr_ctrl_1(dev, pwr_ctrl_1_config)))
+        return err;
+
+    ili9341_pwr_ctrl_2_t pwr_ctrl_2_config = { 0 } ;
+    if((err = ili9341_pwr_ctrl_2(dev, pwr_ctrl_2_config)))
+        return err;
+
+    ili9341_vcom_ctrl_1_t vcom_ctrl_1_config = { 0 } ;
+    vcom_ctrl_1_config.vmh = 0b00111110;
+    vcom_ctrl_1_config.vml = 0b00101000;
+    if((err = ili9341_vcom_ctrl_1(dev, vcom_ctrl_1_config)))
+        return err;
+
+    ili9341_vcom_ctrl_2_t vcom_ctrl_2_config = { 0 } ;
+    vcom_ctrl_2_config.vmf = 6 ;
+    vcom_ctrl_2_config.nvm = 1 ;
+    if((err = ili9341_vcom_ctrl_2(dev, vcom_ctrl_2_config)))
+        return err;
+
+    ili9341_pwr_seq_ctrl_t pwr_seq_ctrl_config  = { 0 };
+    pwr_seq_ctrl_config.cp23_soft_start = 0 ;
+    pwr_seq_ctrl_config.cp1_soft_start = 2 ;
+    pwr_seq_ctrl_config.en_ddvdh = 3 ;
+    pwr_seq_ctrl_config.en_vgh = 1 ;
+    pwr_seq_ctrl_config.en_vgl = 2 ;
+    pwr_seq_ctrl_config.ddvdh_enh = 1;
+    if((err = ili9341_power_on_seq_ctrl(dev, pwr_seq_ctrl_config)))
+        return err;
+
+    ili9341_int_ctrl_t ili9341_int_ctrl_config = { 0 };
+    ili9341_int_ctrl_config.wemode = 1 ;
+    ili9341_int_ctrl_config.endian = 1 ;
+    if((err = ili9341_interface_ctrl(dev, ili9341_int_ctrl_config)))
+        return err;
+
+    ili9341_ena_3g_t ili9341_ena_3g_config = { 0 };
+    if((err = ili9341_enable_3g(dev, ili9341_ena_3g_config)))
+        return err;
+
+    ili9341_timing_ctrl_a_t timing_ctrl_a_config = { 0 };
+    timing_ctrl_a_config.now = 1 ;
+    if((err = ili9341_timing_ctrl_a(dev, timing_ctrl_a_config)))
+        return err;
+
+    ili9341_timing_ctrl_b_t timing_ctrl_b_config = { 0 };
+    if((err = ili9341_timing_ctrl_b(dev, timing_ctrl_b_config)))
+        return err;
+#endif
+
+
     //TODO: can we swap order for them ? to wait only 120 ms
     ili9341_sleep(dev, false);
     ili9341_display_pwr(dev, true);
@@ -472,123 +568,6 @@ int ili9341_unknow(const ili9341_t *dev)
 {
     uint8_t data[3] = { 0x03, 0x80, 0x02  };
     return _sendCommandData(dev, ILI9341_UNKNOW, data, sizeof(data));
-}
-
-/**
- *  @pre EXTC should be high to enable this CMD
- */
-int ili9341_power_control_b(const ili9341_t *dev, ili9341_pwr_ctrl_b_t config)
-{
-    uint8_t data[3] = { 0 };
-    data[0] = 0x00 ;
-    data[1] = 0x81 | config.power_ctrl << 3 | config.drv_ena << 5 | config.pceq << 6 ;
-    data[2] = 0x20 | config.drv_vmh | (config.drv_vml & BIT_MASK(0,0)) << 3  |
-        (config.drv_vml & BIT_MASK(1,2)) << 5 | config.dc_ena << 4;
-    return _sendCommandData(dev, ILI9341_PWR_CTR_B, data, sizeof(data));
-}
-
-/**
- *  @pre EXTC should be high to enable this CMD
- */
-int ili9341_power_on_seq_ctrl(const ili9341_t *dev, ili9341_pwr_seq_ctrl_t config)
-{
-    uint8_t data[4] = { 0 };
-    data[0] = 0x44 | config.cp23_soft_start | config.cp1_soft_start << 4;
-    data[1] = config.en_ddvdh | config.en_vcl << 4 ;
-    data[2] = config.en_vgl | config.en_vgh << 4 ;
-    data[3] = 0x01 | config.ddvdh_enh << 7 ;
-    return _sendCommandData(dev, ILI9341_PWR_ON_SEQ_CTR, data, sizeof(data));
-}
-
-/**
- *  @pre EXTC should be high to enable this CMD
- */
-int ili9341_timing_ctrl_a(const ili9341_t *dev, ili9341_timing_ctrl_a_t config)
-{
-    uint8_t data[3] = { 0 };
-    data[0] = 0x84 | config.now ;
-    data[1] = config.cr | config.eq <<4 ;
-    data[2] = 0x78 | config.pc ;
-    return _sendCommandData(dev, ILI9341_TIMING_CTR_A, data, sizeof(data));
-}
-
-/**
- *  @pre EXTC should be high to enable this CMD
- */
-int ili9341_pwr_ctrl_a(const ili9341_t *dev, ili9341_pwr_ctrl_a_t config)
-{
-    uint8_t data[5] = { 0 };
-    data[0] = 0x39 ;
-    data[1] = 0x2C ;
-    data[2] = 0x00 ;
-    data[3] = 0x30 | config.reg_vd ;
-    data[4] = config.vbc ;
-    return _sendCommandData(dev, ILI9341_PWR_CTR_A, data, sizeof(data));
-}
-
-/**
- *  @pre EXTC should be high to enable this CMD
- */
-int ili9341_pump_ratio_ctrl(const ili9341_t *dev, ili9341_pump_ratio_ctrl_t config)
-{
-    if (config.ratio <= 1)
-    {
-       return -ENOTSUP; //Reserved area
-    }
-    uint8_t data[1] = { 0 };
-    data[0] = config.ratio << 4;
-    return _sendCommandData(dev, ILI9341_PUMP_RATIO_CTR, data, sizeof(data));
-}
-
-/**
- *  @pre EXTC should be high to enable this CMD
- */
-int ili9341_timing_ctrl_b(const ili9341_t *dev, ili9341_timing_ctrl_b_t config)
-{
-    uint8_t data[2] = { 0 };
-    data[0] = *(uint8_t*)&config;
-    return _sendCommandData(dev, ILI9341_TIMING_CTR_B, data, sizeof(data));
-}
-
-/**
- *  @pre EXTC should be high to enable this CMD
- */
-int ili9341_pwr_ctrl_1(const ili9341_t *dev, ili9341_pwr_ctrl_1_t config)
-{
-    uint8_t data[1] = { 0 };
-    data[0] = config.vrh ;
-    return _sendCommandData(dev, ILI9341_PWR_CTR_1, data, sizeof(data));
-}
-
-/**
- *  @pre EXTC should be high to enable this CMD
- */
-int ili9341_pwr_ctrl_2(const ili9341_t *dev, ili9341_pwr_ctrl_2_t config)
-{
-    uint8_t data[1] = { 0 };
-    data[0] = 0x10 | config.bt ;
-    return _sendCommandData(dev, ILI9341_PWR_CTR_2, data, sizeof(data));
-}
-
-/**
- *  @pre EXTC should be high to enable this CMD
- */
-int ili9341_vcom_ctrl_1(const ili9341_t *dev, ili9341_vcom_ctrl_1_t config)
-{
-    uint8_t data[2] = { 0 };
-    data[0] = config.vmh ;
-    data[1] = config.vml ;
-    return _sendCommandData(dev, ILI9341_VCOM_CTR_1, data, sizeof(data));
-}
-
-/**
- *  @pre EXTC should be high to enable this CMD
- */
-int ili9341_vcom_ctrl_2(const ili9341_t *dev, ili9341_vcom_ctrl_2_t config)
-{
-    uint8_t data[1] = { 0 };
-    data[0] = *(uint8_t*)&config ;
-    return _sendCommandData(dev, ILI9341_VCOM_CTR_2, data, sizeof(data));
 }
 
 int ili9341_mem_ctrl(const ili9341_t *dev, ili9341_mem_ctrl_t config)
@@ -640,16 +619,6 @@ int ili9341_display_fn_ctrl(const ili9341_t *dev, ili9341_dis_fn_ctrl_t config)
     return _sendCommandData(dev, ILI9341_DIS_FUNCTION_CTR, data, sizeof(data));
 }
 
-/**
- *  @pre EXTC should be high to enable this CMD
- */
-int ili9341_enable_3g(const ili9341_t *dev, ili9341_ena_3g_t config)
-{
-    uint8_t data[1] = { 0 };
-    data[0] = 0x02 | config.ena_3g ;
-    return _sendCommandData(dev, ILI9341_ENABLE_3G, data, sizeof(data));
-}
-
 int ili9341_gamma_set(const ili9341_t *dev, ili9341_gamma_set_t config)
 {
     uint8_t data[1] = { 0 };
@@ -680,6 +649,148 @@ int ili9341_gamma_cor(const ili9341_t *dev, ili9341_gamma_type_e type, ili9341_g
         ILI9341_POS_GAMMA_COR : ILI9341_NEG_GAMMA_COR,   data, sizeof(data));
 }
 
+#if ILI9341_EXTC_SUPPORT
+/**
+ *  @pre EXTC should be high to enable this CMD
+ */
+int ili9341_power_on_seq_ctrl(const ili9341_t *dev, ili9341_pwr_seq_ctrl_t config)
+{
+    uint8_t data[4] = { 0 };
+    data[0] = 0x44 | config.cp23_soft_start | config.cp1_soft_start << 4;
+    data[1] = config.en_ddvdh | config.en_vcl << 4 ;
+    data[2] = config.en_vgl | config.en_vgh << 4 ;
+    data[3] = 0x01 | config.ddvdh_enh << 7 ;
+    return _sendCommandData(dev, ILI9341_PWR_ON_SEQ_CTR, data, sizeof(data));
+}
+
+/**
+ *  @pre EXTC should be high to enable this CMD
+ */
+int ili9341_timing_ctrl_a(const ili9341_t *dev, ili9341_timing_ctrl_a_t config)
+{
+    uint8_t data[3] = { 0 };
+    data[0] = 0x84 | config.now ;
+    data[1] = config.cr | config.eq <<4 ;
+    data[2] = 0x78 | config.pc ;
+    return _sendCommandData(dev, ILI9341_TIMING_CTR_A, data, sizeof(data));
+}
+
+/**
+ *  @pre EXTC should be high to enable this CMD
+ */
+int ili9341_timing_ctrl_b(const ili9341_t *dev, ili9341_timing_ctrl_b_t config)
+{
+    uint8_t data[2] = { 0 };
+    data[0] = *(uint8_t*)&config;
+    return _sendCommandData(dev, ILI9341_TIMING_CTR_B, data, sizeof(data));
+}
+
+/**
+ *  @pre EXTC should be high to enable this CMD
+ */
+int ili9341_vcom_ctrl_1(const ili9341_t *dev, ili9341_vcom_ctrl_1_t config)
+{
+    uint8_t data[2] = { 0 };
+    data[0] = config.vmh ;
+    data[1] = config.vml ;
+    return _sendCommandData(dev, ILI9341_VCOM_CTR_1, data, sizeof(data));
+}
+
+/**
+ *  @pre EXTC should be high to enable this CMD
+ */
+int ili9341_vcom_ctrl_2(const ili9341_t *dev, ili9341_vcom_ctrl_2_t config)
+{
+    uint8_t data[1] = { 0 };
+    data[0] = *(uint8_t*)&config ;
+    return _sendCommandData(dev, ILI9341_VCOM_CTR_2, data, sizeof(data));
+}
+
+/**
+ *  @pre EXTC should be high to enable this CMD
+ */
+int ili9341_pwr_ctrl_a(const ili9341_t *dev, ili9341_pwr_ctrl_a_t config)
+{
+    uint8_t data[5] = { 0 };
+    data[0] = 0x39 ;
+    data[1] = 0x2C ;
+    data[2] = 0x00 ;
+    data[3] = 0x30 | config.reg_vd ;
+    data[4] = config.vbc ;
+    return _sendCommandData(dev, ILI9341_PWR_CTR_A, data, sizeof(data));
+}
+
+/**
+ *  @pre EXTC should be high to enable this CMD
+ */
+int ili9341_pwr_ctrl_b(const ili9341_t *dev, ili9341_pwr_ctrl_b_t config)
+{
+    uint8_t data[3] = { 0 };
+    data[0] = 0x00 ;
+    data[1] = 0x81 | config.power_ctrl << 3 | config.drv_ena << 5 | config.pceq << 6 ;
+    data[2] = 0x20 | config.drv_vmh | (config.drv_vml & BIT_MASK(0,0)) << 3  |
+        (config.drv_vml & BIT_MASK(1,2)) << 5 | config.dc_ena << 4;
+    return _sendCommandData(dev, ILI9341_PWR_CTR_B, data, sizeof(data));
+}
+/**
+ *  @pre EXTC should be high to enable this CMD
+ */
+int ili9341_pwr_ctrl_1(const ili9341_t *dev, ili9341_pwr_ctrl_1_t config)
+{
+    uint8_t data[1] = { 0 };
+    data[0] = config.vrh ;
+    return _sendCommandData(dev, ILI9341_PWR_CTR_1, data, sizeof(data));
+}
+
+/**
+ *  @pre EXTC should be high to enable this CMD
+ */
+int ili9341_pwr_ctrl_2(const ili9341_t *dev, ili9341_pwr_ctrl_2_t config)
+{
+    uint8_t data[1] = { 0 };
+    data[0] = 0x10 | config.bt ;
+    return _sendCommandData(dev, ILI9341_PWR_CTR_2, data, sizeof(data));
+}
+
+/**
+ *  @pre EXTC should be high to enable this CMD
+ */
+int ili9341_interface_ctrl(const ili9341_t *dev, ili9341_int_ctrl_t config)
+{
+    uint8_t data[3] = { 0 };
+    data[0] = config.wemode | config.bgr_eor << 4  | config.mv_eor << 5 |
+        config.mx_eor << 6 | config.my_eor << 7 ;
+    data[1] = config.mdt | config.epf << 4 ;
+    data[2] = config.rim | config.rm << 1 | config.dm << 2 | config.endian << 5;
+    return _sendCommandData(dev, ILI9341_INTERFACE_CTR, data, sizeof(data));
+}
+
+/**
+ *  @pre EXTC should be high to enable this CMD
+ */
+int ili9341_enable_3g(const ili9341_t *dev, ili9341_ena_3g_t config)
+{
+    uint8_t data[1] = { 0 };
+    data[0] = 0x02 | config.ena_3g ;
+    return _sendCommandData(dev, ILI9341_ENABLE_3G, data, sizeof(data));
+}
+
+/**
+ *  @pre EXTC should be high to enable this CMD
+ */
+int ili9341_pump_ratio_ctrl(const ili9341_t *dev, ili9341_pump_ratio_ctrl_t config)
+{
+    if (config.ratio <= 1)
+    {
+       return -ENOTSUP; //Reserved area
+    }
+    uint8_t data[1] = { 0 };
+    data[0] = config.ratio << 4;
+    return _sendCommandData(dev, ILI9341_PUMP_RATIO_CTR, data, sizeof(data));
+}
+#endif
+
+//Just one command function
 int ili9341_sleep(const ili9341_t *dev, bool state)
 {
     int err;
@@ -827,38 +938,68 @@ int ili9341_set_page_addr(const ili9341_t *dev, int32_t start, int32_t stop)
 /**********************
  *   STATIC FUNCTIONS
  **********************/
+#if (ILI9341_SPI3WIRE_SUPPORT)
+static int inline _spi3wire_send(const ili9341_t *dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize)
+{
+    lv_spi_wr_cs(dev->spi_dev, false);
+    lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, dc, 1);
+#if SSD1306_ERR_CHECK
+    int err = lv_spi_transaction(dev->spi_dev, NULL, data, len, wordsize);
+#else
+    lv_spi_transaction(dev->spi_dev, NULL, data, len, wordsize);
+#endif
+    lv_spi_clr_preemble(dev->spi_dev, LV_SPI_COMMAND);
+    lv_spi_wr_cs(dev->spi_dev, true);
+#if SSD1306_ERR_CHECK
+    return err;
+#else
+    return 0;
+#endif
+}
+#endif
+#if (ILI9341_SPI4WIRE_SUPPORT)
+static int inline _spi4wire_send(const ili9341_t *dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize)
+{
+    lv_spi_wr_cs(dev->spi_dev, false);
+    lv_spi_wr_dc(dev->spi_dev, dc); /* command mode */
+#if SSD1306_ERR_CHECK
+    int err = lv_spi_transaction(dev->spi_dev, NULL, data, len, wordsize);
+#else
+    lv_spi_transaction(dev->spi_dev, NULL, data, len, wordsize);
+#endif
+    lv_spi_wr_cs(dev->spi_dev, true);
+#if SSD1306_ERR_CHECK
+    return err;
+#else
+    return 0;
+#endif
+}
+#endif
+
 static int _sendCommand(const ili9341_t *dev, uint8_t cmd)
 {
-    int err;
     debug("cmd: %02X",cmd);
     switch(dev->protocol)
     {
-#if (ILI9341_SPI4_SUPPORT)
+#if (ILI9341_SPI4WIRE_SUPPORT)
     case ILI9341_PROTO_SERIAL_8BIT:
-        lv_spi_wr_dc(dev->spi_dev, false); /* command mode */
-        lv_spi_wr_cs(dev->spi_dev, false);
-        err = lv_spi_transaction(dev->spi_dev, NULL, &cmd, 1, 1);
-        lv_spi_wr_cs(dev->spi_dev, true);
+        err_control(_spi4wire_send(dev, 0,  &cmd, 1, 1));
         break;
 #endif
-#if (ILI9341_SPI3_SUPPORT)
+#if (ILI9341_SPI3WIRE_SUPPORT)
     case ILI9341_PROTO_SERIAL_9BIT:
-        lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, 0, 1);
-        lv_spi_wr_cs(dev->spi_dev, false);
-        err = lv_spi_transaction(dev->spi_dev, NULL, &cmd, 1, 1);
-        lv_spi_wr_cs(dev->spi_dev, true);
-        lv_spi_clr_preemble(dev->spi_dev, LV_SPI_COMMAND);
+        err_control(_spi3wire_send(dev, 0, &cmd, 1, 1));
         break;
 #endif
     default:
+        return -EPROTONOSUPPORT;
         break;
     }
-    return err;
+    return 0;
 }
 
 static int _sendData(const ili9341_t *dev, uint8_t* data_out, uint32_t len, uint8_t wordsize)
 {
-    int err;
 #if ILI9341_DEBUG
     printf("%s: ",__FUNCTION__);
     for (uint8_t i = 0 ; i < len ; i++)
@@ -869,34 +1010,24 @@ static int _sendData(const ili9341_t *dev, uint8_t* data_out, uint32_t len, uint
 #endif
     switch(dev->protocol)
     {
-#if (ILI9341_SPI4_SUPPORT)
+#if (ILI9341_SPI4WIRE_SUPPORT)
     case ILI9341_PROTO_SERIAL_8BIT:
-        lv_spi_wr_cs(dev->spi_dev, false);
-        lv_spi_wr_dc(dev->spi_dev, true); /* data mode */
-        err = lv_spi_transaction(dev->spi_dev, NULL, data_out, len, wordsize);
-        lv_spi_wr_cs(dev->spi_dev, true);
+        err_control(_spi4wire_send(dev, 1, data_out, len, wordsize));
         break;
 #endif
-#if (ILI9341_SPI3_SUPPORT)
+#if (ILI9341_SPI3WIRE_SUPPORT)
     case ILI9341_PROTO_SERIAL_9BIT:
-        lv_spi_wr_cs(dev->spi_dev, false);
-        lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, 1, 1);
         for (uint32_t i = 0; i <= len*wordsize; i++)
         {
-            err = lv_spi_transaction(dev->spi_dev, NULL, &data_out[i], 1, 1);
-            if(err)
-            {
-                break;
-            }
+            err_control(_spi3wire_send(dev, 1, &data_out[i], 1, 1));
         }
-        lv_spi_clr_preemble(dev->spi_dev, LV_SPI_COMMAND);
-        lv_spi_wr_cs(dev->spi_dev, true);
         break;
 #endif
     default:
+        return -EPROTONOSUPPORT;
         break;
     }
-    return err;
+    return 0;
 }
 
 //FIXME: this function will be removed

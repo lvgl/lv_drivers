@@ -73,7 +73,7 @@ typedef struct
 #if (SSD1306_I2C_SUPPORT)
         lv_i2c_handle_t i2c_dev;  //!< I2C device descriptor, used by SSD1306_PROTO_I2C
 #endif
-#if (SSD1306_SPI4_SUPPORT) || (SSD1306_SPI3_SUPPORT)
+#if (SSD1306_SPI_4_WIRE_SUPPORT) || (SSD1306_SPI_3_WIRE_SUPPORT)
         lv_spi_handle_t spi_dev;  //!< SPI device descriptor
 #endif
     };

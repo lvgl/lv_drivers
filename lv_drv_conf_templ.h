@@ -311,11 +311,13 @@ static inline int lv_par_read(lv_par_handle_t par_dev, void* data_in, uint16_t l
  *--------------*/
 #define USE_ILI9341        1
 #if USE_ILI9341
-#define ILI9341_DEBUG          (0)
-#define ILI9341_SPI4_SUPPORT   (1)
-#define ILI9341_SPI3_SUPPORT   (1)
-#define ILI9341_SPI_MAX_SAMPLE (64) //half sample size send throw SPI (pixel = 2 byte)
-#define ILI9341_SPI_BYTESWAP   (0)  //Set Endiannes here if SPI don't support it
+#define ILI9341_DEBUG              (0)
+#define ILI9341_ERR_CHECK          (0)  //retrieve err from transaction if true
+#define ILI9341_SPI4WIRE_SUPPORT   (1)
+#define ILI9341_SPI3WIRE_SUPPORT   (1)
+#define ILI9341_EXTC_SUPPORT       (0)  //EXTC pin high ? set at 1 if yes.
+#define ILI9341_MAX_SAMPLE         (64) //Pixel sample size to send (N byte x Pixel Size)
+#define ILI9341_BYTESWAP           (0)  //Set Endiannes here if SPI don't support it ( 2byte pixel)
 #endif
 
 /*----------------
@@ -346,12 +348,13 @@ static inline int lv_par_read(lv_par_handle_t par_dev, void* data_in, uint16_t l
  *--------------*/
 #define USE_SSD1306        1
 #if USE_SSD1306
-#define SSD1306_HOR_RES     LV_HOR_RES
-#define SSD1306_VER_RES     LV_VER_RES
-#define SSD1306_TRANSMISSION_CHECK 0
-#define SSD1306_I2C_SUPPORT  1
-#define SSD1306_SPI4_SUPPORT 1
-#define SSD1306_SPI3_SUPPORT 1
+#define SSD1306_DEBUG              (0)
+#define SSD1306_HOR_RES            (LV_HOR_RES)
+#define SSD1306_VER_RES            (LV_VER_RES)
+#define SSD1306_ERR_CHECK          (0)
+#define SSD1306_I2C_SUPPORT        (1)
+#define SSD1306_SPI_4_WIRE_SUPPORT (1)
+#define SSD1306_SPI_3_WIRE_SUPPORT (1)
 #endif
 
 /*----------------
