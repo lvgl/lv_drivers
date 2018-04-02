@@ -23,6 +23,10 @@
 #define ILI9341_SPI4WIRE_SUPPORT 1
 #endif
 
+#if (ILI9341_COLOR != 65) && (ILI9341_COLOR != 262)
+#error "Invalid ILI9341_COLOR number, it is 65 or 262"
+#endif
+
 /* utility */
 #define BIT_MASK(a, b) (((unsigned) -1 >> (31 - (b))) & ~((1U << (a)) - 1))
 #define SWAPBYTES(i) ((i>>8) | (i<<8))
@@ -141,7 +145,8 @@ static int inline _spi4wire_send(const ili9341_t *dev, bool dc, uint8_t* data, u
 
 static int _sendCommand(const ili9341_t *dev, uint8_t cmd);
 static int _sendCommandData(const ili9341_t *dev, uint8_t cmd, uint8_t* data_out, uint32_t len);
-static int _sendData(const ili9341_t *dev, uint8_t* data_out, uint32_t len, uint8_t wordsize);
+static int _sendDataPixels(const ili9341_t *dev, const lv_color_t *pixel, uint32_t len, uint8_t wordsize);
+//
 static int _receiveData(const ili9341_t *dev, uint8_t cmd, uint8_t* data_in, uint32_t len);
 
 /**********************
@@ -191,56 +196,12 @@ void ili9341_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
 
     uint32_t size = (x2 - x1 + 1) * (y2 - y1 + 1);
 
-#if ILI9341_COLOR == 65
-#if ILI9341_BYTESWAP
-    uint16_t buf[ILI9341_MAX_SAMPLE];
     for(uint16_t i= size/ILI9341_MAX_SAMPLE ; i > 0 ; i--)
     {
-        for(uint16_t u = 0 ; u < ILI9341_MAX_SAMPLE ; u++)
-        {
-            buf[u] = SWAPBYTES(color_p->full);
-            color_p++;
-        }
-        _sendData(_device, (uint8_t*)buf, ILI9341_MAX_SAMPLE, sizeof(lv_color_t));
-    }
-    for(uint16_t u = 0 ; u < size % ILI9341_MAX_SAMPLE ; u++)
-    {
-        buf[u] = SWAPBYTES(color_p->full);
-        color_p++;
-    }
-    _sendData(_device, (uint8_t*)buf, size % ILI9341_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
-#else
-    for(uint16_t i= size/ILI9341_MAX_SAMPLE ; i > 0 ; i--)
-    {
-        _sendData(_device, (uint8_t*)color_p, ILI9341_MAX_SAMPLE, sizeof(lv_color_t));
+        _sendDataPixels(_device, color_p, ILI9341_MAX_SAMPLE, sizeof(lv_color_t));
         color_p += ILI9341_MAX_SAMPLE;
     }
-    _sendData(_device, (uint8_t*)color_p, size % ILI9341_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
-#endif
-#else
-    //FIXME: Color conversion good ? Protocol from datasheet said to shift it but it is don't work as expected
-    ili9341_color24_t buf[ILI9341_MAX_SAMPLE];
-    for(uint16_t i= size/ILI9341_MAX_SAMPLE ; i > 0 ; i--)
-    {
-        for(uint16_t u = 0 ; u < ILI9341_MAX_SAMPLE ; u++)
-        {
-            buf[u].red = color_p->red;//<< 2;
-            buf[u].green = color_p->green;//<< 2;
-            buf[u].blue = color_p->blue;//<< 2;
-            color_p++;
-        }
-        _sendData(_device, (uint8_t*)buf, ILI9341_MAX_SAMPLE*3, 1);
-    }
-    for(uint16_t u = 0 ; u < size % ILI9341_MAX_SAMPLE ; u++)
-    {
-        buf[u].red = color_p->red;//<< 2;
-        buf[u].green = color_p->green;//<< 2;
-        buf[u].blue = color_p->blue;//<< 2;
-        color_p++;
-    }
-    _sendData(_device, (uint8_t*)buf, size % ILI9341_MAX_SAMPLE*3, 1); /*Send the remaining data*/
-#endif
-
+    _sendDataPixels(_device, color_p, size % ILI9341_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
 
     lv_flush_ready();
 }
@@ -266,36 +227,14 @@ void ili9341_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t col
     ili9341_memory_write(_device);
 
     uint32_t size = (x2 - x1 + 1) * (y2 - y1 + 1);
+    lv_color_t buf[ILI9341_MAX_SAMPLE];
 
-#if ILI9341_COLOR == 65
-    uint16_t buf[ILI9341_MAX_SAMPLE];
-    for(uint16_t i = 0; i < ILI9341_MAX_SAMPLE; i++)
-    {
-#if ILI9341_BYTESWAP
-        buf[i] = SWAPBYTES(color.full);
-#else
-        buf[i] = color.full;
-#endif
-    }
     for(uint16_t i= size/ILI9341_MAX_SAMPLE ; i > 0 ; i--)
     {
-        _sendData(_device, (uint8_t*)buf, ILI9341_MAX_SAMPLE, sizeof(lv_color_t));
+        _sendDataPixels(_device, buf, ILI9341_MAX_SAMPLE, sizeof(lv_color_t));
     }
-    _sendData(_device, (uint8_t*)buf, size % ILI9341_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
-#else
-    ili9341_color24_t buf[ILI9341_MAX_SAMPLE];
-    for(uint16_t i = 0; i < ILI9341_MAX_SAMPLE; i++)
-    {
-        buf[i].red = color.red;
-        buf[i].green = color.green;
-        buf[i].blue = color.blue;
-    }
-    for(uint16_t i= size/ILI9341_MAX_SAMPLE ; i > 0 ; i--)
-    {
-        _sendData(_device, (uint8_t*)buf, ILI9341_MAX_SAMPLE*3, sizeof(lv_color_t));
-    }
-    _sendData(_device, (uint8_t*)buf, size % ILI9341_MAX_SAMPLE*3, sizeof(lv_color_t)); /*Send the remaining data*/
-#endif
+    _sendDataPixels(_device, buf, size % ILI9341_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
+
 }
 
 void ili9341_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
@@ -318,54 +257,12 @@ void ili9341_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
 
     uint32_t size = (x2 - x1 + 1) * (y2 - y1 + 1);
 
-#if ILI9341_COLOR == 65
-#if ILI9341_BYTESWAP
-    uint16_t buf[ILI9341_MAX_SAMPLE];
     for(uint16_t i= size/ILI9341_MAX_SAMPLE ; i > 0 ; i--)
     {
-        for(uint16_t u = 0 ; u < ILI9341_MAX_SAMPLE ; u++)
-        {
-            buf[u] = SWAPBYTES(color_p->full);
-            color_p++;
-        }
-        _sendData(_device, (uint8_t*)buf, ILI9341_MAX_SAMPLE, sizeof(lv_color_t));
-    }
-    for(uint16_t u = 0 ; u < size % ILI9341_MAX_SAMPLE ; u++)
-    {
-        buf[u] = SWAPBYTES(color_p->full);
-        color_p++;
-    }
-    _sendData(_device, (uint8_t*)buf, size % ILI9341_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
-#else
-    for(uint16_t i= size/ILI9341_MAX_SAMPLE ; i > 0 ; i--)
-    {
-        _sendData(_device, (uint8_t*)color_p, ILI9341_MAX_SAMPLE, sizeof(lv_color_t));
+        _sendDataPixels(_device, color_p, ILI9341_MAX_SAMPLE, sizeof(lv_color_t));
         color_p += ILI9341_MAX_SAMPLE;
     }
-    _sendData(_device, (uint8_t*)color_p, size % ILI9341_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
-#endif
-#else
-    ili9341_color24_t buf[ILI9341_MAX_SAMPLE];
-    for(uint16_t i= size/ILI9341_MAX_SAMPLE ; i > 0 ; i--)
-    {
-        for(uint16_t u = 0 ; u < ILI9341_MAX_SAMPLE ; u++)
-        {
-            buf[u].red = color_p->red;//<< 2;
-            buf[u].green = color_p->green;//<< 2;
-            buf[u].blue = color_p->blue;//<< 2;
-            color_p++;
-        }
-        _sendData(_device, (uint8_t*)buf, ILI9341_MAX_SAMPLE*3, 1);
-    }
-    for(uint16_t u = 0 ; u < size % ILI9341_MAX_SAMPLE ; u++)
-    {
-        buf[u].red = color_p->red;//<< 2;
-        buf[u].green = color_p->green;//<< 2;
-        buf[u].blue = color_p->blue;//<< 2;
-        color_p++;
-    }
-    _sendData(_device, (uint8_t*)buf, size % ILI9341_MAX_SAMPLE*3, 1); /*Send the remaining data*/
-#endif
+    _sendDataPixels(_device, color_p, size % ILI9341_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
 
 }
 
@@ -373,8 +270,6 @@ void ili9341_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
 //TODO: don't forget to make it constant again
 int ili9341_init(ili9341_t *dev)
 {
-    int err;
-
     if(_device)
     {
        return -1; //A screen was already initialized.
@@ -409,8 +304,7 @@ int ili9341_init(ili9341_t *dev)
     ili9341_mem_ctrl_t ili9341_mem_ctrl_config = { 0 } ;
     ili9341_mem_ctrl_config.mx = 1 ;
     ili9341_mem_ctrl_config.bgr = 1 ;
-    if((err = ili9341_mem_ctrl(dev, ili9341_mem_ctrl_config)))
-        return err;
+    err_control(ili9341_mem_ctrl(dev, ili9341_mem_ctrl_config));
 
     //ili9341_vert_scroll_start_t ili9341_vert_scroll_start_config = { 0 };
     //if((err = ili9341_vert_scroll_start(dev, ili9341_vert_scroll_start_config)))
@@ -424,15 +318,11 @@ int ili9341_init(ili9341_t *dev)
     ili9341_pixel_fmt_config.dbi = 0b110 ;
     ili9341_pixel_fmt_config.dpi = 0b110 ;
 #endif
-    if((err = ili9341_pixel_fmt(dev, ili9341_pixel_fmt_config)))
-        return err;
-
+    err_control(ili9341_pixel_fmt(dev, ili9341_pixel_fmt_config));
 
     ili9341_gamma_set_t ili9341_gamma_set_config = { 0 };
     ili9341_gamma_set_config.gamma_set = 0x01 ;
-    if((err = ili9341_gamma_set(dev, ili9341_gamma_set_config)))
-        return err;
-
+    err_control(ili9341_gamma_set(dev, ili9341_gamma_set_config));
 
     ili9341_gamma_cor_t ili9341_gamma_config = { 0 };
     ili9341_gamma_config.v63 = 0x0F ;
@@ -451,8 +341,7 @@ int ili9341_init(ili9341_t *dev)
     ili9341_gamma_config.v2 = 0x0E ;
     ili9341_gamma_config.v1 = 0x09 ;
     ili9341_gamma_config.v0 = 0x00 ;
-    if((err = ili9341_gamma_cor(dev, ili9341_gamma_pos, ili9341_gamma_config)))
-        return err;
+    err_control(ili9341_gamma_cor(dev, ili9341_gamma_pos, ili9341_gamma_config));
 
     ili9341_gamma_config.v63 = 0x00 ;
     ili9341_gamma_config.v62 = 0x0E ;
@@ -470,60 +359,50 @@ int ili9341_init(ili9341_t *dev)
     ili9341_gamma_config.v2 = 0x31 ;
     ili9341_gamma_config.v1 = 0x36 ;
     ili9341_gamma_config.v0 = 0x0F ;
-    if((err = ili9341_gamma_cor(dev, ili9341_gamma_neg, ili9341_gamma_config)))
-        return err;
+    err_control(ili9341_gamma_cor(dev, ili9341_gamma_neg, ili9341_gamma_config));
 
 #if ILI9341_EXTC_SUPPORT
     ili9341_frame_rate_ctrl_t ili9341_frame_rate_ctrl_config = { 0 };
     ili9341_frame_rate_ctrl_config.rtna = 0b11000 ;
-    if((err = ili9341_frame_rate_ctrl(dev, ili9341_frame_rate_ctrl_config)))
-        return err;
+    err_control(ili9341_frame_rate_ctrl(dev, ili9341_frame_rate_ctrl_config));
 
     ili9341_dis_fn_ctrl_t ili9341_dis_fn_ctrl_config = { 0 };
     ili9341_dis_fn_ctrl_config.ptg = 0b10 ;
     ili9341_dis_fn_ctrl_config.isc = 0b0010 ;
     ili9341_dis_fn_ctrl_config.rev = 0b1 ;
     ili9341_dis_fn_ctrl_config.nl = 0b100111;
-    if((err = ili9341_display_fn_ctrl(dev, ili9341_dis_fn_ctrl_config)))
-        return err;
+    err_control(ili9341_display_fn_ctrl(dev, ili9341_dis_fn_ctrl_config));
 
     ili9341_pump_ratio_ctrl_t pump_ration_ctrl_config = { 0 };
     pump_ration_ctrl_config.ratio = 2 ;
-    if((err = ili9341_pump_ratio_ctrl(dev, pump_ration_ctrl_config)))
-        return err;
+    err_control(ili9341_pump_ratio_ctrl(dev, pump_ration_ctrl_config));
 
     ili9341_pwr_ctrl_a_t power_ctrl_a_config = { 0 };
     power_ctrl_a_config.reg_vd = 4 ;
     power_ctrl_a_config.vbc = 2 ;
-    if((err = ili9341_pwr_ctrl_a(dev, power_ctrl_a_config)))
-        return err;
+    err_control(ili9341_pwr_ctrl_a(dev, power_ctrl_a_config));
 
     ili9341_pwr_ctrl_b_t pwr_ctrl_b_config = { 0 };
     pwr_ctrl_b_config.dc_ena = 1 ;
     pwr_ctrl_b_config.pceq = 1 ;
-    if((err = ili9341_pwr_ctrl_b(dev, pwr_ctrl_b_config)))
-        return err;
+    err_control(ili9341_pwr_ctrl_b(dev, pwr_ctrl_b_config));
 
     ili9341_pwr_ctrl_1_t pwr_ctrl_1_config = { 0 } ;
     pwr_ctrl_1_config.vrh = 0b100011;
-    if((err = ili9341_pwr_ctrl_1(dev, pwr_ctrl_1_config)))
-        return err;
+    err_control(ili9341_pwr_ctrl_1(dev, pwr_ctrl_1_config));
 
     ili9341_pwr_ctrl_2_t pwr_ctrl_2_config = { 0 } ;
-    if((err = ili9341_pwr_ctrl_2(dev, pwr_ctrl_2_config)))
-        return err;
+    err_control(ili9341_pwr_ctrl_2(dev, pwr_ctrl_2_config));
 
     ili9341_vcom_ctrl_1_t vcom_ctrl_1_config = { 0 } ;
     vcom_ctrl_1_config.vmh = 0b00111110;
     vcom_ctrl_1_config.vml = 0b00101000;
-    if((err = ili9341_vcom_ctrl_1(dev, vcom_ctrl_1_config)))
-        return err;
+    err_control(ili9341_vcom_ctrl_1(dev, vcom_ctrl_1_config));
 
     ili9341_vcom_ctrl_2_t vcom_ctrl_2_config = { 0 } ;
     vcom_ctrl_2_config.vmf = 6 ;
     vcom_ctrl_2_config.nvm = 1 ;
-    if((err = ili9341_vcom_ctrl_2(dev, vcom_ctrl_2_config)))
-        return err;
+    err_control(ili9341_vcom_ctrl_2(dev, vcom_ctrl_2_config));
 
     ili9341_pwr_seq_ctrl_t pwr_seq_ctrl_config  = { 0 };
     pwr_seq_ctrl_config.cp23_soft_start = 0 ;
@@ -532,33 +411,28 @@ int ili9341_init(ili9341_t *dev)
     pwr_seq_ctrl_config.en_vgh = 1 ;
     pwr_seq_ctrl_config.en_vgl = 2 ;
     pwr_seq_ctrl_config.ddvdh_enh = 1;
-    if((err = ili9341_power_on_seq_ctrl(dev, pwr_seq_ctrl_config)))
-        return err;
+    err_control(ili9341_power_on_seq_ctrl(dev, pwr_seq_ctrl_config));
 
     ili9341_int_ctrl_t ili9341_int_ctrl_config = { 0 };
     ili9341_int_ctrl_config.wemode = 1 ;
     ili9341_int_ctrl_config.endian = 1 ;
-    if((err = ili9341_interface_ctrl(dev, ili9341_int_ctrl_config)))
-        return err;
+    err_control(ili9341_interface_ctrl(dev, ili9341_int_ctrl_config));
 
     ili9341_ena_3g_t ili9341_ena_3g_config = { 0 };
-    if((err = ili9341_enable_3g(dev, ili9341_ena_3g_config)))
-        return err;
+    err_control(ili9341_enable_3g(dev, ili9341_ena_3g_config));
 
     ili9341_timing_ctrl_a_t timing_ctrl_a_config = { 0 };
     timing_ctrl_a_config.now = 1 ;
-    if((err = ili9341_timing_ctrl_a(dev, timing_ctrl_a_config)))
-        return err;
+    err_control(ili9341_timing_ctrl_a(dev, timing_ctrl_a_config));
 
     ili9341_timing_ctrl_b_t timing_ctrl_b_config = { 0 };
-    if((err = ili9341_timing_ctrl_b(dev, timing_ctrl_b_config)))
-        return err;
+    err_control(ili9341_timing_ctrl_b(dev, timing_ctrl_b_config));
 #endif
 
 
     //TODO: can we swap order for them ? to wait only 120 ms
-    ili9341_sleep(dev, false);
-    ili9341_display_pwr(dev, true);
+    err_control(ili9341_sleep(dev, false));
+    err_control(ili9341_display_pwr(dev, true));
 
     return 0;
 }
@@ -938,6 +812,24 @@ int ili9341_set_page_addr(const ili9341_t *dev, int32_t start, int32_t stop)
 /**********************
  *   STATIC FUNCTIONS
  **********************/
+#if (ILI9341_PAR_SUPPORT)
+static int inline _par_send(const ili9341_t *dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize)
+{
+    lv_par_wr_cs(dev->spi_dev, false);
+    lv_par_wr_dc(dev->spi_dev, dc); /* command mode */
+#if SSD1306_ERR_CHECK
+    int err = lv_par_write(dev->spi_dev, data, len, wordsize);
+#else
+    lv_par_write(dev->spi_dev, data, len, wordsize);
+#endif
+    lv_par_wr_cs(dev->spi_dev, true);
+#if SSD1306_ERR_CHECK
+    return err;
+#else
+    return 0;
+#endif
+}
+#endif
 #if (ILI9341_SPI3WIRE_SUPPORT)
 static int inline _spi3wire_send(const ili9341_t *dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize)
 {
@@ -991,6 +883,11 @@ static int _sendCommand(const ili9341_t *dev, uint8_t cmd)
         err_control(_spi3wire_send(dev, 0, &cmd, 1, 1));
         break;
 #endif
+#if (ILI9341_PAR_SUPPORT)
+    case ILI9341_PROTO_8080_8BIT:
+        err_control(_par_send(dev, 0, &cmd, 1, 1));
+        break;
+#endif
     default:
         return -EPROTONOSUPPORT;
         break;
@@ -998,7 +895,7 @@ static int _sendCommand(const ili9341_t *dev, uint8_t cmd)
     return 0;
 }
 
-static int _sendData(const ili9341_t *dev, uint8_t* data_out, uint32_t len, uint8_t wordsize)
+static int _sendDataPixels(const ili9341_t *dev, const lv_color_t *pixel, uint32_t len, uint8_t wordsize)
 {
 #if ILI9341_DEBUG
     printf("%s: ",__FUNCTION__);
@@ -1008,19 +905,71 @@ static int _sendData(const ili9341_t *dev, uint8_t* data_out, uint32_t len, uint
     }
     printf("\n");
 #endif
+
+#if (ILI9341_COLOR == 262)
+    ili9341_color24_t buf[ILI9341_MAX_SAMPLE];
+#elif (ILI9341_SERIAL_BYTESWAP)
+    uint16_t buf[ILI9341_MAX_SAMPLE];
+#endif
+
     switch(dev->protocol)
     {
 #if (ILI9341_SPI4WIRE_SUPPORT)
-    case ILI9341_PROTO_SERIAL_8BIT:
-        err_control(_spi4wire_send(dev, 1, data_out, len, wordsize));
+    case ILI9341_PROTO_SERIAL_8BIT:  ; //This is an empty statement. gcc don't allow declaration following statment
+#if (ILI9341_COLOR == 65)
+#if (ILI9341_SERIAL_BYTESWAP)
+        for(uint16_t u = 0 ; u < len ; u++)
+        {
+            buf[u] = SWAPBYTES(pixel->full);
+            pixel++;
+        }
+        err_control(_spi4wire_send(dev, 1, (uint8_t*)buf, len, wordsize));
+#else
+        err_control(_spi4wire_send(dev, 1, (uint8_t*)pixel, len, wordsize));
+#endif
+#else //262k color
+        for(uint16_t u = 0 ; u < len ; u++)
+        {
+            buf[u].red = pixel->red;
+            buf[u].green = pixel->green;
+            buf[u].blue = pixel->blue;
+            pixel++;
+        }
+        err_control(_spi4wire_send(dev, 1, (uint8_t*)buf, len*3, 1));
+#endif
         break;
 #endif
 #if (ILI9341_SPI3WIRE_SUPPORT)
-    case ILI9341_PROTO_SERIAL_9BIT:
+    case ILI9341_PROTO_SERIAL_9BIT: ; //This is an empty statement. gcc don't allow declaration following statment
+#if ILI9341_COLOR == 65
+        uint8_t* ptr = (uint8_t*)pixel;
+#if ILI9341_SERIAL_BYTESWAP
+        ptr = (uint8_t*)buf;
+        for(uint16_t u = 0 ; u < len ; u++)
+        {
+            buf[u] = SWAPBYTES(pixel->full);
+            pixel++;
+        }
+#endif
         for (uint32_t i = 0; i <= len*wordsize; i++)
         {
-            err_control(_spi3wire_send(dev, 1, &data_out[i], 1, 1));
+            err_control(_spi3wire_send(dev, 1, &ptr[i], 1, 1));
         }
+#else //262k color
+        for(uint16_t u = 0 ; u < len ; u++)
+        {
+            buf[u].red = pixel->red;//<< 2;
+            buf[u].green = pixel->green;//<< 2;
+            buf[u].blue = pixel->blue;//<< 2;
+            pixel++;
+        }
+        err_control(_spi4wire_send(dev, 1, (uint8_t*)buf, len*sizeof(ili9341_color24_t), 1));
+#endif
+        break;
+#endif
+#if (ILI9341_PAR_SUPPORT)
+    case ILI9341_PROTO_8080_8BIT:
+        err_control(_par_send(dev, 1, pixel, len, wordsize));
         break;
 #endif
     default:
@@ -1030,16 +979,37 @@ static int _sendData(const ili9341_t *dev, uint8_t* data_out, uint32_t len, uint
     return 0;
 }
 
-//FIXME: this function will be removed
 static int _sendCommandData(const ili9341_t *dev, uint8_t cmd, uint8_t* data_out, uint32_t len)
 {
-    int err;
-    if((err = _sendCommand(dev, cmd)))
+    //Send command
+    err_control(_sendCommand(dev, cmd));
+
+    //Send command data
+    switch(dev->protocol)
     {
-        return err;
+#if (ILI9341_SPI4WIRE_SUPPORT)
+    case ILI9341_PROTO_SERIAL_8BIT:
+        err_control(_spi4wire_send(dev, 1, data_out, len, 1));
+        break;
+#endif
+#if (ILI9341_SPI3WIRE_SUPPORT)
+    case ILI9341_PROTO_SERIAL_9BIT:
+        for (uint32_t i = 0; i <= len; i++)
+        {
+            err_control(_spi3wire_send(dev, 1, &data_out[i], 1, 1));
+        }
+        break;
+#endif
+#if (ILI9341_PAR_SUPPORT)
+    case ILI9341_PROTO_8080_8BIT:
+        err_control(_par_send(dev, 1, data_out, len, 1));
+        break;
+#endif
+    default:
+        return -EPROTONOSUPPORT;
+        break;
     }
-    err = _sendData(dev, data_out, len, 1);
-    return err ;
+    return 0;
 }
 
 static int _receiveData(const ili9341_t *dev, uint8_t cmd, uint8_t* data_in, uint32_t len)
