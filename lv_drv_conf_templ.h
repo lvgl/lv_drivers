@@ -313,11 +313,12 @@ static inline int lv_par_read(lv_par_handle_t par_dev, void* data_in, uint16_t l
 #if USE_ILI9341
 #define ILI9341_DEBUG              (0)
 #define ILI9341_ERR_CHECK          (0)  //retrieve err from transaction if true
+#define ILI9341_PAR_SUPPORT        (1)
 #define ILI9341_SPI4WIRE_SUPPORT   (1)
 #define ILI9341_SPI3WIRE_SUPPORT   (1)
-#define ILI9341_EXTC_SUPPORT       (0)  //EXTC pin high ? set at 1 if yes.
+#define ILI9341_EXTC_SUPPORT       (0)  //EXTC pin high ? Set at 1 if yes for extended command usage.
 #define ILI9341_MAX_SAMPLE         (64) //Pixel sample size to send (N byte x Pixel Size)
-#define ILI9341_SERIAL_BYTESWAP    (0)  //Set Endiannes here if SPI don't support it ( 2byte pixel)
+#define ILI9341_SERIAL_BYTESWAP    (0)  //Set Endiannes Swap { 0: None, 1: CPU Swap, 2: ILI9341 swap(need EXTC) }
 #endif
 
 /*----------------

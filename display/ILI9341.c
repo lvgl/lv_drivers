@@ -16,15 +16,31 @@
  *      DEFINES
  *********************/
 #ifndef ILI9341_SPI3WIRE_SUPPORT
-#define ILI9341_SPI3WIRE_SUPPORT 1
+#define ILI9341_SPI3WIRE_SUPPORT (1)
 #endif
 
 #ifndef ILI9341_SPI4WIRE_SUPPORT
-#define ILI9341_SPI4WIRE_SUPPORT 1
+#define ILI9341_SPI4WIRE_SUPPORT (1)
+#endif
+
+#ifndef ILI9341_PAR_SUPPORT
+#define ILI9341_PAR_SUPPORT (1)
+#endif
+
+#ifndef ILI9341_COLOR
+#define ILI9341_COLOR (65)
+#endif
+
+#ifndef ILI9341_ERR_CHECK
+#define ILI9341_ERR_CHECK (0)
 #endif
 
 #if (ILI9341_COLOR != 65) && (ILI9341_COLOR != 262)
 #error "Invalid ILI9341_COLOR number, it is 65 or 262"
+#endif
+
+#if (ILI9341_SERIAL_BYTESWAP == 2) && (!ILI9341_EXTC_SUPPORT)
+#error "ILI9341 can't swap byte, extended command disable"
 #endif
 
 /* utility */
@@ -142,6 +158,9 @@ static int inline _spi3wire_send(const ili9341_t *dev, bool dc, uint8_t* data, u
 #if (ILI9341_SPI4WIRE_SUPPORT)
 static int inline _spi4wire_send(const ili9341_t *dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize);
 #endif
+#if (ILI9341_PAR_SUPPORT)
+static int inline _par_send(const ili9341_t *dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize);
+#endif
 
 static int _sendCommand(const ili9341_t *dev, uint8_t cmd);
 static int _sendCommandData(const ili9341_t *dev, uint8_t cmd, uint8_t* data_out, uint32_t len);
@@ -209,7 +228,7 @@ void ili9341_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
 void ili9341_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t color)
 {
     /*The most simple case (but also the slowest) to put all pixels to the screen one-by-one*/
-
+    debug("fill usage");
     /*Return if the area is out the screen*/
     if (x2 < 0 || y2 < 0 || x1 > LV_HOR_RES - 1 || y1 > LV_VER_RES - 1)
     {
@@ -239,6 +258,7 @@ void ili9341_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t col
 
 void ili9341_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
 {
+    debug("map usage");
     /*Return if the area is out the screen*/
     if (x2 < 0 || y2 < 0 || x1 > LV_HOR_RES - 1 || y1 > LV_VER_RES - 1)
     {
@@ -301,17 +321,17 @@ int ili9341_init(ili9341_t *dev)
     //if((err = ili9341_unknow(dev)))
     //    return err;
 
+    //ili9341_vert_scroll_start_t ili9341_vert_scroll_start_config = { 0 };
+    //if((err = ili9341_vert_scroll_start(dev, ili9341_vert_scroll_start_config)))
+    //    return err;
+
     ili9341_mem_ctrl_t ili9341_mem_ctrl_config = { 0 } ;
     ili9341_mem_ctrl_config.mx = 1 ;
     ili9341_mem_ctrl_config.bgr = 1 ;
     err_control(ili9341_mem_ctrl(dev, ili9341_mem_ctrl_config));
 
-    //ili9341_vert_scroll_start_t ili9341_vert_scroll_start_config = { 0 };
-    //if((err = ili9341_vert_scroll_start(dev, ili9341_vert_scroll_start_config)))
-    //    return err;
-
     ili9341_px_fmt_t ili9341_pixel_fmt_config = { 0 };
-#if ILI9341_COLOR == 65
+#if (ILI9341_COLOR == 65)
     ili9341_pixel_fmt_config.dbi = 0b101 ;
     ili9341_pixel_fmt_config.dpi = 0b101 ;
 #else
@@ -361,7 +381,7 @@ int ili9341_init(ili9341_t *dev)
     ili9341_gamma_config.v0 = 0x0F ;
     err_control(ili9341_gamma_cor(dev, ili9341_gamma_neg, ili9341_gamma_config));
 
-#if ILI9341_EXTC_SUPPORT
+#if (ILI9341_EXTC_SUPPORT)
     ili9341_frame_rate_ctrl_t ili9341_frame_rate_ctrl_config = { 0 };
     ili9341_frame_rate_ctrl_config.rtna = 0b11000 ;
     err_control(ili9341_frame_rate_ctrl(dev, ili9341_frame_rate_ctrl_config));
@@ -415,7 +435,11 @@ int ili9341_init(ili9341_t *dev)
 
     ili9341_int_ctrl_t ili9341_int_ctrl_config = { 0 };
     ili9341_int_ctrl_config.wemode = 1 ;
+#if (ILI9341_SERIAL_BYTESWAP == 2)
     ili9341_int_ctrl_config.endian = 1 ;
+#else
+    ili9341_int_ctrl_config.endian = 0 ;
+#endif
     err_control(ili9341_interface_ctrl(dev, ili9341_int_ctrl_config));
 
     ili9341_ena_3g_t ili9341_ena_3g_config = { 0 };
@@ -523,7 +547,7 @@ int ili9341_gamma_cor(const ili9341_t *dev, ili9341_gamma_type_e type, ili9341_g
         ILI9341_POS_GAMMA_COR : ILI9341_NEG_GAMMA_COR,   data, sizeof(data));
 }
 
-#if ILI9341_EXTC_SUPPORT
+#if (ILI9341_EXTC_SUPPORT)
 /**
  *  @pre EXTC should be high to enable this CMD
  */
@@ -817,13 +841,13 @@ static int inline _par_send(const ili9341_t *dev, bool dc, uint8_t* data, uint8_
 {
     lv_par_wr_cs(dev->spi_dev, false);
     lv_par_wr_dc(dev->spi_dev, dc); /* command mode */
-#if SSD1306_ERR_CHECK
+#if (ILI9341_ERR_CHECK)
     int err = lv_par_write(dev->spi_dev, data, len, wordsize);
 #else
     lv_par_write(dev->spi_dev, data, len, wordsize);
 #endif
     lv_par_wr_cs(dev->spi_dev, true);
-#if SSD1306_ERR_CHECK
+#if (ILI9341_ERR_CHECK)
     return err;
 #else
     return 0;
@@ -835,14 +859,14 @@ static int inline _spi3wire_send(const ili9341_t *dev, bool dc, uint8_t* data, u
 {
     lv_spi_wr_cs(dev->spi_dev, false);
     lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, dc, 1);
-#if SSD1306_ERR_CHECK
+#if (ILI9341_ERR_CHECK)
     int err = lv_spi_transaction(dev->spi_dev, NULL, data, len, wordsize);
 #else
     lv_spi_transaction(dev->spi_dev, NULL, data, len, wordsize);
 #endif
     lv_spi_clr_preemble(dev->spi_dev, LV_SPI_COMMAND);
     lv_spi_wr_cs(dev->spi_dev, true);
-#if SSD1306_ERR_CHECK
+#if (ILI9341_ERR_CHECK)
     return err;
 #else
     return 0;
@@ -854,13 +878,13 @@ static int inline _spi4wire_send(const ili9341_t *dev, bool dc, uint8_t* data, u
 {
     lv_spi_wr_cs(dev->spi_dev, false);
     lv_spi_wr_dc(dev->spi_dev, dc); /* command mode */
-#if SSD1306_ERR_CHECK
+#if (ILI9341_ERR_CHECK)
     int err = lv_spi_transaction(dev->spi_dev, NULL, data, len, wordsize);
 #else
     lv_spi_transaction(dev->spi_dev, NULL, data, len, wordsize);
 #endif
     lv_spi_wr_cs(dev->spi_dev, true);
-#if SSD1306_ERR_CHECK
+#if (ILI9341_ERR_CHECK)
     return err;
 #else
     return 0;
@@ -915,9 +939,9 @@ static int _sendDataPixels(const ili9341_t *dev, const lv_color_t *pixel, uint32
     switch(dev->protocol)
     {
 #if (ILI9341_SPI4WIRE_SUPPORT)
-    case ILI9341_PROTO_SERIAL_8BIT:  ; //This is an empty statement. gcc don't allow declaration following statment
+    case ILI9341_PROTO_SERIAL_8BIT:
 #if (ILI9341_COLOR == 65)
-#if (ILI9341_SERIAL_BYTESWAP)
+#if (ILI9341_SERIAL_BYTESWAP == 1)
         for(uint16_t u = 0 ; u < len ; u++)
         {
             buf[u] = SWAPBYTES(pixel->full);
@@ -935,15 +959,16 @@ static int _sendDataPixels(const ili9341_t *dev, const lv_color_t *pixel, uint32
             buf[u].blue = pixel->blue;
             pixel++;
         }
-        err_control(_spi4wire_send(dev, 1, (uint8_t*)buf, len*3, 1));
+        //FIXME: Can't use wordize, lv_color24 use 4 byte.
+        err_control(_spi4wire_send(dev, 1, (uint8_t*)buf, len*sizeof(ili9341_color24_t), 1));
 #endif
         break;
 #endif
 #if (ILI9341_SPI3WIRE_SUPPORT)
     case ILI9341_PROTO_SERIAL_9BIT: ; //This is an empty statement. gcc don't allow declaration following statment
-#if ILI9341_COLOR == 65
+#if (ILI9341_COLOR == 65)
         uint8_t* ptr = (uint8_t*)pixel;
-#if ILI9341_SERIAL_BYTESWAP
+#if (ILI9341_SERIAL_BYTESWAP == 1)
         ptr = (uint8_t*)buf;
         for(uint16_t u = 0 ; u < len ; u++)
         {
@@ -963,13 +988,14 @@ static int _sendDataPixels(const ili9341_t *dev, const lv_color_t *pixel, uint32
             buf[u].blue = pixel->blue;//<< 2;
             pixel++;
         }
+        //FIXME: Can't use wordize, lv_color24 use 4 byte, not 3.
         err_control(_spi4wire_send(dev, 1, (uint8_t*)buf, len*sizeof(ili9341_color24_t), 1));
 #endif
         break;
 #endif
 #if (ILI9341_PAR_SUPPORT)
     case ILI9341_PROTO_8080_8BIT:
-        err_control(_par_send(dev, 1, pixel, len, wordsize));
+        err_control(_par_send(dev, 1, (uint8_t*)pixel, len, wordsize));
         break;
 #endif
     default:
