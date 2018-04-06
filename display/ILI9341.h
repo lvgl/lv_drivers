@@ -7,7 +7,9 @@
 
 #ifndef ILI9341_H
 #define ILI9341_H
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 /*********************
  *      INCLUDES
  *********************/
@@ -394,6 +396,8 @@ int ili9341_interface_ctrl(const ili9341_t *dev, ili9341_int_ctrl_t config);
 ///////////////////////////////////////////////////////////////////////////
 //API
 
+#ifdef __cplusplus
+}
 #endif
-
-#endif
+#endif /* USE_ILI9341 */
+#endif //ILI9341_H
