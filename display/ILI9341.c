@@ -220,7 +220,10 @@ void ili9341_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
         _sendDataPixels(_device, color_p, ILI9341_MAX_SAMPLE, sizeof(lv_color_t));
         color_p += ILI9341_MAX_SAMPLE;
     }
-    _sendDataPixels(_device, color_p, size % ILI9341_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
+    if(size % ILI9341_MAX_SAMPLE)
+    {
+        _sendDataPixels(_device, color_p, size % ILI9341_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
+    }
 
     lv_flush_ready();
 }
@@ -252,7 +255,10 @@ void ili9341_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t col
     {
         _sendDataPixels(_device, buf, ILI9341_MAX_SAMPLE, sizeof(lv_color_t));
     }
-    _sendDataPixels(_device, buf, size % ILI9341_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
+    if(size % ILI9341_MAX_SAMPLE)
+    {
+        _sendDataPixels(_device, buf, size % ILI9341_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
+    }
 
 }
 
@@ -282,8 +288,10 @@ void ili9341_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
         _sendDataPixels(_device, color_p, ILI9341_MAX_SAMPLE, sizeof(lv_color_t));
         color_p += ILI9341_MAX_SAMPLE;
     }
-    _sendDataPixels(_device, color_p, size % ILI9341_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
-
+    if(size % ILI9341_MAX_SAMPLE)
+    {
+        _sendDataPixels(_device, color_p, size % ILI9341_MAX_SAMPLE, sizeof(lv_color_t)); /*Send the remaining data*/
+    }
 }
 
 /* Perform default init routine according */
