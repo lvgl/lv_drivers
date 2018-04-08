@@ -116,7 +116,7 @@ static uint8_t _flag_redraw; //FIXME: Used to optimize the screen update, need t
 #if SSD1306_TRANSMISSION_CHECK
 #define verify_send(fn) do { int err; if((err = fn)) return err; } while (0)
 #else
-#define verify_send(fn)
+#define verify_send(fn) (fn)
 #endif
 /**********************
  *   GLOBAL FUNCTIONS
