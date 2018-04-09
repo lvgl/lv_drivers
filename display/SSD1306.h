@@ -71,13 +71,13 @@ typedef struct
     union
     {
 #if (SSD1306_I2C_SUPPORT)
-        lv_i2c_handle_t i2c_dev;         	//!< I2C device descriptor, used by SSD1306_PROTO_I2C
+        lv_i2c_handle_t i2c_dev;  //!< I2C device descriptor, used by SSD1306_PROTO_I2C
 #endif
-#if (SSD1306_SPI4_SUPPORT) || (SSD1306_SPI3_SUPPORT)
-        lv_spi_handle_t spi_dev;
+#if (SSD1306_SPI_4_WIRE_SUPPORT) || (SSD1306_SPI_3_WIRE_SUPPORT)
+        lv_spi_handle_t spi_dev;  //!< SPI device descriptor
 #endif
     };
-    lv_gpio_handle_t rst_pin;
+    lv_gpio_handle_t rst_pin;     //!< Reset pin
     uint8_t width;                //!< Screen width, currently supported 128px, 96px
     uint8_t height;               //!< Screen height, currently supported 16px, 32px, 64px
 } ssd1306_t;

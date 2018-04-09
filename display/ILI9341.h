@@ -7,7 +7,9 @@
 
 #ifndef ILI9341_H
 #define ILI9341_H
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 /*********************
  *      INCLUDES
  *********************/
@@ -46,14 +48,14 @@ typedef enum
  */
 typedef struct
 {
-    ili9341_protocol_t protocol;
+    ili9341_protocol_t protocol;   //!< Protocol used
     union
     {
 #if (ILI9341_PAR_SUPPORT)
-        lv_par_handle_t par_dev;
+        lv_par_handle_t par_dev;   //!< Parallel device descriptor
 #endif
-#if (ILI9341_SPI4_SUPPORT) || (ILI9341_SPI3_SUPPORT)
-        lv_spi_handle_t spi_dev;
+#if (ILI9341_SPI4WIRE_SUPPORT) || (ILI9341_SPI3WIRE_SUPPORT)
+        lv_spi_handle_t spi_dev;   //!< SPI device descriptor
 #endif
     };
     lv_gpio_handle_t rst_pin;      //!< Reset pin
@@ -278,6 +280,21 @@ typedef struct
 
 } ili9341_dis_status_t;
 
+typedef struct
+{
+    uint8_t wemode : 1 ;
+    uint8_t bgr_eor : 1 ;
+    uint8_t mv_eor : 1 ;
+    uint8_t mx_eor : 1 ;
+    uint8_t my_eor : 1 ;
+    uint8_t mdt : 2 ;
+    uint8_t epf : 2 ;
+    uint8_t rim : 1 ;
+    uint8_t rm : 1 ;
+    uint8_t dm : 2 ;
+    uint8_t endian : 1 ;
+} ili9341_int_ctrl_t;
+
 
 typedef enum {
     ili9341_gamma_pos,
@@ -333,29 +350,17 @@ int ili9341_init(ili9341_t *dev);
 
 
 
-
-//Order Command
+//Setting Command
 int ili9341_unknow(const ili9341_t *dev);
-int ili9341_power_control_b(const ili9341_t *dev, ili9341_pwr_ctrl_b_t config);
-int ili9341_power_on_seq_ctrl(const ili9341_t *dev, ili9341_pwr_seq_ctrl_t config);
-int ili9341_timing_ctrl_a(const ili9341_t *dev, ili9341_timing_ctrl_a_t config);
-int ili9341_pwr_ctrl_a(const ili9341_t *dev, ili9341_pwr_ctrl_a_t config);
-int ili9341_pump_ratio_ctrl(const ili9341_t *dev, ili9341_pump_ratio_ctrl_t config);
-int ili9341_timing_ctrl_b(const ili9341_t *dev, ili9341_timing_ctrl_b_t config);
-int ili9341_pwr_ctrl_1(const ili9341_t *dev, ili9341_pwr_ctrl_1_t config);
-int ili9341_pwr_ctrl_2(const ili9341_t *dev, ili9341_pwr_ctrl_2_t config);
-int ili9341_vcom_ctrl_1(const ili9341_t *dev, ili9341_vcom_ctrl_1_t config);
-int ili9341_vcom_ctrl_2(const ili9341_t *dev, ili9341_vcom_ctrl_2_t config);
 int ili9341_mem_ctrl(const ili9341_t *dev, ili9341_mem_ctrl_t config);
 int ili9341_vert_scroll_start(const ili9341_t *dev, ili9341_vert_scroll_start_t config);
 int ili9341_pixel_fmt(const ili9341_t *dev, ili9341_px_fmt_t config);
-int ili9341_frame_rate_ctrl(const ili9341_t *dev, ili9341_frame_rate_ctrl_t config);
-int ili9341_display_fn_ctrl(const ili9341_t *dev, ili9341_dis_fn_ctrl_t config);
-int ili9341_enable_3g(const ili9341_t *dev, ili9341_ena_3g_t config);
 int ili9341_gamma_set(const ili9341_t *dev, ili9341_gamma_set_t config);
 int ili9341_gamma_cor(const ili9341_t *dev, ili9341_gamma_type_e type, ili9341_gamma_cor_t config);
+int ili9341_set_column_addr(const ili9341_t *dev, int32_t start, int32_t stop);
+int ili9341_set_page_addr(const ili9341_t *dev, int32_t start, int32_t stop);
 
-//No parameters commands
+//Simple commands
 int ili9341_nope(const ili9341_t *dev);
 int ili9341_rst(const ili9341_t *dev, bool hard);
 int ili9341_sleep(const ili9341_t *dev, bool state);
@@ -370,16 +375,29 @@ int ili9341_read_id(const ili9341_t *dev, ili9341_id_t *result);
 int ili9341_read_display_status(const ili9341_t *dev, ili9341_dis_status_t *result);
 
 
-//
-int ili9341_set_column_addr(const ili9341_t *dev, int32_t start, int32_t stop);
-int ili9341_set_page_addr(const ili9341_t *dev, int32_t start, int32_t stop);
-
-
+//Extended command
+#if ILI9341_EXTC_SUPPORT
+int ili9341_vcom_ctrl_1(const ili9341_t *dev, ili9341_vcom_ctrl_1_t config);
+int ili9341_vcom_ctrl_2(const ili9341_t *dev, ili9341_vcom_ctrl_2_t config);
+int ili9341_pwr_ctrl_a(const ili9341_t *dev, ili9341_pwr_ctrl_a_t config);
+int ili9341_pwr_ctrl_b(const ili9341_t *dev, ili9341_pwr_ctrl_b_t config);
+int ili9341_pwr_ctrl_1(const ili9341_t *dev, ili9341_pwr_ctrl_1_t config);
+int ili9341_pwr_ctrl_2(const ili9341_t *dev, ili9341_pwr_ctrl_2_t config);
+int ili9341_timing_ctrl_a(const ili9341_t *dev, ili9341_timing_ctrl_a_t config);
+int ili9341_timing_ctrl_b(const ili9341_t *dev, ili9341_timing_ctrl_b_t config);
+int ili9341_display_fn_ctrl(const ili9341_t *dev, ili9341_dis_fn_ctrl_t config);
+int ili9341_frame_rate_ctrl(const ili9341_t *dev, ili9341_frame_rate_ctrl_t config);
+int ili9341_enable_3g(const ili9341_t *dev, ili9341_ena_3g_t config);
+int ili9341_pump_ratio_ctrl(const ili9341_t *dev, ili9341_pump_ratio_ctrl_t config);
+int ili9341_power_on_seq_ctrl(const ili9341_t *dev, ili9341_pwr_seq_ctrl_t config);
+int ili9341_interface_ctrl(const ili9341_t *dev, ili9341_int_ctrl_t config);
+#endif
 
 ///////////////////////////////////////////////////////////////////////////
 //API
 
-
+#ifdef __cplusplus
+}
 #endif
-
-#endif
+#endif /* USE_ILI9341 */
+#endif //ILI9341_H
