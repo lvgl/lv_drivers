@@ -18,14 +18,6 @@
 #define AR10XX_VERIFY_ANSWER (1)
 #endif
 
-#ifndef AR10XX_SPI_SUPPORT
-#define AR10XX_SPI_SUPPORT (1)
-#endif
-
-#ifndef AR10XX_I2C_SUPPORT
-#define AR10XX_I2C_SUPPORT (1)
-#endif
-
 #if (AR10XX_COMPONENT != 10) && (AR10XX_COMPONENT != 11) && (AR10XX_COMPONENT != 20) && (AR10XX_COMPONENT != 21)
 #error "AR10XX_COMPONENT: This library don't support this component version"
 #endif
@@ -93,7 +85,9 @@ static int inline _i2c_receive(const ar10xx_t *dev, uint8_t* data, uint8_t len);
 
 static int _sendData(const ar10xx_t *dev, uint8_t* data_out, uint32_t len);
 static int _receiveData(const ar10xx_t *dev, uint8_t* data_in, uint32_t len);
+
 static void _wait_cmd_answer(ar10xx_t *dev);
+static int _send_register_setting(ar10xx_t *dev, uint8_t cmd, uint8_t value);
 
 /**********************
  *  STATIC VARIABLES
@@ -316,15 +310,7 @@ int ar10xx_eeprom_write(ar10xx_t *dev, uint8_t addr, const uint8_t* buf, uint8_t
 
 int ar10xx_set_touch_treshold(ar10xx_t *dev, uint8_t value)
 {
-    uint8_t data[reg_bufsize(sizeof(value))] = reg_write_format(AR10XX_TOUCH_TRESHOLD, 1, value);
-    err_control(_sendData(dev, data, sizeof(data)));
-#if (AR10XX_VERIFY_ANSWER)
-    _wait_cmd_answer(dev);
-    err_control(_receiveData(dev, data, 4));
-    return data[2];
-#else
-    return 0;
-#endif
+    return _send_register_setting(dev, AR10XX_TOUCH_TRESHOLD,value);
 }
 
 int ar10xx_set_sensitivity_filter(ar10xx_t *dev, uint8_t value)
@@ -333,15 +319,79 @@ int ar10xx_set_sensitivity_filter(ar10xx_t *dev, uint8_t value)
     {
         return -1;
     }
-    uint8_t data[reg_bufsize(sizeof(value))] = reg_write_format(AR10XX_SENSITIVITY_FILTER, 1, value);
-    err_control(_sendData(dev, data, sizeof(data)));
-#if (AR10XX_VERIFY_ANSWER)
-    _wait_cmd_answer(dev);
-    err_control(_receiveData(dev, data, 4));
-    return data[2];
-#else
-    return 0;
-#endif
+    return _send_register_setting(dev, AR10XX_SENSITIVITY_FILTER,value);
+}
+
+int ar10xx_set_sampling_fast(ar10xx_t *dev, ar10xx_sampling_t value)
+{
+    return _send_register_setting(dev, AR10XX_SAMPLING_FAST,value);
+}
+
+int ar10xx_set_sampling_slow(ar10xx_t *dev, ar10xx_sampling_t value)
+{
+    return _send_register_setting(dev, AR10XX_SAMPLING_SLOW,value);
+}
+
+int ar10xx_set_accuracy_filter_fast(ar10xx_t *dev, uint8_t value)
+{
+    if(!value || (value > 8))
+    {
+        return -1;
+    }
+    return _send_register_setting(dev, AR10XX_ACC_FILTER_FAST,value);
+}
+
+int ar10xx_set_accuracy_filter_slow(ar10xx_t *dev, uint8_t value)
+{
+    if(!value || (value > 8))
+    {
+        return -1;
+    }
+    return _send_register_setting(dev, AR10XX_ACC_FILTER_SLOW,value);
+}
+
+int ar10xx_set_speed_treshold(ar10xx_t *dev, uint8_t value)
+{
+    return _send_register_setting(dev,AR10XX_SPEED_TRESHOLD,value);
+}
+
+int ar10xx_set_sleep_delay(ar10xx_t *dev, uint8_t value)
+{
+    return _send_register_setting(dev, AR10XX_SLEEP_DELAY,value);
+}
+
+int ar10xx_set_penup_delay(ar10xx_t *dev, uint8_t value)
+{
+    return _send_register_setting(dev, AR10XX_PENUP_DELAY,value);
+}
+
+int ar10xx_set_touch_mode(ar10xx_t *dev, ar10xx_touchmode_t reg)
+{
+    return _send_register_setting(dev, AR10XX_TOUCHMODE, reg.value);
+}
+
+int ar10xx_set_touch_options(ar10xx_t *dev, ar10xx_touchoption_t reg)
+{
+    return _send_register_setting(dev, AR10XX_TOUCHMODE, reg.value);
+}
+
+int ar10xx_set_calibration_inset( ar10xx_t *dev, uint8_t value)
+{
+    if(value > 40)
+    {
+        return -1;
+    }
+    return _send_register_setting(dev, AR10XX_CALIB_INSET,value);
+}
+
+int ar10xx_set_pen_state_report_delay( ar10xx_t *dev, uint8_t value)
+{
+    return _send_register_setting(dev, AR10XX_PEN_STATE_REPORT_DELAY, value);
+}
+
+int ar10xx_set_touch_report_delay( ar10xx_t *dev, uint8_t value)
+{
+    return _send_register_setting(dev, AR10XX_TOUCH_REPORT_DELAY, value);
 }
 
 /**********************
@@ -385,6 +435,20 @@ static int inline _i2c_receive(const ar10xx_t *dev, uint8_t* data, uint8_t len)
 #endif
 }
 #endif
+
+
+static int _send_register_setting(ar10xx_t *dev, uint8_t cmd, uint8_t value)
+{
+    uint8_t data[reg_bufsize(sizeof(value))] = reg_write_format(cmd, 1, value);
+    err_control(_sendData(dev, data, sizeof(data)));
+#if (AR10XX_VERIFY_ANSWER)
+    _wait_cmd_answer(dev);
+    err_control(_receiveData(dev, data, 4));
+    return data[_POS_ARRAY_ERROR];
+#else
+    return 0;
+#endif
+}
 
 static void _wait_cmd_answer(ar10xx_t *dev)
 {

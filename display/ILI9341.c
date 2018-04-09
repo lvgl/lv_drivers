@@ -15,18 +15,6 @@
 /*********************
  *      DEFINES
  *********************/
-#ifndef ILI9341_SPI3WIRE_SUPPORT
-#define ILI9341_SPI3WIRE_SUPPORT (1)
-#endif
-
-#ifndef ILI9341_SPI4WIRE_SUPPORT
-#define ILI9341_SPI4WIRE_SUPPORT (1)
-#endif
-
-#ifndef ILI9341_PAR_SUPPORT
-#define ILI9341_PAR_SUPPORT (1)
-#endif
-
 #ifndef ILI9341_COLOR
 #define ILI9341_COLOR (65)
 #endif

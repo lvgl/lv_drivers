@@ -33,6 +33,18 @@ extern "C" {
 #define AR10XX_BUFFERED (0)
 #endif
 
+#ifndef AR10XX_SPI_SUPPORT
+#define AR10XX_SPI_SUPPORT (1)
+#endif
+
+#ifndef AR10XX_I2C_SUPPORT
+#define AR10XX_I2C_SUPPORT (1)
+#endif
+
+#ifndef AR10XX_UART_SUPPORT
+#define AR10XX_UART_SUPPORT (1)
+#endif
+
 //error list from AR10XX
 #define AR10XX_ERR_SUCCESS               (0x00)
 #define AR10XX_ERR_CMD_UNRECOGNIZED      (0x01)
@@ -42,7 +54,7 @@ extern "C" {
 
 #define AR10XX_I2C_ADDR             (0x4D)
 #define AR10XX_CMD_IRQ_DELAY_MAX    (500)  //in ms
-#define AR10XX_CMD_ANSWER_WAIT      (1000) //in us
+#define AR10XX_CMD_ANSWER_WAIT      (100) //in us
 #define AR10XX_EEPROM_USER_SIZE     (128)
 /**********************
  *      TYPEDEFS
@@ -57,6 +69,17 @@ typedef enum
     AR10XX_PROTO_SPI, //!<  SPI 4 Wire
 } ar10xx_protocol_t;
 
+typedef enum
+{
+    AR10XX_SAMPLING_1 = 1,
+    AR10XX_SAMPLING_4 = 4,
+    AR10XX_SAMPLING_8 = 8,
+    AR10XX_SAMPLING_16 = 16,
+    AR10XX_SAMPLING_32 = 32,
+    AR10XX_SAMPLING_64 = 64,
+    AR10XX_SAMPLING_128 = 128,
+} ar10xx_sampling_t;
+
 /**
  * Device descriptor
  */
@@ -70,6 +93,9 @@ typedef struct
 #endif
 #if (AR10XX_SPI_SUPPORT)
         lv_spi_handle_t spi_dev;   //!< SPI device descriptor
+#endif
+#if (AR10XX_UART_SUPPORT)
+        lv_uart_handle_t uart_dev;   //!< uart device descriptor
 #endif
     };
     lv_gpio_handle_t irq_pin;      //!< Interupt pin to detect new data (optionnal) //FIXME: Needed ?
@@ -90,6 +116,33 @@ typedef struct
 
 
 } ar10xx_regmap_t ;
+
+/*
+ * Touchmode register (Datasheet: page 27)
+ */
+typedef union
+{
+    struct {
+        uint8_t pu : 3; //Pen up state bits
+        uint8_t pm : 2; //Pen mouvement state bits
+        uint8_t pd : 3; //Pen Down state bits
+    };
+    uint8_t value;
+} ar10xx_touchmode_t ;
+
+/*
+ * Touchoption register (Datasheet: page 28)
+ */
+typedef union
+{
+    struct {
+        uint8_t cce : 1; //Calibrate coordinate bit
+        uint8_t W48 : 1; //4/8 wire selection bit
+        uint8_t : 6;
+    };
+    uint8_t value;
+} ar10xx_touchoption_t ;
+
 
 typedef struct
 {
@@ -112,9 +165,9 @@ int ar10xx_set_touch_treshold( ar10xx_t *dev, uint8_t value);
 //0 - 10
 int ar10xx_set_sensitivity_filter( ar10xx_t *dev, uint8_t value);
 //1,4,8,16,32,64,128
-int ar10xx_set_sampling_fast( ar10xx_t *dev, uint8_t value);
+int ar10xx_set_sampling_fast( ar10xx_t *dev, ar10xx_sampling_t value);
 //1,4,8,16,32,64,128
-int ar10xx_set_sampling_slow( ar10xx_t *dev, uint8_t value);
+int ar10xx_set_sampling_slow( ar10xx_t *dev, ar10xx_sampling_t value);
 //1 - 8
 int ar10xx_set_accuracy_filter_fast( ar10xx_t *dev, uint8_t value);
 //1 - 8
@@ -126,9 +179,9 @@ int ar10xx_set_sleep_delay( ar10xx_t *dev, uint8_t value);
 // 0 - 255  (* 240 us )
 int ar10xx_set_penup_delay( ar10xx_t *dev, uint8_t value);
 //complex register
-int ar10xx_set_touch_mode( ar10xx_t *dev, uint8_t value);
+int ar10xx_set_touch_mode( ar10xx_t *dev, ar10xx_touchmode_t reg);
 //complex register
-int ar10xx_set_touch_options( ar10xx_t *dev, uint8_t value);
+int ar10xx_set_touch_options( ar10xx_t *dev, ar10xx_touchoption_t reg);
 //0 - 40
 int ar10xx_set_calibration_inset( ar10xx_t *dev, uint8_t value);
 //0 - 255

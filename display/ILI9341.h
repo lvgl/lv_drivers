@@ -24,6 +24,17 @@ extern "C" {
 /*********************
  *      DEFINES
  *********************/
+#ifndef ILI9341_SPI3WIRE_SUPPORT
+#define ILI9341_SPI3WIRE_SUPPORT (1)
+#endif
+
+#ifndef ILI9341_SPI4WIRE_SUPPORT
+#define ILI9341_SPI4WIRE_SUPPORT (1)
+#endif
+
+#ifndef ILI9341_PAR_SUPPORT
+#define ILI9341_PAR_SUPPORT (1)
+#endif
 
 /**********************
  *      TYPEDEFS
@@ -376,7 +387,7 @@ int ili9341_read_display_status(const ili9341_t *dev, ili9341_dis_status_t *resu
 
 
 //Extended command
-#if ILI9341_EXTC_SUPPORT
+#if (ILI9341_EXTC_SUPPORT)
 int ili9341_vcom_ctrl_1(const ili9341_t *dev, ili9341_vcom_ctrl_1_t config);
 int ili9341_vcom_ctrl_2(const ili9341_t *dev, ili9341_vcom_ctrl_2_t config);
 int ili9341_pwr_ctrl_a(const ili9341_t *dev, ili9341_pwr_ctrl_a_t config);
