@@ -4,7 +4,6 @@
  * @copyright MIT License.
  * XXX: I2C mode, SDO is THE IRQ signal
  * XXX: SPI mode, SIQ is THE IRQ signal
- * XXX: Factory AR1021 write FF to 0x01 and 0x29  of EEPROM, then rebooot
  */
 
 #ifndef AR10XX_H
@@ -23,6 +22,7 @@ extern "C" {
 #include <stdbool.h>
 #include <errno.h>
 #include "lvgl/lv_misc/lv_color.h"
+#include "lvgl/lvgl.h"
 
 /*********************
  *      DEFINES
@@ -43,6 +43,10 @@ extern "C" {
 
 #ifndef AR10XX_UART_SUPPORT
 #define AR10XX_UART_SUPPORT (1)
+#endif
+
+#ifndef AR10XX_USE_IRQ
+#define AR10XX_USE_IRQ (1)
 #endif
 
 //error list from AR10XX
@@ -98,9 +102,10 @@ typedef struct
         lv_uart_handle_t uart_dev;   //!< uart device descriptor
 #endif
     };
-    lv_gpio_handle_t irq_pin;      //!< Interupt pin to detect new data (optionnal) //FIXME: Needed ?
-    volatile uint8_t flag_irq;     //!< Store Interupt information
-    uint8_t flag_enable;  //FIXME: Needed to prevent user to write into register ?
+#if AR10XX_USE_IRQ
+    volatile uint8_t count_irq;     //!< Store Interupt information
+#endif
+    uint8_t opt_enable : 1 ;  //FIXME: Needed to prevent user to write into register ?
 } ar10xx_t;
 
 typedef struct {
@@ -142,14 +147,6 @@ typedef union
     };
     uint8_t value;
 } ar10xx_touchoption_t ;
-
-
-typedef struct
-{
-   uint8_t pen;
-   uint16_t X;
-   uint16_t Y;
-} ar10xx_read_t ;
 
 /**********************
  *      MACROS
@@ -211,17 +208,22 @@ int ar10xx_read_configs(ar10xx_t *dev);
 //write configs to registers
 int ar10xx_write_configs(ar10xx_t *dev);
 
-//read touch controller
-int ar10xx_read_touch(ar10xx_t *dev, ar10xx_read_t data);
-
 //Read user data (128 byte max)
 int ar10xx_eeprom_read(ar10xx_t *dev, uint8_t addr, uint8_t* buf, uint8_t size);
 
 //write user data  (128 byte max)
 int ar10xx_eeprom_write(ar10xx_t *dev, uint8_t addr, const uint8_t* data, uint8_t size);
 
-//int ar10xx_need_read(const ar10xx_t *dev); //FIXME: better a generic lvgl_need_read(); ( need ba a irq count)
+//lvlg input read
+bool ar10xx_input_get(lv_indev_data_t * data);
 
+//function to call in interupt routine
+#if AR10XX_USE_IRQ
+inline void INTERUPT_ATTRIBUTE ar10xx_irq(ar10xx_t* dev)
+{
+    if(dev->count_irq != 0xFF) dev->count_irq++ ; //event on irq
+}
+#endif
 
 #ifdef __cplusplus
 }

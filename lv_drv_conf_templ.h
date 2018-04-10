@@ -28,6 +28,8 @@
 /* use this macro if you want ignore a gpio write/read. e.g: spi.cs = LV_DRIVER_NOPIN */
 #define LV_DRIVER_NOPIN (0xFFFF)
 
+/* use this macro to add specific attribute to fucntion call into an interupt routines */
+#define INTERUPT_ATTRIBUTE
 /**********************
  *      TYPEDEFS
  **********************/

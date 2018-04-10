@@ -75,6 +75,12 @@
 /**********************
  *      TYPEDEFS
  **********************/
+typedef struct
+{
+   uint8_t pen;
+   uint16_t x;
+   uint16_t y;
+} ar10xx_read_t ;
 
 /**********************
  *  STATIC PROTOTYPES
@@ -86,6 +92,7 @@ static int inline _i2c_receive(const ar10xx_t *dev, uint8_t* data, uint8_t len);
 static int _sendData(const ar10xx_t *dev, uint8_t* data_out, uint32_t len);
 static int _receiveData(const ar10xx_t *dev, uint8_t* data_in, uint32_t len);
 
+static int _read_pos(const ar10xx_t *dev, ar10xx_read_t* pos);
 static void _wait_cmd_answer(ar10xx_t *dev);
 static int _send_register_setting(ar10xx_t *dev, uint8_t cmd, uint8_t value);
 
@@ -152,11 +159,19 @@ int ar10xx_enable_touch( ar10xx_t *dev)
 {
     uint8_t data[4] = { AR10XX_CMD_HEADER, 0x01, AR10XX_ENABLE_TOUCH, 0 };
     err_control(_sendData(dev, data, 3));
+#if AR10XX_USE_IRQ
+    dev->count_irq = 0; //reset irq
+#endif
 #if (AR10XX_VERIFY_ANSWER)
     _wait_cmd_answer(dev);
     err_control(_receiveData(dev, data, 4));
+    if(!data[2])
+    {
+        dev->opt_enable = 1;
+    }
     return data[2];
 #else
+    dev->opt_enable = 1;
     return 0;
 #endif
 }
@@ -165,11 +180,19 @@ int ar10xx_disable_touch( ar10xx_t *dev)
 {
     uint8_t data[4] = { AR10XX_CMD_HEADER, 0x01, AR10XX_DISABLE_TOUCH , 0 };
     err_control(_sendData(dev, data, 3));
+#if AR10XX_USE_IRQ
+    dev->count_irq = 0; //reset irq
+#endif
 #if (AR10XX_VERIFY_ANSWER)
     _wait_cmd_answer(dev);
     err_control(_receiveData(dev, data, 4));
+    if(!data[2])
+    {
+        dev->opt_enable = 0;
+    }
     return data[2];
 #else
+    dev->opt_enable = 0;
     return 0;
 #endif
 }
@@ -389,9 +412,39 @@ int ar10xx_set_pen_state_report_delay( ar10xx_t *dev, uint8_t value)
     return _send_register_setting(dev, AR10XX_PEN_STATE_REPORT_DELAY, value);
 }
 
-int ar10xx_set_touch_report_delay( ar10xx_t *dev, uint8_t value)
+int ar10xx_set_touch_report_delay(ar10xx_t *dev, uint8_t value)
 {
     return _send_register_setting(dev, AR10XX_TOUCH_REPORT_DELAY, value);
+}
+
+//Read register
+bool ar10xx_input_get(lv_indev_data_t * data)
+{
+    /* check irq or basic read */
+    ar10xx_t* dev = (ar10xx_t*)data->user_data;
+#if (AR10XX_USE_IRQ)
+    if (!dev->count_irq) //no irq, return false
+        return false;
+#endif
+
+    /*Get coordinate*/
+    ar10xx_read_t position;
+    _read_pos(dev, &position);
+
+    /*Store the collected data*/
+    data->point.x = position.x;
+    data->point.y = position.y;
+    data->state = position.pen ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL; //Depend setting
+
+    /* update irq reading */
+#if (AR10XX_USE_IRQ)
+    dev->count_irq--;
+    if(dev->count_irq)
+    {
+        return true;
+    }
+#endif
+    return false;
 }
 
 /**********************
@@ -437,6 +490,13 @@ static int inline _i2c_receive(const ar10xx_t *dev, uint8_t* data, uint8_t len)
 #endif
 
 
+static int _read_pos(const ar10xx_t *dev, ar10xx_read_t* pos)
+{
+    err_control(_receiveData(dev, (uint8_t*)pos, 5));
+    pos->pen &= 0x01 ;
+    return 0;
+}
+
 static int _send_register_setting(ar10xx_t *dev, uint8_t cmd, uint8_t value)
 {
     uint8_t data[reg_bufsize(sizeof(value))] = reg_write_format(cmd, 1, value);
@@ -452,20 +512,17 @@ static int _send_register_setting(ar10xx_t *dev, uint8_t cmd, uint8_t value)
 
 static void _wait_cmd_answer(ar10xx_t *dev)
 {
-    if(dev->irq_pin != LV_DRIVER_NOPIN)
+#if (AR10XX_USE_IRQ)
+    uint32_t time = lv_get_ms();
+    while((time+AR10XX_CMD_IRQ_DELAY_MAX) > lv_get_ms())
     {
-        uint32_t time = lv_get_ms();
-        while((time+AR10XX_CMD_IRQ_DELAY_MAX) > lv_get_ms())
-        {
-            if(dev->flag_irq) break;
-        }
-        dev->flag_irq = 0;
+        if(dev->count_irq) break;
     }
-    else
-    {
-        //FIXME: Need to test it. datasheet don't specify time betwen send and receive cmd result
-        lv_delay_us(AR10XX_CMD_ANSWER_WAIT);
-    }
+    dev->count_irq = 0;
+#else
+    //FIXME: Need to test it. datasheet don't specify time betwen send and receive cmd result
+    lv_delay_us(AR10XX_CMD_ANSWER_WAIT);
+#endif
 }
 
 static int _sendData(const ar10xx_t *dev, uint8_t* data_out, uint32_t len)
