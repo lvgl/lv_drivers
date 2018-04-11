@@ -54,7 +54,7 @@
 #define AR10XX_REGISTERS_WRITE_TO_EEPROM (0x23)
 #define AR10XX_EEPROM_READ               (0x28)
 #define AR10XX_EEPROM_WRITE              (0x29)
-#define AR10XX_EEPROM_WRITE_TO_REGS      (0x2B)
+#define AR10XX_EEPROM_WRITE_TO_REGISTERS (0x2B)
 
 //OTHER
 #define AR10XX_CMD_HEADER                (0x55)
@@ -99,6 +99,7 @@ static int _send_register_setting(ar10xx_t *dev, uint8_t cmd, uint8_t value);
 /**********************
  *  STATIC VARIABLES
  **********************/
+static ar10xx_t* _device;
 
 /**********************
  *      MACROS
@@ -123,6 +124,13 @@ static int _send_register_setting(ar10xx_t *dev, uint8_t cmd, uint8_t value);
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
+int ar10xx_init(ar10xx_t *dev)
+{
+    _device = dev;
+    err_control(ar10xx_enable_touch(dev));
+    return 0;
+}
+
 int ar10xx_factory_setting(ar10xx_t *dev)
 {
 #if (AR10XX_COMPONENT == 10) || (AR10XX_COMPONENT == 20)
@@ -222,7 +230,7 @@ int ar10xx_save_configs(ar10xx_t *dev)
 
 int ar10xx_load_configs(ar10xx_t *dev)
 {
-    uint8_t data[4] = { AR10XX_CMD_HEADER, 0x01, AR10XX_EEPROM_WRITE_TO_REGS, 0 };
+    uint8_t data[4] = { AR10XX_CMD_HEADER, 0x01, AR10XX_EEPROM_WRITE_TO_REGISTERS, 0 };
     err_control(_sendData(dev, data, 3));
 #if (AR10XX_VERIFY_ANSWER)
     _wait_cmd_answer(dev);
@@ -293,7 +301,7 @@ int ar10xx_eeprom_write(ar10xx_t *dev, uint8_t addr, const uint8_t* buf, uint8_t
         return -1; //size invalid
     }
 
-    uint8_t data_out[13] = { AR10XX_CMD_HEADER, 0x12, AR10XX_EEPROM_WRITE, 0x08, addr , size };
+    uint8_t data_out[13] = { AR10XX_CMD_HEADER, 0x04 + AR10XX_MAX_TRANSFERT_BYTE, AR10XX_EEPROM_WRITE, 0x00, addr , AR10XX_MAX_TRANSFERT_BYTE };
     uint8_t data_in[4] = { 0 };
 
     for(uint8_t i= size/AR10XX_MAX_TRANSFERT_BYTE ; i > 0 ; i--)
@@ -329,6 +337,89 @@ int ar10xx_eeprom_write(ar10xx_t *dev, uint8_t addr, const uint8_t* buf, uint8_t
     }
     return 0;
 }
+
+
+
+int ar10xx_read_configs(ar10xx_t *dev, ar10xx_regmap_t* regmap)
+{
+    uint8_t data_out[6] = { AR10XX_CMD_HEADER, 0x04, AR10XX_REGISTER_READ, 0x00, 0x00 , AR10XX_MAX_TRANSFERT_BYTE };
+    uint8_t data_in[13] = { 0  };
+    uint8_t* ptr = regmap->reg_data;
+
+    for(uint8_t i= sizeof(ar10xx_regmap_t)/AR10XX_MAX_TRANSFERT_BYTE ; i > 0 ; i--)
+    {
+        err_control(_sendData(dev, data_out, sizeof(data_out)));
+        _wait_cmd_answer(dev);
+        err_control(_receiveData(dev, data_in, sizeof(data_in)));
+#if (AR10XX_VERIFY_ANSWER)
+        if(data_in[2])
+        {
+            return data_in[2];
+        }
+#endif
+        memcpy((void*)ptr, (void*)&data_in[4], AR10XX_MAX_TRANSFERT_BYTE);
+        ptr += AR10XX_MAX_TRANSFERT_BYTE;
+        data_out[4] += AR10XX_MAX_TRANSFERT_BYTE;
+
+    }
+    if(sizeof(ar10xx_regmap_t) % AR10XX_MAX_TRANSFERT_BYTE)
+    {
+        data_out[5] = sizeof(ar10xx_regmap_t) % AR10XX_MAX_TRANSFERT_BYTE;
+        err_control(_sendData(dev, data_out, sizeof(data_out)));
+        _wait_cmd_answer(dev);
+        err_control(_receiveData(dev, data_in, sizeof(ar10xx_regmap_t) % AR10XX_MAX_TRANSFERT_BYTE));
+#if (AR10XX_VERIFY_ANSWER)
+        if(data_in[2])
+        {
+            return data_in[2];
+        }
+#endif
+        memcpy((void*)ptr, (void*)&data_in[4], sizeof(ar10xx_regmap_t) % AR10XX_MAX_TRANSFERT_BYTE);
+    }
+    return 0;
+}
+
+int ar10xx_write_configs(ar10xx_t *dev, const ar10xx_regmap_t* regmap)
+{
+
+    uint8_t data_out[13] = { AR10XX_CMD_HEADER, 0x04 + AR10XX_MAX_TRANSFERT_BYTE, AR10XX_REGISTER_WRITE, 0x00, 0x00 , AR10XX_MAX_TRANSFERT_BYTE };
+    uint8_t data_in[4] = { 0 };
+    const uint8_t* ptr = regmap->reg_data;
+
+    for(uint8_t i= sizeof(ar10xx_regmap_t)/AR10XX_MAX_TRANSFERT_BYTE ; i > 0 ; i--)
+    {
+        memcpy((void*)&data_out[6],(void*)ptr, AR10XX_MAX_TRANSFERT_BYTE);
+        err_control(_sendData(dev, data_out, sizeof(data_out)));
+#if (AR10XX_VERIFY_ANSWER)
+        _wait_cmd_answer(dev);
+        err_control(_receiveData(dev, data_in, sizeof(data_in)));
+        if(data_in[2])
+        {
+            return data_in[2];
+        }
+#endif
+        ptr += AR10XX_MAX_TRANSFERT_BYTE;
+        data_out[4] += AR10XX_MAX_TRANSFERT_BYTE;
+
+    }
+    if(sizeof(ar10xx_regmap_t) % AR10XX_MAX_TRANSFERT_BYTE)
+    {
+        data_out[2] = 4 + sizeof(ar10xx_regmap_t) % AR10XX_MAX_TRANSFERT_BYTE;
+        data_out[5] = sizeof(ar10xx_regmap_t) % AR10XX_MAX_TRANSFERT_BYTE;
+        memcpy((void*)&data_out[6],(void*)ptr, sizeof(ar10xx_regmap_t) % AR10XX_MAX_TRANSFERT_BYTE);
+        err_control(_sendData(dev, data_out,  sizeof(ar10xx_regmap_t) % AR10XX_MAX_TRANSFERT_BYTE));
+#if (AR10XX_VERIFY_ANSWER)
+        _wait_cmd_answer(dev);
+        err_control(_receiveData(dev, data_in, sizeof(data_in)));
+        if(data_in[2])
+        {
+            return data_in[2];
+        }
+#endif
+    }
+    return 0;
+}
+
 //Register set functions
 
 int ar10xx_set_touch_treshold(ar10xx_t *dev, uint8_t value)
@@ -421,15 +512,15 @@ int ar10xx_set_touch_report_delay(ar10xx_t *dev, uint8_t value)
 bool ar10xx_input_get(lv_indev_data_t * data)
 {
     /* check irq or basic read */
-    ar10xx_t* dev = (ar10xx_t*)data->user_data;
+    //ar10xx_t* dev = (ar10xx_t*)data->user_data;
 #if (AR10XX_USE_IRQ)
-    if (!dev->count_irq) //no irq, return false
+    if (!_device->count_irq) //no irq, return false
         return false;
 #endif
 
     /*Get coordinate*/
     ar10xx_read_t position;
-    _read_pos(dev, &position);
+    _read_pos(_device, &position);
 
     /*Store the collected data*/
     data->point.x = position.x;
@@ -438,8 +529,8 @@ bool ar10xx_input_get(lv_indev_data_t * data)
 
     /* update irq reading */
 #if (AR10XX_USE_IRQ)
-    dev->count_irq--;
-    if(dev->count_irq)
+    _device->count_irq--;
+    if(_device->count_irq)
     {
         return true;
     }
@@ -499,6 +590,10 @@ static int _read_pos(const ar10xx_t *dev, ar10xx_read_t* pos)
 
 static int _send_register_setting(ar10xx_t *dev, uint8_t cmd, uint8_t value)
 {
+    if(dev->opt_enable)// touch controller need be disable to change register safety
+    {
+        return -1;
+    }
     uint8_t data[reg_bufsize(sizeof(value))] = reg_write_format(cmd, 1, value);
     err_control(_sendData(dev, data, sizeof(data)));
 #if (AR10XX_VERIFY_ANSWER)

@@ -6,6 +6,9 @@
  * XXX: SPI mode, SIQ is THE IRQ signal
  */
 
+//TODO: Disable/enable touch controller when send register and command
+//TODO: Buffered mod with a function ar10XX_update();
+
 #ifndef AR10XX_H
 #define AR10XX_H
 #ifdef __cplusplus
@@ -71,6 +74,7 @@ typedef enum
 {
     AR10XX_PROTO_I2C = 0, //!<  I2C 2 Wire
     AR10XX_PROTO_SPI, //!<  SPI 4 Wire
+    AR10XX_PROTO_UART, //<! UART 2 Wire
 } ar10xx_protocol_t;
 
 typedef enum
@@ -115,11 +119,30 @@ typedef struct {
 } ar10xx_id_t;
 
 
-typedef struct
+typedef union
 {
-
-
-
+    struct {
+        uint8_t spe_use1;
+        uint8_t spe_use2;
+        uint8_t touch_treshold;
+        uint8_t sensitivity_filter;
+        uint8_t sampling_fast;
+        uint8_t sampling_slow;
+        uint8_t accurancy_filter_fast;
+        uint8_t accurancy_filter_slow;
+        uint8_t speed_treshold;
+        uint8_t spe_use3;
+        uint8_t sleep_delay;
+        uint8_t pen_up_delay;
+        uint8_t touch_mode;
+        uint8_t touch_options;
+        uint8_t calibration_inset;
+        uint8_t pen_state_report_delay;
+        uint8_t spe_use4;
+        uint8_t touch_report_delay;
+        uint8_t spe_use5;
+    };
+    uint8_t reg_data[19];
 } ar10xx_regmap_t ;
 
 /*
@@ -155,6 +178,11 @@ typedef union
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
+
+
+
+
+
 
 //Touch need be disable when you you use this API
 // 0 - 255
@@ -193,6 +221,8 @@ int ar10xx_disable_touch( ar10xx_t *dev);
 int ar10xx_enable_touch( ar10xx_t *dev);
 
 
+int ar10xx_init(ar10xx_t *dev);
+
 //Set default value for touch screen (need reboot after this)
 int ar10xx_factory_setting(ar10xx_t *dev);
 
@@ -203,10 +233,10 @@ int ar10xx_save_configs(ar10xx_t *dev);
 int ar10xx_load_configs(ar10xx_t *dev);
 
 //read configs from registers
-int ar10xx_read_configs(ar10xx_t *dev);
+int ar10xx_read_configs(ar10xx_t *dev, ar10xx_regmap_t* regmap);
 
 //write configs to registers
-int ar10xx_write_configs(ar10xx_t *dev);
+int ar10xx_write_configs(ar10xx_t *dev, const ar10xx_regmap_t* regmap);
 
 //Read user data (128 byte max)
 int ar10xx_eeprom_read(ar10xx_t *dev, uint8_t addr, uint8_t* buf, uint8_t size);
