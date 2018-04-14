@@ -72,6 +72,8 @@
 #define _POS_ARRAY_ERROR                 (2)
 #define _POS_ARRAY_CMD                   (3)
 
+#define DELAY_BETWEEN_BYTE_TRANSACTION   (50) //in us
+
 /**********************
  *      TYPEDEFS
  **********************/
@@ -89,8 +91,8 @@ static int inline _spi_transaction(const ar10xx_t *dev, uint8_t* data_in, uint8_
 static int inline _i2c_send(const ar10xx_t *dev, uint8_t reg, const uint8_t* data, uint8_t len);
 static int inline _i2c_receive(const ar10xx_t *dev, uint8_t* data, uint8_t len);
 
-static int _sendData(const ar10xx_t *dev, uint8_t* data_out, uint32_t len);
-static int _receiveData(const ar10xx_t *dev, uint8_t* data_in, uint32_t len);
+static int _sendData(const ar10xx_t *dev, uint8_t* data_out, uint8_t len);
+static int _receiveData(const ar10xx_t *dev, uint8_t* data_in, uint8_t len);
 
 static int _read_pos(const ar10xx_t *dev, ar10xx_read_t* pos);
 static void _wait_cmd_answer(ar10xx_t *dev);
@@ -104,7 +106,7 @@ static ar10xx_t* _device;
 /**********************
  *      MACROS
  **********************/
-#if AR10XX_DEBUG
+#if (AR10XX_DEBUG)
 #include <stdio.h>
 #define debug(fmt, ...) printf("%s: " fmt "\n", __FUNCTION__, ## __VA_ARGS__)
 #else
@@ -527,6 +529,8 @@ bool ar10xx_input_get(lv_indev_data_t * data)
     data->point.y = position.y;
     data->state = position.pen ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL; //Depend setting
 
+    debug("x: %04X, y: %04X",position.x, position.y);
+
     /* update irq reading */
 #if (AR10XX_USE_IRQ)
     _device->count_irq--;
@@ -620,45 +624,71 @@ static void _wait_cmd_answer(ar10xx_t *dev)
 #endif
 }
 
-static int _sendData(const ar10xx_t *dev, uint8_t* data_out, uint32_t len)
+static int _sendData(const ar10xx_t *dev, uint8_t* data_out, uint8_t len)
 {
     switch(dev->protocol)
     {
 #if (AR10XX_I2C_SUPPORT)
     case AR10XX_PROTO_I2C:
-        err_control(_i2c_send(dev, AR10XX_I2C_CMD_REG, data_out, len));
+        err_control(_i2c_send(dev, AR10XX_I2C_CMD_REG, data_out, 1)); //FIXME: A 50 us delay is needed before the Stop bit.
+        lv_delay_us(DELAY_BETWEEN_BYTE_TRANSACTION);
         break;
 #endif
 #if (AR10XX_SPI_SUPPORT)
     case AR10XX_PROTO_SPI:
-        err_control(_spi_transaction(dev, NULL, data_out, len, 1));
+        for (uint8_t i = 0 ; i < len ; i++)
+        {
+            err_control(_spi_transaction(dev, NULL, &data_out[i], len, 1));
+            lv_delay_us(DELAY_BETWEEN_BYTE_TRANSACTION);
+        }
         break;
 #endif
     default:
         return -EPROTONOSUPPORT;
         break;
     }
+#if (AR10XX_DEBUG)
+    printf("%s:",__FUNCTION__);
+    for (uint16_t i = 0; i < len ; i++)
+    {
+        printf("%02X ",data_out[i]);
+    }
+    printf("\n");
+#endif
     return 0;
 }
 
-static int _receiveData(const ar10xx_t *dev, uint8_t* data_in, uint32_t len)
+static int _receiveData(const ar10xx_t *dev, uint8_t* data_in, uint8_t len)
 {
     switch(dev->protocol)
     {
 #if (AR10XX_I2C_SUPPORT)
     case AR10XX_PROTO_I2C:
-        err_control(_i2c_receive(dev, data_in, len));
+        err_control(_i2c_receive(dev, data_in, 1)); //a 50 us delay is needed before the Stop bit.
+        lv_delay_us(DELAY_BETWEEN_BYTE_TRANSACTION);
         break;
 #endif
 #if (AR10XX_SPI_SUPPORT)
     case AR10XX_PROTO_SPI:
-        err_control(_spi_transaction(dev, data_in, NULL, len, 1));
+        for (uint8_t i = 0 ; i < len ; i++)
+        {
+            err_control(_spi_transaction(dev, &data_in[i], NULL, len, 1));
+            lv_delay_us(DELAY_BETWEEN_BYTE_TRANSACTION);
+        }
         break;
 #endif
     default:
         return -EPROTONOSUPPORT;
         break;
     }
+#if (AR10XX_DEBUG)
+    printf("%s:",__FUNCTION__);
+    for (uint16_t i = 0; i < len ; i++)
+    {
+        printf("%02X ",data_in[i]);
+    }
+    printf("\n");
+#endif
     return 0;
 }
 

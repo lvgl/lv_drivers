@@ -2,6 +2,7 @@
  * @file AR10XX.h
  * @author zaltora  (https://github.com/Zaltora)
  * @copyright MIT License.
+ * @pre SPI frequency, Max: 900KHz / CPOL: 0, CPHA: 1.
  * XXX: I2C mode, SDO is THE IRQ signal
  * XXX: SPI mode, SIQ is THE IRQ signal
  */
@@ -61,7 +62,7 @@ extern "C" {
 
 #define AR10XX_I2C_ADDR             (0x4D)
 #define AR10XX_CMD_IRQ_DELAY_MAX    (500)  //in ms
-#define AR10XX_CMD_ANSWER_WAIT      (100) //in us
+#define AR10XX_CMD_ANSWER_WAIT      (50000) //in us
 #define AR10XX_EEPROM_USER_SIZE     (128)
 /**********************
  *      TYPEDEFS
