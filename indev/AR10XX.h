@@ -2,13 +2,16 @@
  * @file AR10XX.h
  * @author zaltora  (https://github.com/Zaltora)
  * @copyright MIT License.
- * @pre SPI frequency, Max: 900KHz / CPOL: 0, CPHA: 1.
- * XXX: I2C mode, SDO is THE IRQ signal
- * XXX: SPI mode, SIQ is THE IRQ signal
+ * @warn SPI:  Frequency 900KHz Max / CPOL: 0, CPHA: 1.
+ * @warn SPI:  SIQ is THE IRQ signal
+ * @warn I2C:  AR1020 don't support clock stretching.
+ * @warn I2C:  Clock stretching can up to 50 us.
+ * @warn I2C:  SDO is THE IRQ signal
+ * @warn UART: Max baudrate is 9600
  */
 
-//TODO: Disable/enable touch controller when send register and command
 //TODO: Buffered mod with a function ar10XX_update();
+//TODO: Verify error_control only to test transmission error / not component error
 
 #ifndef AR10XX_H
 #define AR10XX_H
@@ -61,9 +64,15 @@ extern "C" {
 #define AR10XX_ERR_CANCEL_CALIB_MODE     (0xFC)
 
 #define AR10XX_I2C_ADDR             (0x4D)
-#define AR10XX_CMD_IRQ_DELAY_MAX    (500)  //in ms
-#define AR10XX_CMD_ANSWER_WAIT      (50000) //in us
+#define AR10XX_READ_TIMEOUT         (200) //in ms
+#define AR10XX_READ_DELAY_LOOP      (50)  //in ms
 #define AR10XX_EEPROM_USER_SIZE     (128)
+
+#define AR10XX_DEFAULT_X1   (400)
+#define AR10XX_DEFAULT_Y1   (260)
+#define AR10XX_DEFAULT_X2   (3930)
+#define AR10XX_DEFAULT_Y2   (3820)
+
 /**********************
  *      TYPEDEFS
  **********************/
@@ -89,6 +98,23 @@ typedef enum
     AR10XX_SAMPLING_128 = 128,
 } ar10xx_sampling_t;
 
+typedef enum
+{
+    AR10XX_STAGE_TOPLEFT = 0,
+    AR10XX_STAGE_TOPRIGHT,
+    AR10XX_STAGE_BOTRIGHT,
+    AR10XX_STAGE_BOTLEFT,
+} ar10xx_calib_t;
+
+typedef enum
+{
+    AR10XX_DEGREE_0 = 0,
+    AR10XX_DEGREE_90,
+    AR10XX_DEGREE_180,
+    AR10XX_DEGREE_270,
+} ar10xx_rotation_t;
+
+
 /**
  * Device descriptor
  */
@@ -110,7 +136,14 @@ typedef struct
 #if AR10XX_USE_IRQ
     volatile uint8_t count_irq;     //!< Store Interupt information
 #endif
-    uint8_t opt_enable : 1 ;  //FIXME: Needed to prevent user to write into register ?
+    uint16_t x1;
+    uint16_t y1;
+    uint16_t x2;
+    uint16_t y2;
+    uint16_t w;
+    uint16_t h;
+    ar10xx_rotation_t r;
+    uint8_t opt_enable : 1;
 } ar10xx_t;
 
 typedef struct {
@@ -118,7 +151,6 @@ typedef struct {
     uint8_t controler_type : 6 ;
     uint8_t resolution : 2 ;
 } ar10xx_id_t;
-
 
 typedef union
 {
@@ -180,11 +212,6 @@ typedef union
  * GLOBAL PROTOTYPES
  **********************/
 
-
-
-
-
-
 //Touch need be disable when you you use this API
 // 0 - 255
 int ar10xx_set_touch_treshold( ar10xx_t *dev, uint8_t value);
@@ -222,7 +249,7 @@ int ar10xx_disable_touch( ar10xx_t *dev);
 int ar10xx_enable_touch( ar10xx_t *dev);
 
 
-int ar10xx_init(ar10xx_t *dev);
+int ar10xx_init(ar10xx_t *dev, uint16_t heigth, uint16_t width);
 
 //Set default value for touch screen (need reboot after this)
 int ar10xx_factory_setting(ar10xx_t *dev);
@@ -245,6 +272,9 @@ int ar10xx_eeprom_read(ar10xx_t *dev, uint8_t addr, uint8_t* buf, uint8_t size);
 //write user data  (128 byte max)
 int ar10xx_eeprom_write(ar10xx_t *dev, uint8_t addr, const uint8_t* data, uint8_t size);
 
+//
+int ar10xx_map_screen_coordinate(ar10xx_t *dev, ar10xx_calib_t stage, uint8_t number, uint16_t max_delay);
+
 //lvlg input read
 bool ar10xx_input_get(lv_indev_data_t * data);
 
@@ -255,6 +285,8 @@ inline void INTERUPT_ATTRIBUTE ar10xx_irq(ar10xx_t* dev)
     if(dev->count_irq != 0xFF) dev->count_irq++ ; //event on irq
 }
 #endif
+
+
 
 #ifdef __cplusplus
 }
