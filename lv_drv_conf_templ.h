@@ -8,6 +8,10 @@
 #ifndef LV_DRV_CONF_H
 #define LV_DRV_CONF_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "lv_conf.h"
 
 /*********************
@@ -494,6 +498,9 @@ static inline int lv_uart_read(lv_uart_handle_t uart_dev, void* data_in, uint16_
 /*No settings*/
 #endif
 
-#endif  /*LV_DRV_CONF_H*/
+#ifdef __cplusplus
+}
+#endif
 
+#endif  /*LV_DRV_CONF_H*/
 #endif /*Remove this to enable the content*/

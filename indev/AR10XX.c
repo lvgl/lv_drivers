@@ -130,6 +130,8 @@ static ar10xx_t* _device;
 #define reg_bufsize(len) (6 + len)
 #define reg_write_format(reg, len, ... ) { AR10XX_CMD_HEADER, 0x04 + len, AR10XX_REGISTER_WRITE, 0x00, reg, len, ## __VA_ARGS__ }
 
+#define  SWAP(x, y)    do { typeof(x) SWAP = x; x = y; y = SWAP; } while (0)
+
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
@@ -541,13 +543,8 @@ int ar10xx_set_touch_report_delay(ar10xx_t *dev, uint8_t value)
     return _send_register_setting(dev, AR10XX_TOUCH_REPORT_DELAY, value);
 }
 
-long map(long x, long in_min, long in_max, long out_min, long out_max)
-{
-  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-}
-
 //Read register
-bool ar10xx_input_get(lv_indev_data_t * data)
+bool ar10xx_input_get_calib(lv_indev_data_t * data)
 {
     /* check irq or basic read */
     //ar10xx_t* dev = (ar10xx_t*)data->user_data;
@@ -563,12 +560,11 @@ bool ar10xx_input_get(lv_indev_data_t * data)
         return false;
     }
 
-    /*Store the collected data*/
-    data->point.x = map(position.x, _device->x1, _device->y1, 0, _device->w); //position.x;
-    data->point.y = map(position.y, _device->x2, _device->y2, 0, _device->h); //position.y;
+    data->point.x = (((int32_t)position.x - (int32_t)_device->x1) * (int32_t)_device->w) / ((int32_t)_device->x2 - (int32_t)_device->x1);
+    data->point.y = (((int32_t)position.y - (int32_t)_device->y1) * (int32_t)_device->h) / ((int32_t)_device->y2 - (int32_t)_device->y1);
     data->state = position.pen ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL; //Depend setting
 
-    debug("p: %u, x: %u, y: %u", data->state, data->point.x, data->point.y);
+    debug("p: %u, x: %d, y: %d", data->state, data->point.x, data->point.y);
 
     /* update irq reading */
 #if (AR10XX_USE_IRQ)
@@ -582,76 +578,207 @@ bool ar10xx_input_get(lv_indev_data_t * data)
 }
 
 
-static int _save_point(ar10xx_t *dev, uint16_t x, uint16_t y)
+bool ar10xx_input_get_raw(lv_indev_data_t * data)
 {
-    switch(dev->r)
+    /* check irq or basic read */
+    //ar10xx_t* dev = (ar10xx_t*)data->user_data;
+#if (AR10XX_USE_IRQ)
+    if (!_device->count_irq) //no irq, return false
+        return false;
+#endif
+    static int16_t x = 0;
+    static int16_t y = 0;
+    static int16_t p = LV_INDEV_STATE_REL;
+
+    /*Get coordinate*/
+    ar10xx_read_t position;
+
+    if (_read_pos(_device, &position))
     {
-        case AR10XX_DEGREE_0:
-            break;
-        case AR10XX_DEGREE_90:
-            break;
-        case AR10XX_DEGREE_180:
-            break;
-        case AR10XX_DEGREE_270:
-            break;
-        default:
-            break;
+        data->point.x = x;
+        data->point.y = y;
+        data->state =  p;
+        return false;
+    }
+
+    x = position.x;
+    y = position.y;
+    p = position.pen ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
+    data->point.x = position.x;
+    data->point.y = position.y;
+    data->state = position.pen ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL; //Depend setting
+
+    debug("p: %u, x: %d, y: %d", data->state, data->point.x, data->point.y);
+
+    /* update irq reading */
+#if (AR10XX_USE_IRQ)
+    _device->count_irq--;
+    if(_device->count_irq)
+    {
+        return true;
+    }
+#endif
+    return false;
+}
+
+//int ar10xx_map_screen_coordinate(ar10xx_t *dev, ar10xx_calib_t stage, uint8_t number, uint16_t max_delay)
+//{
+//    ar10xx_read_t position;
+//    uint32_t avr_x = 0;
+//    uint32_t avr_y = 0;
+//
+//    if(!number)
+//    {
+//        return -1;
+//    }
+//    //Get the point
+//    for(uint8_t i = 0; i < number; i++)
+//    {
+//        err_control(ar10xx_enable_touch(dev));
+//        do
+//        {
+//            if (_read_pos_wait(_device, &position, max_delay*1000UL))
+//            {
+//                return -1;
+//            }
+//        }
+//        while(position.pen);
+//        err_control(ar10xx_disable_touch(dev));
+//        avr_x += position.x;
+//        avr_y += position.y;
+//    }
+//    avr_x /= number;
+//    avr_y /= number;
+//
+//    //Save coordinate
+//    switch (stage)
+//    {
+//        case AR10XX_STAGE_TOPLEFT:
+//            dev->x1 = avr_x;
+//            dev->y1 = avr_y;
+//            debug("x: %u, y: %u", avr_x, avr_y);
+//            break;
+//        case AR10XX_STAGE_TOPRIGHT:
+//            dev->x2 = avr_x;
+//            dev->y1 = avr_y;
+//            debug("x: %u, y: %u", avr_x, avr_y);
+//            break;
+//        case AR10XX_STAGE_BOTRIGHT:
+//            dev->x2 = avr_x;
+//            dev->y2 = avr_y;
+//            debug("x: %u, y: %u", avr_x, avr_y);
+//            break;
+//        case AR10XX_STAGE_BOTLEFT:
+//            dev->x1 = avr_x;
+//            dev->y2 = avr_y;
+//            debug("x: %u, y: %u", avr_x, avr_y);
+//            break;
+//    }
+//
+//    return 0;
+//}
+
+void ar10xx_set_rotation(ar10xx_t *dev,  int16_t degree)
+{
+    degree = degree / 90 ;
+
+    //+/-180 degree rotation
+    if ((degree == 2) || (degree == -2))
+    {
+        SWAP(dev->x1, dev->x2);
+        SWAP(dev->y1, dev->y2);
+    }
+    //-90 ou +270 degree rotation (left to right)
+    else if ((degree == -1) || (degree == 3))
+    {
+        int16_t temp = dev->x1;
+        dev->x1 = dev->y2;
+        dev->y2 = dev->x2;
+        dev->x2 = dev->y1;
+        dev->y1 = temp;
+        SWAP(dev->w, dev->h);
+    }
+    //+90 ou -270 degree rotation (right to left)
+    else if ((degree == 1) || (degree == -3))
+    {
+        int16_t temp = dev->x1;
+        dev->x1 = dev->y1;
+        dev->y1 = dev->x2;
+        dev->x2 = dev->y2;
+        dev->y2 = temp;
+        SWAP(dev->w, dev->h);
     }
 }
 
-int ar10xx_map_screen_coordinate(ar10xx_t *dev, ar10xx_calib_t stage, uint8_t number, uint16_t max_delay)
+int ar10xx_set_calib_data(ar10xx_t *dev, lv_point_t* pts, int16_t offset)
 {
-    ar10xx_read_t position;
-    uint32_t avr_x = 0;
-    uint32_t avr_y = 0;
-
-    if(!number)
+    if(!pts)
     {
         return -1;
     }
-    //Get the point
-    for(uint8_t i = 0; i < number; i++)
-    {
-        err_control(ar10xx_enable_touch(dev));
-        do
-        {
-            if (_read_pos_wait(_device, &position, max_delay*1000UL))
-            {
-                return -1;
-            }
-        }
-        while(position.pen);
-        err_control(ar10xx_disable_touch(dev));
-        avr_x += position.x;
-        avr_y += position.y;
-    }
-    avr_x /= number;
-    avr_y /= number;
+    //x process, found z = ax+b with point 1 and 3.
+    //b1 is the point at 0, found with the point 3 coordinate.
+    int32_t  b1 = (int32_t)( (pts[2].x*(dev->w-2*offset)) - ((pts[2].x-pts[0].x)*(dev->w-offset)) ) / (int32_t)(dev->w-2*offset);
 
-    //Save coordinate
-    switch (stage)
-    {
-        case AR10XX_STAGE_TOPLEFT:
-            dev->x1 = avr_x;
-            dev->y1 = avr_y;
-            debug("x: %u, y: %u", avr_x, avr_y);
-            break;
-        case AR10XX_STAGE_TOPRIGHT:
-            dev->x2 = avr_x;
-            dev->y1 = avr_y;
-            debug("x: %u, y: %u", avr_x, avr_y);
-            break;
-        case AR10XX_STAGE_BOTRIGHT:
-            dev->x2 = avr_x;
-            dev->y2 = avr_y;
-            debug("x: %u, y: %u", avr_x, avr_y);
-            break;
-        case AR10XX_STAGE_BOTLEFT:
-            dev->x1 = avr_x;
-            dev->y2 = avr_y;
-            debug("x: %u, y: %u", avr_x, avr_y);
-            break;
-    }
+    //found y with the width size
+    int32_t  z1 = (int32_t)( ((pts[2].x-pts[0].x)*dev->w) + b1 * (dev->w-2*offset) ) / (int32_t)(dev->w-2*offset);
+
+    debug("stape 1: x1: %d, x2: %d", b1, z1);
+
+    //x process, found y = ax+b with point 2 and 4.
+    //b1 is the point at 0, found with the point 3 coordinate.
+    int32_t  b2 = (int32_t)( (pts[1].x*(dev->w-2*offset)) - ((pts[1].x-pts[3].x)*(dev->w-offset)) ) / (int32_t)(dev->w-2*offset);
+
+    //found y with the width size
+    int32_t  z2 = (int32_t)( ((pts[1].x-pts[3].x)*dev->w) + b2 * (dev->w-2*offset) ) / (int32_t)(dev->w-2*offset);
+
+    debug("stape 2: x1: %d, x2: %d", b2, z2);
+
+//    if(pts[2].x < pts[0].x)
+//    {
+//        dev->y1 = (z1+z2)/2;
+//        dev->y2 = (b1+b2)/2;
+//    }
+//    else
+//    {
+        dev->x1 = (b1+b2)/2;
+        dev->x2 = (z1+z2)/2;
+//    }
+
+    debug("calib: x1: %d, x2: %d",  dev->x1,  dev->x2);
+
+    //y process, found z = ax+b with point 1 and 3.
+    //b1 is the point at 0, found with the point 3 coordinate.
+    b1 = ( (pts[2].y*(dev->h-2*offset)) - ((pts[2].y-pts[0].y)*(dev->h-offset)) ) / (dev->h-2*offset);
+
+    //found y with the width size
+    z1 = ( ((pts[2].y-pts[0].y)*dev->h) + b1 * (dev->h-2*offset) ) / (dev->h-2*offset);
+
+    debug("stape 1: y1: %d, y2: %d", b1, z1);
+
+    //y process, found y = ax+b with point 2 and 4.
+    //b1 is the point at 0, found with the point 3 coordinate.
+    b2 = ( (pts[3].y*(dev->h-2*offset)) - ((pts[3].y-pts[1].y)*(dev->h-offset)) ) / (dev->h-2*offset);
+
+    //found y with the width size
+    z2 = ( ((pts[3].y-pts[1].y)*dev->h) + b2 * (dev->h-2*offset) ) / (dev->h-2*offset);
+
+    debug("stape 2: y1: %d, y2: %d", b2, z2);
+
+    //FIXME: better way to control when y2  < y1
+//    if(pts[2].y < pts[0].y)
+//    {
+//        dev->y1 = (z1+z2)/2;
+//        dev->y2 = (b1+b2)/2;
+//    }
+//    else
+//    {
+        dev->y1 = (b1+b2)/2;
+        dev->y2 = (z1+z2)/2;
+//    }
+
+    debug("calib: y1: %d, y2: %d",  dev->y1,  dev->y2);
+
 
     return 0;
 }
@@ -702,7 +829,8 @@ static int _read_pos_wait(const ar10xx_t *dev, ar10xx_read_t* pos, uint32_t time
 {
     uint8_t data[5] = { 0 };
     err_control(_waitData(dev, data, 5, timeout));
-    if(data[0] == AR10XX_READ_NODATA)
+    //FIXME: Sometime AR1021 first byte is 0x00. Spi problem or component. Put a new condition fix it. (Remove it to confirm)
+    if((data[0] == AR10XX_READ_NODATA) || (!data[0]))
     {
         return -1;
     }
@@ -718,10 +846,12 @@ static int _read_pos(const ar10xx_t *dev, ar10xx_read_t* pos)
 {
     uint8_t data[5] = { 0 };
     err_control(_receiveData(dev, data, 5));
-    if(data[0] == AR10XX_READ_NODATA)
+    //FIXME: Sometime AR1021 0x00. Spi problem or component. Put a new condition fix it.
+    if((data[0] == AR10XX_READ_NODATA) || (!data[0]))
     {
         return -1;
     }
+
     pos->x = (data[2] << 7) | (data[1] & 0x7F);
     pos->y = (data[4] << 7) | (data[3] & 0x7F);
     pos->pen = data[0] & 0x01;
@@ -801,12 +931,12 @@ static int _receiveData(const ar10xx_t *dev, uint8_t* data_in, uint8_t len)
         break;
     }
 #if (AR10XX_DEBUG)
-    printf("%s:",__FUNCTION__);
-    for (uint16_t i = 0; i < len ; i++)
-    {
-        printf("%02X ",data_in[i]);
-    }
-    printf("\n");
+//    printf("%s:",__FUNCTION__);
+//    for (uint16_t i = 0; i < len ; i++)
+//    {
+//        printf("%02X ",data_in[i]);
+//    }
+//    printf("\n");
 #endif
     return 0;
 }

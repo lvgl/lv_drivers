@@ -53,6 +53,14 @@ typedef enum
     ILI9341_PROTO_SERIAL_8BIT, //!<  SPI 8 bits
 } ili9341_protocol_t;
 
+typedef enum
+{
+    ILI9341_DEGREE_0 = 0,
+    ILI9341_DEGREE_90,
+    ILI9341_DEGREE_180,
+    ILI9341_DEGREE_270,
+} ili9341_rotation_t;
+
 
 /**
  * Device descriptor
@@ -358,6 +366,9 @@ void ili9341_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
  * @return Non-zero if error occured
  */
 int ili9341_init(ili9341_t *dev);
+
+
+int ili9341_set_rotation(ili9341_t *dev, ili9341_rotation_t degree);
 
 
 

@@ -12,6 +12,9 @@
 
 //TODO: Buffered mod with a function ar10XX_update();
 //TODO: Verify error_control only to test transmission error / not component error
+//TODO: Add offset parameter for calibration position button (use range size of display to determine tactile size)
+//TODO: Tactile component need trig lvgl API
+//TODO: A NON-BLOCK API for tactile information.
 
 #ifndef AR10XX_H
 #define AR10XX_H
@@ -68,10 +71,11 @@ extern "C" {
 #define AR10XX_READ_DELAY_LOOP      (50)  //in ms
 #define AR10XX_EEPROM_USER_SIZE     (128)
 
-#define AR10XX_DEFAULT_X1   (400)
-#define AR10XX_DEFAULT_Y1   (260)
-#define AR10XX_DEFAULT_X2   (3930)
-#define AR10XX_DEFAULT_Y2   (3820)
+//default value for resistive touch
+#define AR10XX_DEFAULT_X1   (260)
+#define AR10XX_DEFAULT_Y1   (3820)
+#define AR10XX_DEFAULT_X2   (3840)
+#define AR10XX_DEFAULT_Y2   (330)
 
 /**********************
  *      TYPEDEFS
@@ -114,7 +118,6 @@ typedef enum
     AR10XX_DEGREE_270,
 } ar10xx_rotation_t;
 
-
 /**
  * Device descriptor
  */
@@ -136,12 +139,12 @@ typedef struct
 #if AR10XX_USE_IRQ
     volatile uint8_t count_irq;     //!< Store Interupt information
 #endif
-    uint16_t x1;
-    uint16_t y1;
-    uint16_t x2;
-    uint16_t y2;
-    uint16_t w;
-    uint16_t h;
+    uint16_t w; //width
+    uint16_t h; //height
+    int16_t x1;
+    int16_t x2;
+    int16_t y1;
+    int16_t y2;
     ar10xx_rotation_t r;
     uint8_t opt_enable : 1;
 } ar10xx_t;
@@ -272,11 +275,23 @@ int ar10xx_eeprom_read(ar10xx_t *dev, uint8_t addr, uint8_t* buf, uint8_t size);
 //write user data  (128 byte max)
 int ar10xx_eeprom_write(ar10xx_t *dev, uint8_t addr, const uint8_t* data, uint8_t size);
 
-//
+/**
+ * Wait a event on the screen to save current coordinate as reference
+ * @param dev Pointer to the touch controller descriptor
+ * @param stage the touch location to do.
+ * @param number Number of screen touch to do
+ * @param max_delay Timeout in second
+ * @return Non-zero if error occurred
+ */
 int ar10xx_map_screen_coordinate(ar10xx_t *dev, ar10xx_calib_t stage, uint8_t number, uint16_t max_delay);
 
+int ar10xx_set_calib_data(ar10xx_t *dev, lv_point_t* pts, int16_t offset);
+
+//int ar10xx_set_rotation(ar10xx_t *dev, ar10xx_rotation_t degree);
+
 //lvlg input read
-bool ar10xx_input_get(lv_indev_data_t * data);
+bool ar10xx_input_get_raw(lv_indev_data_t * data);
+bool ar10xx_input_get_calib(lv_indev_data_t * data);
 
 //function to call in interupt routine
 #if AR10XX_USE_IRQ
@@ -285,7 +300,6 @@ inline void INTERUPT_ATTRIBUTE ar10xx_irq(ar10xx_t* dev)
     if(dev->count_irq != 0xFF) dev->count_irq++ ; //event on irq
 }
 #endif
-
 
 
 #ifdef __cplusplus

@@ -458,6 +458,23 @@ int ili9341_init(ili9341_t *dev)
 }
 
 
+int ili9341_set_rotation(ili9341_t *dev, ili9341_rotation_t degree)
+{
+    switch(degree)
+    {
+        case ILI9341_DEGREE_0:
+            break;
+        case ILI9341_DEGREE_90:
+            break;
+        case ILI9341_DEGREE_180:
+            break;
+        case ILI9341_DEGREE_270:
+            break;
+        default:
+            break;
+    }
+}
+
 int ili9341_unknow(const ili9341_t *dev)
 {
     uint8_t data[3] = { 0x03, 0x80, 0x02  };
@@ -919,9 +936,9 @@ static int _sendDataPixels(const ili9341_t *dev, const lv_color_t *pixel, uint32
 {
 #if ILI9341_DEBUG
     printf("%s: ",__FUNCTION__);
-    for (uint8_t i = 0 ; i < len ; i++)
+    for (uint16_t i = 0 ; i < len ; i++)
     {
-        printf("%02X ",data_out[i]);
+        //printf("%02X ",pixel[i]);
     }
     printf("\n");
 #endif
