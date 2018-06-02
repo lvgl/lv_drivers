@@ -101,14 +101,14 @@ static int _receiveData(const ar10xx_t *dev, uint8_t* data_in, uint8_t len);
 static int _waitData(const ar10xx_t *dev, uint8_t* data_in, uint8_t len, uint32_t timeout);
 
 static int _read_pos(const ar10xx_t *dev, ar10xx_read_t* pos);
-static int _read_pos_wait(const ar10xx_t *dev, ar10xx_read_t* pos, uint32_t timeout);
+//static int _read_pos_wait(const ar10xx_t *dev, ar10xx_read_t* pos, uint32_t timeout);
 
 static int _send_register_setting(ar10xx_t *dev, uint8_t cmd, uint8_t value);
 
 /**********************
  *  STATIC VARIABLES
  **********************/
-static ar10xx_t* _device;
+static ar10xx_t* _device; //FIXME: To remove when multi-display will be supported.
 
 /**********************
  *      MACROS
@@ -130,20 +130,47 @@ static ar10xx_t* _device;
 #define reg_bufsize(len) (6 + len)
 #define reg_write_format(reg, len, ... ) { AR10XX_CMD_HEADER, 0x04 + len, AR10XX_REGISTER_WRITE, 0x00, reg, len, ## __VA_ARGS__ }
 
-#define  SWAP(x, y)    do { typeof(x) SWAP = x; x = y; y = SWAP; } while (0)
-
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
-int ar10xx_init(ar10xx_t *dev, uint16_t heigth, uint16_t width)
+int ar10xx_init(ar10xx_t *dev, uint16_t width, uint16_t heigth, lv_rotation_t rotation)
 {
     _device = dev;
     dev->h = heigth;
     dev->w = width;
-    dev->x1 = AR10XX_DEFAULT_X1;
-    dev->x2 = AR10XX_DEFAULT_X2;
-    dev->y1 = AR10XX_DEFAULT_Y1;
-    dev->y2 = AR10XX_DEFAULT_Y2;
+    dev->ro = rotation;
+    dev->rc = LV_ROT_DEGREE_0;
+
+    switch (dev->ro)
+    {
+        case LV_ROT_DEGREE_0:
+            dev->x1 = AR10XX_DEFAULT_X1;
+            dev->x2 = AR10XX_DEFAULT_X2;
+            dev->y1 = AR10XX_DEFAULT_Y1;
+            dev->y2 = AR10XX_DEFAULT_Y2;
+            break;
+        case LV_ROT_DEGREE_90:
+            dev->x1 = AR10XX_DEFAULT_Y2;
+            dev->x2 = AR10XX_DEFAULT_Y1;
+            dev->y1 = AR10XX_DEFAULT_X1;
+            dev->y2 = AR10XX_DEFAULT_X2;
+            break;
+        case LV_ROT_DEGREE_180:
+            dev->x1 = AR10XX_DEFAULT_X2;
+            dev->x2 = AR10XX_DEFAULT_X1;
+            dev->y1 = AR10XX_DEFAULT_Y2;
+            dev->y2 = AR10XX_DEFAULT_Y1;
+            break;
+        case LV_ROT_DEGREE_270:
+            dev->x1 = AR10XX_DEFAULT_Y1;
+            dev->x2 = AR10XX_DEFAULT_Y2;
+            dev->y1 = AR10XX_DEFAULT_X2;
+            dev->y2 = AR10XX_DEFAULT_X1;
+            break;
+        default:
+            return -1;
+            break;
+    }
     err_control(ar10xx_enable_touch(dev));
     return 0;
 }
@@ -550,6 +577,13 @@ bool ar10xx_input_get_calib(lv_indev_data_t * data)
     //ar10xx_t* dev = (ar10xx_t*)data->user_data;
 #if (AR10XX_USE_IRQ)
     if (!_device->count_irq) //no irq, return false
+        if(_device->p == LV_INDEV_STATE_PR) //Protection if last input read was pressed state
+        {
+            _device->p = LV_INDEV_STATE_REL;
+            data->point.x = _device->x;
+            data->point.y = _device->y;
+            data->state =  _device->p;
+        }
         return false;
 #endif
 
@@ -557,12 +591,22 @@ bool ar10xx_input_get_calib(lv_indev_data_t * data)
     ar10xx_read_t position;
     if (_read_pos(_device, &position))
     {
+        if(_device->p == LV_INDEV_STATE_PR) //Protection if last input read was pressed state
+        {
+            _device->p = LV_INDEV_STATE_REL;
+            data->point.x = _device->x;
+            data->point.y = _device->y;
+            data->state =  _device->p;
+        }
         return false;
     }
 
-    data->point.x = (((int32_t)position.x - (int32_t)_device->x1) * (int32_t)_device->w) / ((int32_t)_device->x2 - (int32_t)_device->x1);
-    data->point.y = (((int32_t)position.y - (int32_t)_device->y1) * (int32_t)_device->h) / ((int32_t)_device->y2 - (int32_t)_device->y1);
-    data->state = position.pen ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL; //Depend setting
+    _device->x = GET_POINT_CALIB(position.x, _device->w, _device->x1, _device->x2);
+    _device->y = GET_POINT_CALIB(position.y, _device->h, _device->y1, _device->y2);
+    _device->p = position.pen ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL; //Depend setting
+    data->point.x = _device->x;
+    data->point.y = _device->y;
+    data->state = _device->p;
 
     debug("p: %u, x: %d, y: %d", data->state, data->point.x, data->point.y);
 
@@ -584,29 +628,37 @@ bool ar10xx_input_get_raw(lv_indev_data_t * data)
     //ar10xx_t* dev = (ar10xx_t*)data->user_data;
 #if (AR10XX_USE_IRQ)
     if (!_device->count_irq) //no irq, return false
+        if(_device->p == LV_INDEV_STATE_PR) //Protection if last input read was pressed state
+        {
+            _device->p = LV_INDEV_STATE_REL;
+            data->point.x = _device->x;
+            data->point.y = _device->y;
+            data->state =  _device->p;
+        }
         return false;
 #endif
-    static int16_t x = 0;
-    static int16_t y = 0;
-    static int16_t p = LV_INDEV_STATE_REL;
 
     /*Get coordinate*/
     ar10xx_read_t position;
 
     if (_read_pos(_device, &position))
     {
-        data->point.x = x;
-        data->point.y = y;
-        data->state =  p;
+        if(_device->p == LV_INDEV_STATE_PR) //Protection if last input read was pressed state
+        {
+            _device->p = LV_INDEV_STATE_REL;
+            data->point.x = _device->x;
+            data->point.y = _device->y;
+            data->state =  _device->p;
+        }
         return false;
     }
 
-    x = position.x;
-    y = position.y;
-    p = position.pen ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
-    data->point.x = position.x;
-    data->point.y = position.y;
-    data->state = position.pen ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL; //Depend setting
+    _device->x = position.x;
+    _device->y = position.y;
+    _device->p = position.pen ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
+    data->point.x = _device->x;
+    data->point.y = _device->y;
+    data->state = _device->p;
 
     debug("p: %u, x: %d, y: %d", data->state, data->point.x, data->point.y);
 
@@ -615,81 +667,26 @@ bool ar10xx_input_get_raw(lv_indev_data_t * data)
     _device->count_irq--;
     if(_device->count_irq)
     {
-        return true;
+        return false;
     }
 #endif
     return false;
 }
 
-//int ar10xx_map_screen_coordinate(ar10xx_t *dev, ar10xx_calib_t stage, uint8_t number, uint16_t max_delay)
-//{
-//    ar10xx_read_t position;
-//    uint32_t avr_x = 0;
-//    uint32_t avr_y = 0;
-//
-//    if(!number)
-//    {
-//        return -1;
-//    }
-//    //Get the point
-//    for(uint8_t i = 0; i < number; i++)
-//    {
-//        err_control(ar10xx_enable_touch(dev));
-//        do
-//        {
-//            if (_read_pos_wait(_device, &position, max_delay*1000UL))
-//            {
-//                return -1;
-//            }
-//        }
-//        while(position.pen);
-//        err_control(ar10xx_disable_touch(dev));
-//        avr_x += position.x;
-//        avr_y += position.y;
-//    }
-//    avr_x /= number;
-//    avr_y /= number;
-//
-//    //Save coordinate
-//    switch (stage)
-//    {
-//        case AR10XX_STAGE_TOPLEFT:
-//            dev->x1 = avr_x;
-//            dev->y1 = avr_y;
-//            debug("x: %u, y: %u", avr_x, avr_y);
-//            break;
-//        case AR10XX_STAGE_TOPRIGHT:
-//            dev->x2 = avr_x;
-//            dev->y1 = avr_y;
-//            debug("x: %u, y: %u", avr_x, avr_y);
-//            break;
-//        case AR10XX_STAGE_BOTRIGHT:
-//            dev->x2 = avr_x;
-//            dev->y2 = avr_y;
-//            debug("x: %u, y: %u", avr_x, avr_y);
-//            break;
-//        case AR10XX_STAGE_BOTLEFT:
-//            dev->x1 = avr_x;
-//            dev->y2 = avr_y;
-//            debug("x: %u, y: %u", avr_x, avr_y);
-//            break;
-//    }
-//
-//    return 0;
-//}
-
-void ar10xx_set_rotation(ar10xx_t *dev,  int16_t degree)
+void ar10xx_set_rotation(ar10xx_t *dev, lv_rotation_t degree)
 {
-    degree = degree / 90 ;
+    //degree = degree / 90 ;
+    int8_t rotate = degree - dev->rc;
+    dev->rc = degree;
 
     //+/-180 degree rotation
-    if ((degree == 2) || (degree == -2))
+    if ((rotate == 2) || (rotate == -2))
     {
         SWAP(dev->x1, dev->x2);
         SWAP(dev->y1, dev->y2);
     }
-    //-90 ou +270 degree rotation (left to right)
-    else if ((degree == -1) || (degree == 3))
+    //+90 or -270 degree rotation (right to left)
+    else if ((rotate == 1) || (rotate == -3))
     {
         int16_t temp = dev->x1;
         dev->x1 = dev->y2;
@@ -698,8 +695,8 @@ void ar10xx_set_rotation(ar10xx_t *dev,  int16_t degree)
         dev->y1 = temp;
         SWAP(dev->w, dev->h);
     }
-    //+90 ou -270 degree rotation (right to left)
-    else if ((degree == 1) || (degree == -3))
+    //-90 or +270 degree rotation (left to right)
+    else if ((rotate == -1) || (rotate == 3))
     {
         int16_t temp = dev->x1;
         dev->x1 = dev->y1;
@@ -734,16 +731,8 @@ int ar10xx_set_calib_data(ar10xx_t *dev, lv_point_t* pts, int16_t offset)
 
     debug("stape 2: x1: %d, x2: %d", b2, z2);
 
-//    if(pts[2].x < pts[0].x)
-//    {
-//        dev->y1 = (z1+z2)/2;
-//        dev->y2 = (b1+b2)/2;
-//    }
-//    else
-//    {
-        dev->x1 = (b1+b2)/2;
-        dev->x2 = (z1+z2)/2;
-//    }
+    dev->x1 = (b1+b2)/2;
+    dev->x2 = (z1+z2)/2;
 
     debug("calib: x1: %d, x2: %d",  dev->x1,  dev->x2);
 
@@ -765,20 +754,10 @@ int ar10xx_set_calib_data(ar10xx_t *dev, lv_point_t* pts, int16_t offset)
 
     debug("stape 2: y1: %d, y2: %d", b2, z2);
 
-    //FIXME: better way to control when y2  < y1
-//    if(pts[2].y < pts[0].y)
-//    {
-//        dev->y1 = (z1+z2)/2;
-//        dev->y2 = (b1+b2)/2;
-//    }
-//    else
-//    {
-        dev->y1 = (b1+b2)/2;
-        dev->y2 = (z1+z2)/2;
-//    }
+    dev->y1 = (b1+b2)/2;
+    dev->y2 = (z1+z2)/2;
 
     debug("calib: y1: %d, y2: %d",  dev->y1,  dev->y2);
-
 
     return 0;
 }
@@ -825,23 +804,6 @@ static int inline _i2c_receive(const ar10xx_t *dev, uint8_t* data, uint8_t len)
 }
 #endif
 
-static int _read_pos_wait(const ar10xx_t *dev, ar10xx_read_t* pos, uint32_t timeout)
-{
-    uint8_t data[5] = { 0 };
-    err_control(_waitData(dev, data, 5, timeout));
-    //FIXME: Sometime AR1021 first byte is 0x00. Spi problem or component. Put a new condition fix it. (Remove it to confirm)
-    if((data[0] == AR10XX_READ_NODATA) || (!data[0]))
-    {
-        return -1;
-    }
-
-    pos->x = (data[2] << 7) | (data[1] & 0x7F);
-    pos->y = (data[4] << 7) | (data[3] & 0x7F);
-    pos->pen = data[0] & 0x01;
-    debug("p: %u, x: %u, y: %u", pos->pen, pos->x, pos->y);
-    return 0;
-}
-
 static int _read_pos(const ar10xx_t *dev, ar10xx_read_t* pos)
 {
     uint8_t data[5] = { 0 };
@@ -852,8 +814,20 @@ static int _read_pos(const ar10xx_t *dev, ar10xx_read_t* pos)
         return -1;
     }
 
-    pos->x = (data[2] << 7) | (data[1] & 0x7F);
-    pos->y = (data[4] << 7) | (data[3] & 0x7F);
+#if (AR10XX_INVERT_XY)
+    if(!(dev->ro+dev->rc)%2))
+#else
+    if((dev->ro+dev->rc)%2)
+#endif
+    {
+        pos->y = (data[2] << 7) | (data[1] & 0x7F);
+        pos->x = (data[4] << 7) | (data[3] & 0x7F);
+    }
+    else
+    {
+        pos->x = (data[2] << 7) | (data[1] & 0x7F);
+        pos->y = (data[4] << 7) | (data[3] & 0x7F);
+    }
     pos->pen = data[0] & 0x01;
     debug("p: %u, x: %u, y: %u", pos->pen, pos->x, pos->y);
     return 0;

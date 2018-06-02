@@ -31,6 +31,7 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 #include <errno.h>
+#include "../lv_drv_common.h"
 #include "lvgl/lv_misc/lv_color.h"
 #include "lvgl/lvgl.h"
 
@@ -72,10 +73,11 @@ extern "C" {
 #define AR10XX_EEPROM_USER_SIZE     (128)
 
 //default value for resistive touch
-#define AR10XX_DEFAULT_X1   (260)
-#define AR10XX_DEFAULT_Y1   (3820)
-#define AR10XX_DEFAULT_X2   (3840)
-#define AR10XX_DEFAULT_Y2   (330)
+#define AR10XX_DEFAULT_X1     (260)
+#define AR10XX_DEFAULT_Y1     (3820)
+#define AR10XX_DEFAULT_X2     (3840)
+#define AR10XX_DEFAULT_Y2     (330)
+#define AR10XX_READ_INVERT_XY (false)
 
 /**********************
  *      TYPEDEFS
@@ -101,22 +103,6 @@ typedef enum
     AR10XX_SAMPLING_64 = 64,
     AR10XX_SAMPLING_128 = 128,
 } ar10xx_sampling_t;
-
-typedef enum
-{
-    AR10XX_STAGE_TOPLEFT = 0,
-    AR10XX_STAGE_TOPRIGHT,
-    AR10XX_STAGE_BOTRIGHT,
-    AR10XX_STAGE_BOTLEFT,
-} ar10xx_calib_t;
-
-typedef enum
-{
-    AR10XX_DEGREE_0 = 0,
-    AR10XX_DEGREE_90,
-    AR10XX_DEGREE_180,
-    AR10XX_DEGREE_270,
-} ar10xx_rotation_t;
 
 /**
  * Device descriptor
@@ -145,7 +131,11 @@ typedef struct
     int16_t x2;
     int16_t y1;
     int16_t y2;
-    ar10xx_rotation_t r;
+    int16_t x;
+    int16_t y;
+    lv_indev_state_t p;
+    lv_rotation_t ro;
+    lv_rotation_t rc;
     uint8_t opt_enable : 1;
 } ar10xx_t;
 
@@ -252,7 +242,7 @@ int ar10xx_disable_touch( ar10xx_t *dev);
 int ar10xx_enable_touch( ar10xx_t *dev);
 
 
-int ar10xx_init(ar10xx_t *dev, uint16_t heigth, uint16_t width);
+int ar10xx_init(ar10xx_t *dev, uint16_t width, uint16_t heigth, lv_rotation_t rotation);
 
 //Set default value for touch screen (need reboot after this)
 int ar10xx_factory_setting(ar10xx_t *dev);
@@ -275,19 +265,9 @@ int ar10xx_eeprom_read(ar10xx_t *dev, uint8_t addr, uint8_t* buf, uint8_t size);
 //write user data  (128 byte max)
 int ar10xx_eeprom_write(ar10xx_t *dev, uint8_t addr, const uint8_t* data, uint8_t size);
 
-/**
- * Wait a event on the screen to save current coordinate as reference
- * @param dev Pointer to the touch controller descriptor
- * @param stage the touch location to do.
- * @param number Number of screen touch to do
- * @param max_delay Timeout in second
- * @return Non-zero if error occurred
- */
-int ar10xx_map_screen_coordinate(ar10xx_t *dev, ar10xx_calib_t stage, uint8_t number, uint16_t max_delay);
 
 int ar10xx_set_calib_data(ar10xx_t *dev, lv_point_t* pts, int16_t offset);
-
-//int ar10xx_set_rotation(ar10xx_t *dev, ar10xx_rotation_t degree);
+void ar10xx_set_rotation(ar10xx_t *dev, lv_rotation_t degree);
 
 //lvlg input read
 bool ar10xx_input_get_raw(lv_indev_data_t * data);
