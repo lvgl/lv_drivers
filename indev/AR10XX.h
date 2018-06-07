@@ -125,12 +125,8 @@ typedef struct
 #if AR10XX_USE_IRQ
     volatile uint8_t count_irq;     //!< Store Interupt information
 #endif
-    uint16_t w; //width
-    uint16_t h; //height
-    int16_t x1;
-    int16_t x2;
-    int16_t y1;
-    int16_t y2;
+    lv_screen_size_t size;
+    lv_indev_limit_t cal;
     int16_t x;
     int16_t y;
     lv_indev_state_t p;

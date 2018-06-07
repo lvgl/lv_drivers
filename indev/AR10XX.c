@@ -101,8 +101,6 @@ static int _receiveData(const ar10xx_t *dev, uint8_t* data_in, uint8_t len);
 static int _waitData(const ar10xx_t *dev, uint8_t* data_in, uint8_t len, uint32_t timeout);
 
 static int _read_pos(const ar10xx_t *dev, ar10xx_read_t* pos);
-//static int _read_pos_wait(const ar10xx_t *dev, ar10xx_read_t* pos, uint32_t timeout);
-
 static int _send_register_setting(ar10xx_t *dev, uint8_t cmd, uint8_t value);
 
 /**********************
@@ -136,36 +134,37 @@ static ar10xx_t* _device; //FIXME: To remove when multi-display will be supporte
 int ar10xx_init(ar10xx_t *dev, uint16_t width, uint16_t heigth, lv_rotation_t rotation)
 {
     _device = dev;
-    dev->h = heigth;
-    dev->w = width;
+    dev->size.heigth = heigth;
+    dev->size.width = width;
     dev->ro = rotation;
     dev->rc = LV_ROT_DEGREE_0;
 
+    //FIXME: Remove this when lvgl will update rotation ?
     switch (dev->ro)
     {
         case LV_ROT_DEGREE_0:
-            dev->x1 = AR10XX_DEFAULT_X1;
-            dev->x2 = AR10XX_DEFAULT_X2;
-            dev->y1 = AR10XX_DEFAULT_Y1;
-            dev->y2 = AR10XX_DEFAULT_Y2;
+            dev->cal.xmin = AR10XX_DEFAULT_X1;
+            dev->cal.xmax = AR10XX_DEFAULT_X2;
+            dev->cal.ymin = AR10XX_DEFAULT_Y1;
+            dev->cal.ymax = AR10XX_DEFAULT_Y2;
             break;
         case LV_ROT_DEGREE_90:
-            dev->x1 = AR10XX_DEFAULT_Y2;
-            dev->x2 = AR10XX_DEFAULT_Y1;
-            dev->y1 = AR10XX_DEFAULT_X1;
-            dev->y2 = AR10XX_DEFAULT_X2;
+            dev->cal.xmin = AR10XX_DEFAULT_Y2;
+            dev->cal.xmax = AR10XX_DEFAULT_Y1;
+            dev->cal.ymin = AR10XX_DEFAULT_X1;
+            dev->cal.ymax = AR10XX_DEFAULT_X2;
             break;
         case LV_ROT_DEGREE_180:
-            dev->x1 = AR10XX_DEFAULT_X2;
-            dev->x2 = AR10XX_DEFAULT_X1;
-            dev->y1 = AR10XX_DEFAULT_Y2;
-            dev->y2 = AR10XX_DEFAULT_Y1;
+            dev->cal.xmin = AR10XX_DEFAULT_X2;
+            dev->cal.xmax = AR10XX_DEFAULT_X1;
+            dev->cal.ymin = AR10XX_DEFAULT_Y2;
+            dev->cal.ymax = AR10XX_DEFAULT_Y1;
             break;
         case LV_ROT_DEGREE_270:
-            dev->x1 = AR10XX_DEFAULT_Y1;
-            dev->x2 = AR10XX_DEFAULT_Y2;
-            dev->y1 = AR10XX_DEFAULT_X2;
-            dev->y2 = AR10XX_DEFAULT_X1;
+            dev->cal.xmin = AR10XX_DEFAULT_Y1;
+            dev->cal.xmax = AR10XX_DEFAULT_Y2;
+            dev->cal.ymin = AR10XX_DEFAULT_X2;
+            dev->cal.ymax = AR10XX_DEFAULT_X1;
             break;
         default:
             return -1;
@@ -601,8 +600,8 @@ bool ar10xx_input_get_calib(lv_indev_data_t * data)
         return false;
     }
 
-    _device->x = GET_POINT_CALIB(position.x, _device->w, _device->x1, _device->x2);
-    _device->y = GET_POINT_CALIB(position.y, _device->h, _device->y1, _device->y2);
+    _device->x = GET_POINT_CALIB(position.x, _device->size.width, _device->cal.xmin, _device->cal.xmax);
+    _device->y = GET_POINT_CALIB(position.y, _device->size.heigth, _device->cal.ymin, _device->cal.ymax);
     _device->p = position.pen ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL; //Depend setting
     data->point.x = _device->x;
     data->point.y = _device->y;
@@ -673,93 +672,18 @@ bool ar10xx_input_get_raw(lv_indev_data_t * data)
     return false;
 }
 
+//FIXME: Remove this when lvgl will add rotation
 void ar10xx_set_rotation(ar10xx_t *dev, lv_rotation_t degree)
 {
     //degree = degree / 90 ;
     int8_t rotate = degree - dev->rc;
     dev->rc = degree;
-
-    //+/-180 degree rotation
-    if ((rotate == 2) || (rotate == -2))
-    {
-        SWAP(dev->x1, dev->x2);
-        SWAP(dev->y1, dev->y2);
-    }
-    //+90 or -270 degree rotation (right to left)
-    else if ((rotate == 1) || (rotate == -3))
-    {
-        int16_t temp = dev->x1;
-        dev->x1 = dev->y2;
-        dev->y2 = dev->x2;
-        dev->x2 = dev->y1;
-        dev->y1 = temp;
-        SWAP(dev->w, dev->h);
-    }
-    //-90 or +270 degree rotation (left to right)
-    else if ((rotate == -1) || (rotate == 3))
-    {
-        int16_t temp = dev->x1;
-        dev->x1 = dev->y1;
-        dev->y1 = dev->x2;
-        dev->x2 = dev->y2;
-        dev->y2 = temp;
-        SWAP(dev->w, dev->h);
-    }
+    common_indev_rotation(&dev->cal, &dev->size, rotate);
 }
 
 int ar10xx_set_calib_data(ar10xx_t *dev, lv_point_t* pts, int16_t offset)
 {
-    if(!pts)
-    {
-        return -1;
-    }
-    //x process, found z = ax+b with point 1 and 3.
-    //b1 is the point at 0, found with the point 3 coordinate.
-    int32_t  b1 = (int32_t)( (pts[2].x*(dev->w-2*offset)) - ((pts[2].x-pts[0].x)*(dev->w-offset)) ) / (int32_t)(dev->w-2*offset);
-
-    //found y with the width size
-    int32_t  z1 = (int32_t)( ((pts[2].x-pts[0].x)*dev->w) + b1 * (dev->w-2*offset) ) / (int32_t)(dev->w-2*offset);
-
-    debug("stape 1: x1: %d, x2: %d", b1, z1);
-
-    //x process, found y = ax+b with point 2 and 4.
-    //b1 is the point at 0, found with the point 3 coordinate.
-    int32_t  b2 = (int32_t)( (pts[1].x*(dev->w-2*offset)) - ((pts[1].x-pts[3].x)*(dev->w-offset)) ) / (int32_t)(dev->w-2*offset);
-
-    //found y with the width size
-    int32_t  z2 = (int32_t)( ((pts[1].x-pts[3].x)*dev->w) + b2 * (dev->w-2*offset) ) / (int32_t)(dev->w-2*offset);
-
-    debug("stape 2: x1: %d, x2: %d", b2, z2);
-
-    dev->x1 = (b1+b2)/2;
-    dev->x2 = (z1+z2)/2;
-
-    debug("calib: x1: %d, x2: %d",  dev->x1,  dev->x2);
-
-    //y process, found z = ax+b with point 1 and 3.
-    //b1 is the point at 0, found with the point 3 coordinate.
-    b1 = ( (pts[2].y*(dev->h-2*offset)) - ((pts[2].y-pts[0].y)*(dev->h-offset)) ) / (dev->h-2*offset);
-
-    //found y with the width size
-    z1 = ( ((pts[2].y-pts[0].y)*dev->h) + b1 * (dev->h-2*offset) ) / (dev->h-2*offset);
-
-    debug("stape 1: y1: %d, y2: %d", b1, z1);
-
-    //y process, found y = ax+b with point 2 and 4.
-    //b1 is the point at 0, found with the point 3 coordinate.
-    b2 = ( (pts[3].y*(dev->h-2*offset)) - ((pts[3].y-pts[1].y)*(dev->h-offset)) ) / (dev->h-2*offset);
-
-    //found y with the width size
-    z2 = ( ((pts[3].y-pts[1].y)*dev->h) + b2 * (dev->h-2*offset) ) / (dev->h-2*offset);
-
-    debug("stape 2: y1: %d, y2: %d", b2, z2);
-
-    dev->y1 = (b1+b2)/2;
-    dev->y2 = (z1+z2)/2;
-
-    debug("calib: y1: %d, y2: %d",  dev->y1,  dev->y2);
-
-    return 0;
+   return common_indev_calibration(&dev->cal, pts, dev->size.width, dev->size.heigth, offset);
 }
 
 /**********************
@@ -814,6 +738,7 @@ static int _read_pos(const ar10xx_t *dev, ar10xx_read_t* pos)
         return -1;
     }
 
+    //FIXME: Remove this when lvgl will update rotation
 #if (AR10XX_INVERT_XY)
     if(!(dev->ro+dev->rc)%2))
 #else
