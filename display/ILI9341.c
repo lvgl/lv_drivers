@@ -15,18 +15,6 @@
 /*********************
  *      DEFINES
  *********************/
-#ifndef ILI9341_SPI3WIRE_SUPPORT
-#define ILI9341_SPI3WIRE_SUPPORT (1)
-#endif
-
-#ifndef ILI9341_SPI4WIRE_SUPPORT
-#define ILI9341_SPI4WIRE_SUPPORT (1)
-#endif
-
-#ifndef ILI9341_PAR_SUPPORT
-#define ILI9341_PAR_SUPPORT (1)
-#endif
-
 #ifndef ILI9341_COLOR
 #define ILI9341_COLOR (65)
 #endif
@@ -152,16 +140,6 @@ typedef struct {
 /**********************
  *  STATIC PROTOTYPES
  **********************/
-#if (ILI9341_SPI3WIRE_SUPPORT)
-static int inline _spi3wire_send(const ili9341_t *dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize);
-#endif
-#if (ILI9341_SPI4WIRE_SUPPORT)
-static int inline _spi4wire_send(const ili9341_t *dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize);
-#endif
-#if (ILI9341_PAR_SUPPORT)
-static int inline _par_send(const ili9341_t *dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize);
-#endif
-
 static int _sendCommand(const ili9341_t *dev, uint8_t cmd);
 static int _sendCommandData(const ili9341_t *dev, uint8_t cmd, uint8_t* data_out, uint32_t len);
 static int _sendDataPixels(const ili9341_t *dev, const lv_color_t *pixel, uint32_t len, uint8_t wordsize);
@@ -296,8 +274,9 @@ void ili9341_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
 
 /* Perform default init routine according */
 //TODO: don't forget to make it constant again
-int ili9341_init(ili9341_t *dev)
+int ili9341_init(ili9341_t *dev, lv_rotation_t rotation)
 {
+
     if(_device)
     {
        return -1; //A screen was already initialized.
@@ -314,7 +293,6 @@ int ili9341_init(ili9341_t *dev)
         debug("Unsupported screen height");
         return -ENOTSUP;
     }
-
     if(dev->rst_pin != LV_DRIVER_NOPIN)
     {
         lv_gpio_write(dev->rst_pin, 0);
@@ -333,10 +311,15 @@ int ili9341_init(ili9341_t *dev)
     //if((err = ili9341_vert_scroll_start(dev, ili9341_vert_scroll_start_config)))
     //    return err;
 
-    ili9341_mem_ctrl_t ili9341_mem_ctrl_config = { 0 } ;
-    ili9341_mem_ctrl_config.mx = 1 ;
-    ili9341_mem_ctrl_config.bgr = 1 ;
-    err_control(ili9341_mem_ctrl(dev, ili9341_mem_ctrl_config));
+    //ili9341_mem_ctrl_t ili9341_mem_ctrl_config = { 0 } ;
+    //ili9341_mem_ctrl_config.mx = 1 ;
+    //ili9341_mem_ctrl_config.bgr = 1 ;
+    //err_control(ili9341_mem_ctrl(dev, ili9341_mem_ctrl_config));
+
+    dev->r = 0;
+    ili9341_set_rotation(dev, rotation);
+    dev->r = rotation;
+
 
     ili9341_px_fmt_t ili9341_pixel_fmt_config = { 0 };
 #if (ILI9341_COLOR == 65)
@@ -469,6 +452,41 @@ int ili9341_init(ili9341_t *dev)
     return 0;
 }
 
+
+int ili9341_set_rotation(ili9341_t *dev, lv_rotation_t degree)
+{
+    int8_t rotate = (dev->r + degree)%4;
+
+    ili9341_mem_ctrl_t config = { 0 };
+    switch(rotate)
+    {
+        case LV_ROT_DEGREE_0:
+            config.mx = 1;
+            config.bgr = 1;
+            ili9341_mem_ctrl(dev, config);
+            break;
+        case LV_ROT_DEGREE_90:
+            config.mx = 1;
+            config.mv = 1;
+            config.my = 1;
+            config.bgr = 1;
+            ili9341_mem_ctrl(dev, config);
+            break;
+        case LV_ROT_DEGREE_180:
+            config.my = 1;
+            config.bgr = 1;
+            ili9341_mem_ctrl(dev, config);
+            break;
+        case LV_ROT_DEGREE_270:
+            config.mv = 1;
+            config.bgr = 1;
+            ili9341_mem_ctrl(dev, config);
+            break;
+        default:
+            break;
+    }
+    return 0;
+}
 
 int ili9341_unknow(const ili9341_t *dev)
 {
@@ -844,62 +862,6 @@ int ili9341_set_page_addr(const ili9341_t *dev, int32_t start, int32_t stop)
 /**********************
  *   STATIC FUNCTIONS
  **********************/
-#if (ILI9341_PAR_SUPPORT)
-static int inline _par_send(const ili9341_t *dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize)
-{
-    lv_par_wr_cs(dev->spi_dev, false);
-    lv_par_wr_dc(dev->spi_dev, dc); /* command mode */
-#if (ILI9341_ERR_CHECK)
-    int err = lv_par_write(dev->spi_dev, data, len, wordsize);
-#else
-    lv_par_write(dev->spi_dev, data, len, wordsize);
-#endif
-    lv_par_wr_cs(dev->spi_dev, true);
-#if (ILI9341_ERR_CHECK)
-    return err;
-#else
-    return 0;
-#endif
-}
-#endif
-#if (ILI9341_SPI3WIRE_SUPPORT)
-static int inline _spi3wire_send(const ili9341_t *dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize)
-{
-    lv_spi_wr_cs(dev->spi_dev, false);
-    lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, dc, 1);
-#if (ILI9341_ERR_CHECK)
-    int err = lv_spi_transaction(dev->spi_dev, NULL, data, len, wordsize);
-#else
-    lv_spi_transaction(dev->spi_dev, NULL, data, len, wordsize);
-#endif
-    lv_spi_clr_preemble(dev->spi_dev, LV_SPI_COMMAND);
-    lv_spi_wr_cs(dev->spi_dev, true);
-#if (ILI9341_ERR_CHECK)
-    return err;
-#else
-    return 0;
-#endif
-}
-#endif
-#if (ILI9341_SPI4WIRE_SUPPORT)
-static int inline _spi4wire_send(const ili9341_t *dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize)
-{
-    lv_spi_wr_cs(dev->spi_dev, false);
-    lv_spi_wr_dc(dev->spi_dev, dc); /* command mode */
-#if (ILI9341_ERR_CHECK)
-    int err = lv_spi_transaction(dev->spi_dev, NULL, data, len, wordsize);
-#else
-    lv_spi_transaction(dev->spi_dev, NULL, data, len, wordsize);
-#endif
-    lv_spi_wr_cs(dev->spi_dev, true);
-#if (ILI9341_ERR_CHECK)
-    return err;
-#else
-    return 0;
-#endif
-}
-#endif
-
 static int _sendCommand(const ili9341_t *dev, uint8_t cmd)
 {
     debug("cmd: %02X",cmd);
@@ -907,17 +869,17 @@ static int _sendCommand(const ili9341_t *dev, uint8_t cmd)
     {
 #if (ILI9341_SPI4WIRE_SUPPORT)
     case ILI9341_PROTO_SERIAL_8BIT:
-        err_control(_spi4wire_send(dev, 0,  &cmd, 1, 1));
+        err_control(spi4wire_send(dev->spi_dev, 0,  &cmd, 1, 1));
         break;
 #endif
 #if (ILI9341_SPI3WIRE_SUPPORT)
     case ILI9341_PROTO_SERIAL_9BIT:
-        err_control(_spi3wire_send(dev, 0, &cmd, 1, 1));
+        err_control(spi3wire_send(dev->spi_dev, 0, &cmd, 1, 1));
         break;
 #endif
 #if (ILI9341_PAR_SUPPORT)
     case ILI9341_PROTO_8080_8BIT:
-        err_control(_par_send(dev, 0, &cmd, 1, 1));
+        err_control(par_send(dev->spi_dev, 0, &cmd, 1, 1));
         break;
 #endif
     default:
@@ -931,9 +893,9 @@ static int _sendDataPixels(const ili9341_t *dev, const lv_color_t *pixel, uint32
 {
 #if ILI9341_DEBUG
     printf("%s: ",__FUNCTION__);
-    for (uint8_t i = 0 ; i < len ; i++)
+    for (uint16_t i = 0 ; i < len ; i++)
     {
-        printf("%02X ",data_out[i]);
+        //printf("%02X ",pixel[i]);
     }
     printf("\n");
 #endif
@@ -955,9 +917,9 @@ static int _sendDataPixels(const ili9341_t *dev, const lv_color_t *pixel, uint32
             buf[u] = SWAPBYTES(pixel->full);
             pixel++;
         }
-        err_control(_spi4wire_send(dev, 1, (uint8_t*)buf, len, wordsize));
+        err_control(_pi4wire_send(dev->spi_dev, 1, (uint8_t*)buf, len, wordsize));
 #else
-        err_control(_spi4wire_send(dev, 1, (uint8_t*)pixel, len, wordsize));
+        err_control(spi4wire_send(dev->spi_dev, 1, (uint8_t*)pixel, len, wordsize));
 #endif
 #else //262k color
         for(uint16_t u = 0 ; u < len ; u++)
@@ -968,7 +930,7 @@ static int _sendDataPixels(const ili9341_t *dev, const lv_color_t *pixel, uint32
             pixel++;
         }
         //FIXME: Can't use wordize, lv_color24 use 4 byte.
-        err_control(_spi4wire_send(dev, 1, (uint8_t*)buf, len*sizeof(ili9341_color24_t), 1));
+        err_control(spi4wire_send(dev->spi_dev, 1, (uint8_t*)buf, len*sizeof(ili9341_color24_t), 1));
 #endif
         break;
 #endif
@@ -986,7 +948,7 @@ static int _sendDataPixels(const ili9341_t *dev, const lv_color_t *pixel, uint32
 #endif
         for (uint32_t i = 0; i <= len*wordsize; i++)
         {
-            err_control(_spi3wire_send(dev, 1, &ptr[i], 1, 1));
+            err_control(spi3wire_send(dev->spi_dev, 1, &ptr[i], 1, 1));
         }
 #else //262k color
         for(uint16_t u = 0 ; u < len ; u++)
@@ -997,13 +959,13 @@ static int _sendDataPixels(const ili9341_t *dev, const lv_color_t *pixel, uint32
             pixel++;
         }
         //FIXME: Can't use wordize, lv_color24 use 4 byte, not 3.
-        err_control(_spi4wire_send(dev, 1, (uint8_t*)buf, len*sizeof(ili9341_color24_t), 1));
+        err_control(spi3wire_send(dev->spi_dev, 1, (uint8_t*)buf, len*sizeof(ili9341_color24_t), 1));
 #endif
         break;
 #endif
 #if (ILI9341_PAR_SUPPORT)
     case ILI9341_PROTO_8080_8BIT:
-        err_control(_par_send(dev, 1, (uint8_t*)pixel, len, wordsize));
+        err_control(par_send(dev->spi_dev, 1, (uint8_t*)pixel, len, wordsize));
         break;
 #endif
     default:
@@ -1023,20 +985,20 @@ static int _sendCommandData(const ili9341_t *dev, uint8_t cmd, uint8_t* data_out
     {
 #if (ILI9341_SPI4WIRE_SUPPORT)
     case ILI9341_PROTO_SERIAL_8BIT:
-        err_control(_spi4wire_send(dev, 1, data_out, len, 1));
+        err_control(spi4wire_send(dev->spi_dev, 1, data_out, len, 1));
         break;
 #endif
 #if (ILI9341_SPI3WIRE_SUPPORT)
     case ILI9341_PROTO_SERIAL_9BIT:
         for (uint32_t i = 0; i <= len; i++)
         {
-            err_control(_spi3wire_send(dev, 1, &data_out[i], 1, 1));
+            err_control(spi3wire_send(dev->spi_dev, 1, &data_out[i], 1, 1));
         }
         break;
 #endif
 #if (ILI9341_PAR_SUPPORT)
     case ILI9341_PROTO_8080_8BIT:
-        err_control(_par_send(dev, 1, data_out, len, 1));
+        err_control(par_send(dev->spi_dev, 1, data_out, len, 1));
         break;
 #endif
     default:

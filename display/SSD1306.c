@@ -94,21 +94,12 @@
 /**********************
  *  STATIC PROTOTYPES
  **********************/
-#if (SSD1306_I2C_SUPPORT)
-static int inline _i2c_send(const ssd1306_t *dev, uint8_t reg, uint8_t* data, uint8_t len);
-#endif
-#if (SSD1306_SPI_3_WIRE_SUPPORT)
-static int inline _spi3wire_send(const ssd1306_t *dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize);
-#endif
-#if (SSD1306_SPI_4_WIRE_SUPPORT)
-static int inline _spi4wire_send(const ssd1306_t *dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize);
-#endif
 static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y1,  uint8_t x2, uint8_t y2);
 
 /**********************
  *  STATIC VARIABLES
  **********************/
-static uint8_t* _buffer; //FIXME: To remove when pixel by bit will be released  (5.2)
+static uint8_t* _buffer; //FIXME: To remove when pixel by bit will be released  (5.3)
 static uint8_t _flag_redraw; //FIXME: Used to optimize the screen update, need to be remove.
 
 /**********************
@@ -295,17 +286,17 @@ int ssd1306_command(const ssd1306_t *dev, uint8_t cmd)
     {
 #if (SSD1306_I2C_SUPPORT)
     case SSD1306_PROTO_I2C:
-        err_control(_i2c_send(dev, 0x00, &cmd, 1));
+        err_control(i2c_send(dev->i2c_dev, 0x00, &cmd, 1));
         break;
 #endif
 #if (SSD1306_SPI_4_WIRE_SUPPORT)
     case SSD1306_PROTO_SPI4:
-        err_control(_spi4wire_send(dev, 0,  &cmd, 1, 1));
+        err_control(spi4wire_send(dev->spi_dev, 0,  &cmd, 1, 1));
         break;
 #endif
 #if (SSD1306_SPI_3_WIRE_SUPPORT)
     case SSD1306_PROTO_SPI3:
-        err_control(_spi3wire_send(dev, 0, &cmd, 1, 1));
+        err_control(spi3wire_send(dev->spi_dev, 0, &cmd, 1, 1));
         break;
 #endif
     default:
@@ -727,55 +718,6 @@ int ssd1306_start_scroll_hori_vert(const ssd1306_t *dev, bool way, uint8_t start
 /**********************
  *   STATIC FUNCTIONS
  **********************/
-#if (SSD1306_I2C_SUPPORT)
-static int inline _i2c_send(const ssd1306_t *dev, uint8_t reg, uint8_t* data, uint8_t len)
-{
-#if SSD1306_ERR_CHECK
-    return lv_i2c_write(dev->i2c_dev, &reg, data, len);
-#else
-    lv_i2c_write(dev->i2c_dev, &reg, data, len);
-    return 0;
-#endif
-}
-#endif
-#if (SSD1306_SPI_3_WIRE_SUPPORT)
-static int inline _spi3wire_send(const ssd1306_t *dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize)
-{
-    lv_spi_wr_cs(dev->spi_dev, false);
-    lv_spi_set_preemble(dev->spi_dev, LV_SPI_COMMAND, dc, 1);
-#if SSD1306_ERR_CHECK
-    int err = lv_spi_transaction(dev->spi_dev, NULL, data, len, wordsize);
-#else
-    lv_spi_transaction(dev->spi_dev, NULL, data, len, wordsize);
-#endif
-    lv_spi_clr_preemble(dev->spi_dev, LV_SPI_COMMAND);
-    lv_spi_wr_cs(dev->spi_dev, true);
-#if SSD1306_ERR_CHECK
-    return err;
-#else
-    return 0;
-#endif
-}
-#endif
-#if (SSD1306_SPI_4_WIRE_SUPPORT)
-static int inline _spi4wire_send(const ssd1306_t *dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize)
-{
-    lv_spi_wr_cs(dev->spi_dev, false);
-    lv_spi_wr_dc(dev->spi_dev, dc); /* command mode */
-#if SSD1306_ERR_CHECK
-    int err = lv_spi_transaction(dev->spi_dev, NULL, data, len, wordsize);
-#else
-    lv_spi_transaction(dev->spi_dev, NULL, data, len, wordsize);
-#endif
-    lv_spi_wr_cs(dev->spi_dev, true);
-#if SSD1306_ERR_CHECK
-    return err;
-#else
-    return 0;
-#endif
-}
-#endif
-
 static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y1,  uint8_t x2, uint8_t y2)
 {
     uint16_t i;
@@ -796,28 +738,21 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y
     {
 #if (SSD1306_I2C_SUPPORT)
     case SSD1306_PROTO_I2C:
-//        for (i = 0; i < len; i++)
-//        {
-//            if (dev->screen == SH1106_SCREEN && i % dev->width == 0)
-//                sh1106_go_coordinate(dev, 0, i / dev->width);
-//            _i2c_send(dev, 0x40, _buffer ? &_buffer[i] : tab, 16);
-//            i += 15;
-//        }
         if (dev->screen == SSD1306_SCREEN)
         {
             for (j = y1; j <= y2; j++)
             {
                 for (i = x1; i <= x2 ; ) //column
                 {
-                    if((x2-i) >= 16)
+                    if((x2-i) >= 15) //(x2-i+1) >= 16
                     {
-                        err_control(_i2c_send(dev, 0x40, &_buffer[j*dev->width+i], 16));
+                        err_control(i2c_send(dev->i2c_dev, 0x40, &_buffer[j*dev->width+i], 16));
                         i+=16;
                     }
                     else
                     {
-                        err_control(_i2c_send(dev, 0x40, &_buffer[j*dev->width+i], x2-i));
-                        i+=(x2-i);
+                        err_control(i2c_send(dev->i2c_dev, 0x40, &_buffer[j*dev->width+i], x2-i+1));
+                        break; //Last data for this page
                     }
                 }
             }
@@ -829,15 +764,15 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y
                 err_control(sh1106_go_coordinate(dev, x1, j));
                 for (i = x1; i <= x2 ; ) //column
                 {
-                     if((x2-i) >= 16)
+                     if((x2-i) >= 15) //(x2-i+1) >= 16
                     {
-                        err_control(_i2c_send(dev, 0x40, &_buffer[j*dev->width+i], 16));
+                        err_control(i2c_send(dev->i2c_dev, 0x40, &_buffer[j*dev->width+i], 16));
                         i+=16;
                     }
                     else
                     {
-                        err_control(_i2c_send(dev, 0x40, &_buffer[j*dev->width+i], x2-i));
-                        i+=(x2-i);
+                        err_control(i2c_send(dev->i2c_dev, 0x40, &_buffer[j*dev->width+i], x2-i+1));
+                        break; //Last data send for this page
                     }
                 }
             }
@@ -850,7 +785,7 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y
         {
             for(j = y1;  j <= y2 ; j++) //page
             {
-                err_control(_spi4wire_send(dev, 1, &_buffer[j*dev->width+x1], x2-x1, 1));
+                err_control(spi4wire_send(dev->spi_dev, 1, &_buffer[j*dev->width+x1], x2-x1, 1));
             }
         }
         else
@@ -858,7 +793,7 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y
             for (j = y1; j <= y2; j++)
             {
                 err_control(sh1106_go_coordinate(dev, x1, j));
-                err_control(_spi4wire_send(dev, 1, &_buffer[j*dev->width + x1], x2-x1, 1));
+                err_control(spi4wire_send(dev->spi_dev, 1, &_buffer[j*dev->width + x1], x2-x1, 1));
             }
         }
         break;
@@ -871,7 +806,7 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y
             {
                 for (i = x1; i <= x2; i++) //column
                 {
-                    err_control(_spi3wire_send(dev, 1,  &_buffer[j*dev->width+i], 1, 1));
+                    err_control(spi3wire_send(dev->spi_dev, 1,  &_buffer[j*dev->width+i], 1, 1));
                 }
             }
         }
@@ -882,7 +817,7 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y
                 err_control(sh1106_go_coordinate(dev, x1, j));
                 for (i = x1; i <= x2; i++) //column
                 {
-                    err_control(_spi3wire_send(dev, 1,  &_buffer[j*dev->width+i], 1, 1));
+                    err_control(spi3wire_send(dev->spi_dev, 1,  &_buffer[j*dev->width+i], 1, 1));
                 }
             }
         }

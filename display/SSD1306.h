@@ -21,6 +21,7 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 #include <errno.h>
+#include "../lv_drv_common.h"
 #include "lvgl/lv_misc/lv_color.h"
 
 /*********************

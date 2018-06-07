@@ -8,6 +8,10 @@
 #ifndef LV_DRV_CONF_H
 #define LV_DRV_CONF_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "lv_conf.h"
 
 /*********************
@@ -28,6 +32,8 @@
 /* use this macro if you want ignore a gpio write/read. e.g: spi.cs = LV_DRIVER_NOPIN */
 #define LV_DRIVER_NOPIN (0xFFFF)
 
+/* use this macro to add specific attribute to function call into an interupt routines */
+#define INTERUPT_ATTRIBUTE
 /**********************
  *      TYPEDEFS
  **********************/
@@ -39,6 +45,7 @@ typedef const void* lv_gpio_handle_t;
 typedef const void* lv_i2c_handle_t;
 typedef const void* lv_spi_handle_t;
 typedef const void* lv_par_handle_t;
+typedef const void* lv_uart_handle_t;
 
 /*********************
  * 	HAL INTERFACE
@@ -70,6 +77,15 @@ static inline void lv_delay_us(const uint32_t us)
  * @param ms Time to wait in ms
  */
 static inline void lv_delay_ms(const uint32_t ms)
+{
+    //Do the dependant port here
+}
+
+/**
+ * Return system time
+ * @return system time (ms)
+ */
+static inline uint32_t lv_get_ms()
 {
     //Do the dependant port here
 }
@@ -292,6 +308,33 @@ static inline int lv_par_read(lv_par_handle_t par_dev, void* data_in, uint16_t l
     //Do the dependant port here
 }
 
+/*---------
+ *  UART
+ *---------*/
+/**
+ * Do a uart write transmission.
+ * @param uart_dev Pointer to uart device
+ * @param data_out Pointer to data buffer to send if non-null
+ * @param datalen Number of data byte to send
+ * @return Non-Zero if error occured
+ */
+static inline int lv_uart_write(lv_uart_handle_t uart_dev, const void* data_out, uint16_t datalen)
+{
+    //Do the dependant port here
+}
+
+/**
+ * Do a uart read transmission
+ * @param uart_dev Pointer to uart device
+ * @param data_out Pointer to data buffer to send if non-null
+ * @param datalen Number of data byte to read
+ * @return Non-Zero if error occured
+ */
+static inline int lv_uart_read(lv_uart_handle_t uart_dev, void* data_in, uint16_t datalen)
+{
+    //Do the dependant port here
+}
+
 #endif
 /*********************
  *  DISPLAY DRIVERS
@@ -402,6 +445,20 @@ static inline int lv_par_read(lv_par_handle_t par_dev, void* data_in, uint16_t l
  *===================*/
 
 /*--------------
+ *    AR1000
+ *--------------*/
+#define USE_AR10XX (1)
+#if (USE_AR10XX != 0)
+#define AR10XX_SPI_SUPPORT (1)
+#define AR10XX_I2C_SUPPORT (1)
+#define AR10XX_UART_SUPPORT (1)
+#define AR10XX_DEBUG (0)
+#define AR10XX_ERR_CHECK (0)
+#define AR10XX_VERIFY_ANSWER (1)
+#define AR10XX_COMPONENT (21) // Version of XX (10, 11, 20 , 21)
+#endif
+
+/*--------------
  *    XPT2046
  *--------------*/
 #define USE_XPT2046         0
@@ -441,6 +498,9 @@ static inline int lv_par_read(lv_par_handle_t par_dev, void* data_in, uint16_t l
 /*No settings*/
 #endif
 
-#endif  /*LV_DRV_CONF_H*/
+#ifdef __cplusplus
+}
+#endif
 
+#endif  /*LV_DRV_CONF_H*/
 #endif /*Remove this to enable the content*/

@@ -19,11 +19,23 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 #include <errno.h>
+#include "../lv_drv_common.h"
 #include "lvgl/lv_misc/lv_color.h"
 
 /*********************
  *      DEFINES
  *********************/
+#ifndef ILI9341_SPI3WIRE_SUPPORT
+#define ILI9341_SPI3WIRE_SUPPORT (1)
+#endif
+
+#ifndef ILI9341_SPI4WIRE_SUPPORT
+#define ILI9341_SPI4WIRE_SUPPORT (1)
+#endif
+
+#ifndef ILI9341_PAR_SUPPORT
+#define ILI9341_PAR_SUPPORT (1)
+#endif
 
 /**********************
  *      TYPEDEFS
@@ -41,7 +53,6 @@ typedef enum
     ILI9341_PROTO_SERIAL_9BIT, //!<  SPI 9 bits
     ILI9341_PROTO_SERIAL_8BIT, //!<  SPI 8 bits
 } ili9341_protocol_t;
-
 
 /**
  * Device descriptor
@@ -62,6 +73,7 @@ typedef struct
     lv_gpio_handle_t bl_pin;       //!< Backlight pin
     uint16_t width;                //!< Screen width, 320 or 240
     uint16_t height;               //!< Screen height, 240 or 320
+    lv_rotation_t r;               //!< Current Rotation
 } ili9341_t;
 
 
@@ -346,7 +358,10 @@ void ili9341_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
  * @param dev Pointer to device descriptor
  * @return Non-zero if error occured
  */
-int ili9341_init(ili9341_t *dev);
+int ili9341_init(ili9341_t *dev, lv_rotation_t rotation);
+
+
+int ili9341_set_rotation(ili9341_t *dev, lv_rotation_t degree);
 
 
 
@@ -376,7 +391,7 @@ int ili9341_read_display_status(const ili9341_t *dev, ili9341_dis_status_t *resu
 
 
 //Extended command
-#if ILI9341_EXTC_SUPPORT
+#if (ILI9341_EXTC_SUPPORT)
 int ili9341_vcom_ctrl_1(const ili9341_t *dev, ili9341_vcom_ctrl_1_t config);
 int ili9341_vcom_ctrl_2(const ili9341_t *dev, ili9341_vcom_ctrl_2_t config);
 int ili9341_pwr_ctrl_a(const ili9341_t *dev, ili9341_pwr_ctrl_a_t config);
@@ -393,8 +408,6 @@ int ili9341_power_on_seq_ctrl(const ili9341_t *dev, ili9341_pwr_seq_ctrl_t confi
 int ili9341_interface_ctrl(const ili9341_t *dev, ili9341_int_ctrl_t config);
 #endif
 
-///////////////////////////////////////////////////////////////////////////
-//API
 
 #ifdef __cplusplus
 }
