@@ -59,10 +59,10 @@ bool keyboard_read(lv_indev_data_t * data)
 }
 
 
-void keyboard_handler(SDL_Event *event)
+void keyboard_handler(SDL_Event * event)
 {
     /* We are only worried about SDL_KEYDOWN and SDL_KEYUP events */
-    switch( event->type ){
+    switch(event->type) {
         case SDL_KEYDOWN:
             last_key = event->key.keysym.sym;
             state = LV_INDEV_STATE_PR;
@@ -107,7 +107,8 @@ static uint32_t keycode_to_ascii(uint32_t sdl_key)
         case '\r':
             return LV_GROUP_KEY_ENTER;
 
-        default: return sdl_key;
+        default:
+            return sdl_key;
     }
 }
 #endif

@@ -1,6 +1,6 @@
 /**
  * @file ST7565.h
- * 
+ *
  */
 
 #ifndef ST7565_H

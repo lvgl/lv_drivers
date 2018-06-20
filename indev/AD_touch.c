@@ -1,6 +1,6 @@
 /**
  * @file AD_touch.c
- * 
+ *
  */
 
 #include "AD_touch.h"
@@ -70,7 +70,7 @@ static int16_t TouchDetectPosition(void);
 static void TouchCalculateCalPoints(void);
 
 
- /********************************************************************/
+/********************************************************************/
 void ad_touch_init(void)
 {
     // Initialize ADC for auto sampling mode
@@ -96,12 +96,13 @@ void ad_touch_init(void)
     yRawTouch[3] = TOUCHCAL_LLY;
     xRawTouch[2] = TOUCHCAL_LRX;
     yRawTouch[2] = TOUCHCAL_LRY;
- 
-    TouchCalculateCalPoints();   
+
+    TouchCalculateCalPoints();
 }
 
 /*Use this in lv_indev_drv*/
-bool ad_touch_read(lv_indev_data_t *data) {
+bool ad_touch_read(lv_indev_data_t * data)
+{
     static int16_t last_x = 0;
     static int16_t last_y = 0;
 
@@ -110,7 +111,7 @@ bool ad_touch_read(lv_indev_data_t *data) {
     x = TouchGetX();
     y = TouchGetY();
 
-    if ((x > 0) && (y > 0)) {
+    if((x > 0) && (y > 0)) {
         data->point.x = x;
         data->point.y = y;
         last_x = data->point.x;
@@ -131,154 +132,137 @@ int16_t ad_touch_handler(void)
     static int16_t tempX, tempY;
     int16_t temp;
 
-    switch (state)
-    {
-    case IDLE:
-        adcX = 0;
-        adcY = 0;
-        break;
-
-    case SET_VALUES:
-        if (!TOUCH_ADC_DONE)
-            break;
-        if ((WORD)TOUCHSCREEN_RESISTIVE_PRESS_THRESHOLD < (WORD)ADC1BUF0)
-        {
+    switch(state) {
+        case IDLE:
             adcX = 0;
             adcY = 0;
-        }
-        else
-        {
-            adcX = tempX;
-            adcY = tempY;
-        }
-        state = SET_X;
-        return 1; // touch screen acquisition is done
-
-    case SET_X:
-        TOUCH_ADC_INPUT_SEL = ADC_XPOS;
-
-        ResistiveTouchScreen_XPlus_Config_As_Input();
-        ResistiveTouchScreen_YPlus_Config_As_Input();
-        ResistiveTouchScreen_XMinus_Config_As_Input();
-        ResistiveTouchScreen_YMinus_Drive_Low();
-        ResistiveTouchScreen_YMinus_Config_As_Output();
-
-        ADPCFG_YPOS = RESISTIVETOUCH_DIGITAL; // set to digital pin
-        ADPCFG_XPOS = RESISTIVETOUCH_ANALOG; // set to analog pin
-        
-        TOUCH_ADC_START = 1; // run conversion
-        state = CHECK_X;
-        break;
-
-    case CHECK_X:
-    case CHECK_Y:
-
-        if (TOUCH_ADC_DONE == 0)
-        {
             break;
-        }
 
-        if ((WORD)TOUCHSCREEN_RESISTIVE_PRESS_THRESHOLD > (WORD)ADC1BUF0)
-        {
-            if (state == CHECK_X)
-            {
-                ResistiveTouchScreen_YPlus_Drive_High();
-                ResistiveTouchScreen_YPlus_Config_As_Output();
-                tempX = 0;
-                state = RUN_X;
+        case SET_VALUES:
+            if(!TOUCH_ADC_DONE)
+                break;
+            if((WORD)TOUCHSCREEN_RESISTIVE_PRESS_THRESHOLD < (WORD)ADC1BUF0) {
+                adcX = 0;
+                adcY = 0;
+            } else {
+                adcX = tempX;
+                adcY = tempY;
             }
-            else
-            {
-                ResistiveTouchScreen_XPlus_Drive_High();
-                ResistiveTouchScreen_XPlus_Config_As_Output();
-                tempY = 0;
-                state = RUN_Y;
-            }
-        }
-        else
-        {
-            adcX = 0;
-            adcY = 0;
             state = SET_X;
             return 1; // touch screen acquisition is done
-            break;
-        }
 
-    case RUN_X:
-    case RUN_Y:
-        TOUCH_ADC_START = 1;
-        state = (state == RUN_X) ? GET_X : GET_Y;
-        // no break needed here since the next state is either GET_X or GET_Y
-        break;
+        case SET_X:
+            TOUCH_ADC_INPUT_SEL = ADC_XPOS;
 
-    case GET_X:
-    case GET_Y:
-        if (!TOUCH_ADC_DONE)
-            break;
-
-        temp = ADC1BUF0;
-        if (state == GET_X)
-        {
-            if (temp != tempX)
-            {
-                tempX =  temp;
-                state = RUN_X;
-                break;
-            }
-        }
-        else
-        {
-            if (temp != tempY)
-            {
-                tempY = temp;
-                state = RUN_Y;
-                break;
-            }
-        }
-
-        if (state == GET_X)
-            ResistiveTouchScreen_YPlus_Config_As_Input();
-        else
             ResistiveTouchScreen_XPlus_Config_As_Input();
-        TOUCH_ADC_START = 1;
-        state = (state == GET_X) ? SET_Y : SET_VALUES;
-        break;
+            ResistiveTouchScreen_YPlus_Config_As_Input();
+            ResistiveTouchScreen_XMinus_Config_As_Input();
+            ResistiveTouchScreen_YMinus_Drive_Low();
+            ResistiveTouchScreen_YMinus_Config_As_Output();
 
-    case SET_Y:
-        if (!TOUCH_ADC_DONE)
+            ADPCFG_YPOS = RESISTIVETOUCH_DIGITAL; // set to digital pin
+            ADPCFG_XPOS = RESISTIVETOUCH_ANALOG; // set to analog pin
+
+            TOUCH_ADC_START = 1; // run conversion
+            state = CHECK_X;
             break;
 
-        if ((WORD)TOUCHSCREEN_RESISTIVE_PRESS_THRESHOLD < (WORD)ADC1BUF0)
-        {
-            adcX = 0;
-            adcY = 0;
+        case CHECK_X:
+        case CHECK_Y:
+
+            if(TOUCH_ADC_DONE == 0) {
+                break;
+            }
+
+            if((WORD)TOUCHSCREEN_RESISTIVE_PRESS_THRESHOLD > (WORD)ADC1BUF0) {
+                if(state == CHECK_X) {
+                    ResistiveTouchScreen_YPlus_Drive_High();
+                    ResistiveTouchScreen_YPlus_Config_As_Output();
+                    tempX = 0;
+                    state = RUN_X;
+                } else {
+                    ResistiveTouchScreen_XPlus_Drive_High();
+                    ResistiveTouchScreen_XPlus_Config_As_Output();
+                    tempY = 0;
+                    state = RUN_Y;
+                }
+            } else {
+                adcX = 0;
+                adcY = 0;
+                state = SET_X;
+                return 1; // touch screen acquisition is done
+                break;
+            }
+
+        case RUN_X:
+        case RUN_Y:
+            TOUCH_ADC_START = 1;
+            state = (state == RUN_X) ? GET_X : GET_Y;
+            // no break needed here since the next state is either GET_X or GET_Y
+            break;
+
+        case GET_X:
+        case GET_Y:
+            if(!TOUCH_ADC_DONE)
+                break;
+
+            temp = ADC1BUF0;
+            if(state == GET_X) {
+                if(temp != tempX) {
+                    tempX =  temp;
+                    state = RUN_X;
+                    break;
+                }
+            } else {
+                if(temp != tempY) {
+                    tempY = temp;
+                    state = RUN_Y;
+                    break;
+                }
+            }
+
+            if(state == GET_X)
+                ResistiveTouchScreen_YPlus_Config_As_Input();
+            else
+                ResistiveTouchScreen_XPlus_Config_As_Input();
+            TOUCH_ADC_START = 1;
+            state = (state == GET_X) ? SET_Y : SET_VALUES;
+            break;
+
+        case SET_Y:
+            if(!TOUCH_ADC_DONE)
+                break;
+
+            if((WORD)TOUCHSCREEN_RESISTIVE_PRESS_THRESHOLD < (WORD)ADC1BUF0) {
+                adcX = 0;
+                adcY = 0;
+                state = SET_X;
+                return 1; // touch screen acquisition is done
+                break;
+            }
+
+            TOUCH_ADC_INPUT_SEL = ADC_YPOS;
+
+            ResistiveTouchScreen_XPlus_Config_As_Input();
+            ResistiveTouchScreen_YPlus_Config_As_Input();
+            ResistiveTouchScreen_XMinus_Drive_Low();
+            ResistiveTouchScreen_XMinus_Config_As_Output();
+            ResistiveTouchScreen_YMinus_Config_As_Input();
+
+            ADPCFG_YPOS = RESISTIVETOUCH_ANALOG; // set to analog pin
+            ADPCFG_XPOS = RESISTIVETOUCH_DIGITAL; // set to digital pin
+            TOUCH_ADC_START = 1; // run conversion
+            state = CHECK_Y;
+            break;
+
+        default:
             state = SET_X;
             return 1; // touch screen acquisition is done
-            break;
-        }
-
-        TOUCH_ADC_INPUT_SEL = ADC_YPOS;
-
-        ResistiveTouchScreen_XPlus_Config_As_Input();
-        ResistiveTouchScreen_YPlus_Config_As_Input();
-        ResistiveTouchScreen_XMinus_Drive_Low();
-        ResistiveTouchScreen_XMinus_Config_As_Output();
-        ResistiveTouchScreen_YMinus_Config_As_Input();
-
-        ADPCFG_YPOS = RESISTIVETOUCH_ANALOG; // set to analog pin
-        ADPCFG_XPOS = RESISTIVETOUCH_DIGITAL; // set to digital pin
-        TOUCH_ADC_START = 1; // run conversion
-        state = CHECK_Y;
-        break;
-
-    default:
-        state = SET_X;
-        return 1; // touch screen acquisition is done
     }
     stat = state;
     temp_x = adcX;
     temp_y = adcY;
-    
+
     return 0; // touch screen acquisition is not done
 }
 
@@ -286,15 +270,14 @@ int16_t ad_touch_handler(void)
  *   STATIC FUNCTIONS
  **********************/
 
- /********************************************************************/
+/********************************************************************/
 static int16_t TouchGetX(void)
 {
     long result;
 
     result = TouchGetRawX();
 
-    if (result > 0)
-    {
+    if(result > 0) {
         result = (long)((((long)_trC * result) + _trD) >> TOUCHSCREEN_RESISTIVE_CALIBRATION_SCALE_FACTOR);
 
     }
@@ -318,8 +301,7 @@ static int16_t TouchGetY(void)
 
     result = TouchGetRawY();
 
-    if (result > 0)
-    {
+    if(result > 0) {
         result = (long)((((long)_trA * result) + (long)_trB) >> TOUCHSCREEN_RESISTIVE_CALIBRATION_SCALE_FACTOR);
 
     }
