@@ -6,6 +6,10 @@
 #ifndef FT5406EE8_H
 #define FT5406EE8_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*********************
  *      INCLUDES
  *********************/
@@ -34,6 +38,10 @@ bool ft5406ee8_read(lv_indev_data_t * data);
  *      MACROS
  **********************/
 
+#endif /* USE_FT5406EE8 */
+
+#ifdef __cplusplus
+} /* extern "C" */
 #endif
 
-#endif
+#endif /* FT5406EE8_H */

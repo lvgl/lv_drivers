@@ -6,6 +6,10 @@
 #ifndef ST7565_H
 #define ST7565_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*********************
  *      INCLUDES
  *********************/
@@ -35,6 +39,10 @@ void st7565_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t * col
  *      MACROS
  **********************/
 
+#endif /* USE_ST7565 */
+
+#ifdef __cplusplus
+} /* extern "C" */
 #endif
 
-#endif
+#endif /* ST7565_H */

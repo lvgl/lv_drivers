@@ -98,13 +98,15 @@ void fbdev_init(void)
  */
 void fbdev_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
 {
-    if(fbp == NULL) return;
-
-    /*Return if the area is out the screen*/
-    if(x2 < 0) return;
-    if(y2 < 0) return;
-    if(x1 > vinfo.xres - 1) return;
-    if(y1 > vinfo.yres - 1) return;
+    if(fbp == NULL ||
+		x2 < 0 ||
+		y2 < 0 ||
+		x1 > vinfo.xres - 1 ||
+		y1 > vinfo.yres - 1)
+    {
+    	lv_flush_ready();
+    	return;
+    }
 
     /*Truncate the area to the screen*/
     int32_t act_x1 = x1 < 0 ? 0 : x1;

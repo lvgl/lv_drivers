@@ -6,6 +6,10 @@
 #ifndef SSD1963_H
 #define SSD1963_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*********************
  *      INCLUDES
  *********************/
@@ -129,6 +133,10 @@ void ssd1963_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
  *      MACROS
  **********************/
 
+#endif /* USE_SSD1963 */
+
+#ifdef __cplusplus
+} /* extern "C" */
 #endif
 
-#endif
+#endif /* SSD1963_H */
