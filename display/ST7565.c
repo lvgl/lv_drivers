@@ -1,6 +1,6 @@
 /**
  * @file ST7565.c
- * 
+ *
  */
 
 /*********************
@@ -102,9 +102,9 @@ void st7565_init(void)
     LV_DRV_DELAY_MS(10);
     LV_DRV_DISP_RST(1);
     LV_DRV_DELAY_MS(10);
-    
+
     LV_DRV_DISP_SPI_CS(0);
-    
+
     st7565_command(CMD_SET_BIAS_7);
     st7565_command(CMD_SET_ADC_NORMAL);
     st7565_command(CMD_SET_COM_NORMAL);
@@ -119,7 +119,7 @@ void st7565_init(void)
     LV_DRV_DELAY_MS(10);
 
     st7565_command(CMD_SET_RESISTOR_RATIO | 0x6);
- 
+
     st7565_command(CMD_DISPLAY_ON);
     st7565_command(CMD_SET_ALLPTS_NORMAL);
 
@@ -128,14 +128,14 @@ void st7565_init(void)
     st7565_command(CMD_SET_VOLUME_SECOND | (0x18 & 0x3f));
 
     LV_DRV_DISP_SPI_CS(1);
-    
+
     memset(lcd_fb, 0x00, sizeof(lcd_fb));
 }
 
 
 void st7565_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t * color_p)
 {
-     /*Return if the area is out the screen*/
+    /*Return if the area is out the screen*/
     if(x2 < 0) return;
     if(y2 < 0) return;
     if(x1 > ST7565_HOR_RES - 1) return;
@@ -152,12 +152,12 @@ void st7565_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t * c
     /*Set the first row in */
 
     /*Refresh frame buffer*/
-    for(y= act_y1; y <= act_y2; y++) {
+    for(y = act_y1; y <= act_y2; y++) {
         for(x = act_x1; x <= act_x2; x++) {
-            if (lv_color_to1(*color_p) != 0) {
-                lcd_fb[x+ (y/8)*ST7565_HOR_RES] &= ~( 1 << (7-(y%8)));
+            if(lv_color_to1(*color_p) != 0) {
+                lcd_fb[x + (y / 8)*ST7565_HOR_RES] &= ~(1 << (7 - (y % 8)));
             } else {
-                lcd_fb[x+ (y/8)*ST7565_HOR_RES] |= (1 << (7-(y%8)));
+                lcd_fb[x + (y / 8)*ST7565_HOR_RES] |= (1 << (7 - (y % 8)));
             }
             color_p ++;
         }
@@ -173,7 +173,7 @@ void st7565_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t * c
 
 void st7565_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t color)
 {
-     /*Return if the area is out the screen*/
+    /*Return if the area is out the screen*/
     if(x2 < 0) return;
     if(y2 < 0) return;
     if(x1 > ST7565_HOR_RES - 1) return;
@@ -184,27 +184,27 @@ void st7565_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t colo
     int32_t act_y1 = y1 < 0 ? 0 : y1;
     int32_t act_x2 = x2 > ST7565_HOR_RES - 1 ? ST7565_HOR_RES - 1 : x2;
     int32_t act_y2 = y2 > ST7565_VER_RES - 1 ? ST7565_VER_RES - 1 : y2;
-    
+
     int32_t x, y;
     uint8_t white = lv_color_to1(color);
 
     /*Refresh frame buffer*/
-    for(y= act_y1; y <= act_y2; y++) {
+    for(y = act_y1; y <= act_y2; y++) {
         for(x = act_x1; x <= act_x2; x++) {
-            if (white != 0) {
-                lcd_fb[x+ (y/8)*ST7565_HOR_RES] |= (1 << (7-(y%8)));
+            if(white != 0) {
+                lcd_fb[x + (y / 8)*ST7565_HOR_RES] |= (1 << (7 - (y % 8)));
             } else {
-                lcd_fb[x+ (y/8)*ST7565_HOR_RES] &= ~( 1 << (7-(y%8)));
+                lcd_fb[x + (y / 8)*ST7565_HOR_RES] &= ~(1 << (7 - (y % 8)));
             }
         }
     }
-    
+
     st7565_sync(act_x1, act_y1, act_x2, act_y2);
 }
 
 void st7565_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t * color_p)
 {
-     /*Return if the area is out the screen*/
+    /*Return if the area is out the screen*/
     if(x2 < 0) return;
     if(y2 < 0) return;
     if(x1 > ST7565_HOR_RES - 1) return;
@@ -215,25 +215,25 @@ void st7565_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t * col
     int32_t act_y1 = y1 < 0 ? 0 : y1;
     int32_t act_x2 = x2 > ST7565_HOR_RES - 1 ? ST7565_HOR_RES - 1 : x2;
     int32_t act_y2 = y2 > ST7565_VER_RES - 1 ? ST7565_VER_RES - 1 : y2;
-    
+
     int32_t x, y;
 
     /*Set the first row in */
-    
+
     /*Refresh frame buffer*/
-    for(y= act_y1; y <= act_y2; y++) {
+    for(y = act_y1; y <= act_y2; y++) {
         for(x = act_x1; x <= act_x2; x++) {
-            if (lv_color_to1(*color_p) != 0) {
-                lcd_fb[x+ (y/8)*ST7565_HOR_RES] &= ~( 1 << (7-(y%8)));
+            if(lv_color_to1(*color_p) != 0) {
+                lcd_fb[x + (y / 8)*ST7565_HOR_RES] &= ~(1 << (7 - (y % 8)));
             } else {
-                lcd_fb[x+ (y/8)*ST7565_HOR_RES] |= (1 << (7-(y%8)));
+                lcd_fb[x + (y / 8)*ST7565_HOR_RES] |= (1 << (7 - (y % 8)));
             }
             color_p ++;
         }
-        
+
         color_p += x2 - act_x2; /*Next row*/
     }
-    
+
     st7565_sync(act_x1, act_y1, act_x2, act_y2);
 }
 /**********************
@@ -250,16 +250,16 @@ static void st7565_sync(int32_t x1, int32_t y1, int32_t x2, int32_t y2)
 {
 
     LV_DRV_DISP_SPI_CS(0);
-    
+
     uint8_t c, p;
     for(p = y1 / 8; p <= y2 / 8; p++) {
         st7565_command(CMD_SET_PAGE | pagemap[p]);
         st7565_command(CMD_SET_COLUMN_LOWER | (x1 & 0xf));
         st7565_command(CMD_SET_COLUMN_UPPER | ((x1 >> 4) & 0xf));
         st7565_command(CMD_RMW);
-  
-         for(c = x1; c <= x2; c++) {
-            st7565_data(lcd_fb[(ST7565_HOR_RES*p)+c]);
+
+        for(c = x1; c <= x2; c++) {
+            st7565_data(lcd_fb[(ST7565_HOR_RES * p) + c]);
         }
     }
 
@@ -270,17 +270,17 @@ static void st7565_sync(int32_t x1, int32_t y1, int32_t x2, int32_t y2)
  * Write a command to the ST7565
  * @param cmd the command
  */
-static void st7565_command(uint8_t cmd) 
+static void st7565_command(uint8_t cmd)
 {
     LV_DRV_DISP_CMD_DATA(ST7565_CMD_MODE);
     LV_DRV_DISP_SPI_WR_BYTE(data);
 }
-  
+
 /**
  * Write data to the ST7565
  * @param data the data
  */
-static void st7565_data(uint8_t data) 
+static void st7565_data(uint8_t data)
 {
     LV_DRV_DISP_CMD_DATA(ST7565_DATA_MODE);
     LV_DRV_DISP_SPI_WR_BYTE(data);
