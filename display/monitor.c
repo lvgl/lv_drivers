@@ -9,11 +9,14 @@
 #include "monitor.h"
 #if USE_MONITOR
 
+#ifndef MONITOR_SDL_INCLUDE_PATH
+#define <SDL2/SDL.h>
+#endif
+
 #include <stdlib.h>
 #include <stdbool.h>
-#include <unistd.h>
 #include <string.h>
-#include <SDL2/SDL.h>
+#include MONITOR_SDL_INCLUDE_PATH
 #include "lvgl/lv_core/lv_vdb.h"
 
 /*********************
@@ -208,9 +211,14 @@ static int sdl_refr(void * param)
                               SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                               MONITOR_HOR_RES, MONITOR_VER_RES, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
 
-    renderer = SDL_CreateRenderer(window, -1, 0);
-    texture = SDL_CreateTexture(renderer,
-                                SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, MONITOR_HOR_RES, MONITOR_VER_RES);
+#if MONITOR_VIRTUAL_MACHINE == 1
+	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+#else
+	renderer = SDL_CreateRenderer(window, -1, 0);
+#endif
+
+	texture = SDL_CreateTexture(renderer,
+		SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, MONITOR_HOR_RES, MONITOR_VER_RES);
 
     /*Initialize the frame buffer to gray (77 is an empirical value) */
     memset(tft_fb, 77, MONITOR_HOR_RES * MONITOR_VER_RES * sizeof(uint32_t));
