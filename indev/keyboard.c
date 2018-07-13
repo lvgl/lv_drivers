@@ -9,6 +9,11 @@
 #include "keyboard.h"
 #if USE_KEYBOARD
 
+#ifndef MONITOR_SDL_INCLUDE_PATH
+#define <SDL2/SDL.h>
+#endif
+
+#include MONITOR_SDL_INCLUDE_PATH
 #include "lvgl/lv_core/lv_group.h"
 /*********************
  *      DEFINES

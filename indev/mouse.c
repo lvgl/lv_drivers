@@ -9,7 +9,11 @@
 #include "mouse.h"
 #if USE_MOUSE != 0
 
-#include <SDL2/SDL.h>
+#ifndef MONITOR_SDL_INCLUDE_PATH
+#define <SDL2/SDL.h>
+#endif
+
+#include MONITOR_SDL_INCLUDE_PATH
 
 /*********************
  *      DEFINES
