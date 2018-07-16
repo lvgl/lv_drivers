@@ -10,7 +10,7 @@
 #if USE_MONITOR
 
 #ifndef MONITOR_SDL_INCLUDE_PATH
-#define <SDL2/SDL.h>
+#define MONITOR_SDL_INCLUDE_PATH <SDL2/SDL.h>
 #endif
 
 #include <stdlib.h>
