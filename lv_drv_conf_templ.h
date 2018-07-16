@@ -1,6 +1,6 @@
 /**
  * @file lv_drv_conf.h
- * 
+ *
  */
 
 #if 0 /*Remove this to enable the content*/
@@ -82,6 +82,7 @@
 #if USE_MONITOR
 #define MONITOR_HOR_RES     LV_HOR_RES
 #define MONITOR_VER_RES     LV_VER_RES
+#define MONITOR_SDL_INCLUDE_PATH	<SDL.h>   /*Eclipse: <SDL2/SDL.h>    Visual Studio: <SDL.h>*/
 #endif
 
 /*----------------
@@ -154,11 +155,11 @@
 #define XPT2046_HOR_RES     480
 #define XPT2046_VER_RES     320
 #define XPT2046_X_MIN       200
-#define XPT2046_Y_MIN       200 
+#define XPT2046_Y_MIN       200
 #define XPT2046_X_MAX       3800
 #define XPT2046_Y_MAX       3800
-#define XPT2046_AVG         4 
-#define XPT2046_INV         0 
+#define XPT2046_AVG         4
+#define XPT2046_INV         0
 #endif
 
 /*-----------------

@@ -1,6 +1,6 @@
 /**
  * @file XPT2046.h
- * 
+ *
  */
 
 #ifndef XPT2046_H

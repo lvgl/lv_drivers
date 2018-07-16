@@ -9,6 +9,11 @@
 #include "keyboard.h"
 #if USE_KEYBOARD
 
+#ifndef MONITOR_SDL_INCLUDE_PATH
+#define <SDL2/SDL.h>
+#endif
+
+#include MONITOR_SDL_INCLUDE_PATH
 #include "lvgl/lv_core/lv_group.h"
 /*********************
  *      DEFINES
@@ -57,7 +62,6 @@ bool keyboard_read(lv_indev_data_t * data)
 
     return false;		/*No more data to read so return false*/
 }
-
 
 /**
  * It is called periodically to check a key is pressed/released

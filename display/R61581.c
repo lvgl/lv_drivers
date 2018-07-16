@@ -1,6 +1,6 @@
 /**
  * @file R61581.c
- * 
+ *
  */
 
 /*********************
@@ -53,19 +53,19 @@ static bool cmd_mode = true;
  * @return HW_RES_OK or any error from hw_res_t enum
  */
 void r61581_init(void)
-{   
+{
     r61581_io_init();
-    
+
     /*Slow mode until the PLL is not started in the display controller*/
     LV_DRV_DISP_PAR_SLOW;
-    
+
     r61581_reset();
 
     r61581_set_tft_spec();
-    
-    r61581_cmd(0x13);		//SET display on
 
-    r61581_cmd(0x29);		//SET display on
+    r61581_cmd(0x13);       //SET display on
+
+    r61581_cmd(0x29);       //SET display on
     LV_DRV_DELAY_MS(30);
 
     /*Parallel to max speed*/
@@ -74,7 +74,7 @@ void r61581_init(void)
 
 void r61581_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
 {
-     /*Return if the area is out the screen*/
+    /*Return if the area is out the screen*/
     if(x2 < 0) return;
     if(y2 < 0) return;
     if(x1 > R61581_HOR_RES - 1) return;
@@ -110,7 +110,7 @@ void r61581_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color
 #if LV_COLOR_DEPTH == 16
     uint16_t act_w = act_x2 - act_x1 + 1;
     for(i = act_y1; i <= act_y2; i++) {
-        LV_DRV_DISP_PAR_WR_ARRAY((uint16_t*)color_p, act_w);
+        LV_DRV_DISP_PAR_WR_ARRAY((uint16_t *)color_p, act_w);
         color_p += full_w;
     }
 #else
@@ -128,7 +128,7 @@ void r61581_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color
 
 void r61581_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t color)
 {
-     /*Return if the area is out the screen*/
+    /*Return if the area is out the screen*/
     if(x2 < 0) return;
     if(y2 < 0) return;
     if(x1 > R61581_HOR_RES - 1) return;
@@ -154,7 +154,7 @@ void r61581_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t colo
     r61581_data(0x00FF & act_y2);
 
     r61581_cmd(0x2c);
-    
+
     r61581_data_mode();
 
     uint16_t color16 = lv_color_to16(color);
@@ -167,7 +167,7 @@ void r61581_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t colo
 
 void r61581_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
 {
-     /*Return if the area is out the screen*/
+    /*Return if the area is out the screen*/
     if(x2 < 0) return;
     if(y2 < 0) return;
     if(x1 > R61581_HOR_RES - 1) return;
@@ -179,7 +179,7 @@ void r61581_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t
     int32_t act_x2 = x2 > R61581_HOR_RES - 1 ? R61581_HOR_RES - 1 : x2;
     int32_t act_y2 = y2 > R61581_VER_RES - 1 ? R61581_VER_RES - 1 : y2;
 
-        
+
     //Set the rectangular area
     r61581_cmd(0x002A);
     r61581_data(act_x1 >> 8);
@@ -197,13 +197,13 @@ void r61581_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t
 
     int16_t i;
     uint16_t full_w = x2 - x1 + 1;
-    
+
     r61581_data_mode();
-    
+
 #if LV_COLOR_DEPTH == 16
     uint16_t act_w = act_x2 - act_x1 + 1;
     for(i = act_y1; i <= act_y2; i++) {
-        LV_DRV_DISP_PAR_WR_ARRAY((uint16_t*)color_p, act_w);
+        LV_DRV_DISP_PAR_WR_ARRAY((uint16_t *)color_p, act_w);
         color_p += full_w;
     }
 #else
@@ -222,10 +222,10 @@ void r61581_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t
  **********************/
 
 /**
- * Io init 
+ * Io init
  */
 static void r61581_io_init(void)
-{ 
+{
     LV_DRV_DISP_CMD_DATA(R61581_CMD_MODE)
     cmd_mode = true;
 }
@@ -248,7 +248,7 @@ static void r61581_reset(void)
     LV_DRV_DELAY_MS(10);
     LV_DRV_DISP_PAR_CS(0);
     LV_DRV_DELAY_MS(5);
-    
+
     /*Software reset*/
     r61581_cmd(0x01);
     LV_DRV_DELAY_MS(20);
@@ -264,7 +264,7 @@ static void r61581_reset(void)
  * TFT specific initialization
  */
 static void r61581_set_tft_spec(void)
-{    
+{
     r61581_cmd(0xB0);
     r61581_data(0x00);
 
@@ -272,10 +272,10 @@ static void r61581_set_tft_spec(void)
     r61581_data(0x02);
     r61581_data(0x00);
     r61581_data(0x00);
-    r61581_data(0x10); 
+    r61581_data(0x10);
 
-    r61581_cmd(0xB4);	
-    r61581_data(0x00);//0X10 
+    r61581_cmd(0xB4);
+    r61581_data(0x00);//0X10
 
     r61581_cmd(0xB9); //PWM
     r61581_data(0x01);
@@ -306,14 +306,14 @@ static void r61581_set_tft_spec(void)
     r61581_data(0x15);
     r61581_data(0x03);
     r61581_data(0x03);
-    r61581_data(0x01); 
+    r61581_data(0x01);
 
     /*Interface Setting*/
     r61581_cmd(0xC6);
     r61581_data((R61581_DPL << 0) |
                 (R61581_EPL << 1) |
                 (R61581_HSPL << 4) |
-                (R61581_VSPL << 5));  
+                (R61581_VSPL << 5));
 
     /*Gamma Set*/
     r61581_cmd(0xC8);
@@ -326,20 +326,20 @@ static void r61581_set_tft_spec(void)
     r61581_data(0x15);
     r61581_data(0x10);
     r61581_data(0x00);
-    r61581_data(0x31); 
+    r61581_data(0x31);
 
 
     r61581_cmd(0x36);
     if(R61581_ORI == 0) r61581_data(0xE0);
     else r61581_data(0x20);
-    
+
     r61581_cmd(0x0C);
     r61581_data(0x55);
 
     r61581_cmd(0x3A);
     r61581_data(0x55);
 
-    r61581_cmd(0x38); 
+    r61581_cmd(0x38);
 
     r61581_cmd(0xD0);
     r61581_data(0x07);
@@ -363,14 +363,14 @@ static void r61581_set_tft_spec(void)
     r61581_cmd(0x2A);
     r61581_data(0x00);
     r61581_data(0x00);
-    r61581_data(((R61581_HOR_RES - 1) >> 8 ) & 0XFF);
+    r61581_data(((R61581_HOR_RES - 1) >> 8) & 0XFF);
     r61581_data((R61581_HOR_RES - 1) & 0XFF);
 
     r61581_cmd(0x2B);
     r61581_data(0x00);
     r61581_data(0x00);
-    r61581_data(((R61581_VER_RES - 1) >> 8 ) & 0XFF);
-    r61581_data((R61581_VER_RES- 1) & 0XFF);
+    r61581_data(((R61581_VER_RES - 1) >> 8) & 0XFF);
+    r61581_data((R61581_VER_RES - 1) & 0XFF);
 
     LV_DRV_DELAY_MS(10);
 
@@ -408,7 +408,7 @@ static inline void r61581_data_mode(void)
  * @param cmd the command
  */
 static inline void r61581_cmd(uint8_t cmd)
-{    
+{
     r61581_cmd_mode();
     LV_DRV_DISP_PAR_WR_WORD(cmd);
 }
@@ -418,7 +418,7 @@ static inline void r61581_cmd(uint8_t cmd)
  * @param data the data
  */
 static inline void r61581_data(uint8_t data)
-{    
+{
     r61581_data_mode();
     LV_DRV_DISP_PAR_WR_WORD(data);
 }
