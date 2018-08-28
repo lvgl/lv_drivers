@@ -67,8 +67,30 @@ int quit_filter (void *userdata, SDL_Event * event);
  */
 void monitor_init(void)
 {
-	SDL_CreateThread(sdl_refr, "sdl_refr", NULL);
+	#if __APPLE__ && TARGET_OS_MAC
 
+	/*Initialize the SDL*/
+    SDL_Init(SDL_INIT_VIDEO);
+
+	SDL_SetEventFilter(quit_filter, NULL);
+
+	window = SDL_CreateWindow("TFT Simulator",
+		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+		MONITOR_HOR_RES, MONITOR_VER_RES, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
+
+	renderer = SDL_CreateRenderer(window, -1, 0);
+	texture = SDL_CreateTexture(renderer,
+		SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, MONITOR_HOR_RES, MONITOR_VER_RES);
+
+	/*Initialize the frame buffer to gray (77 is an empirical value) */
+	memset(tft_fb, 77, MONITOR_HOR_RES * MONITOR_VER_RES * sizeof(uint32_t));
+	SDL_UpdateTexture(texture, NULL, tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
+	sdl_refr_qry = true;
+	sdl_inited = true;
+	
+	#endif
+
+	SDL_CreateThread(sdl_refr, "sdl_refr", NULL);
 	while(sdl_inited == false); /*Wait until 'sdl_refr' initializes the SDL*/
 }
 
@@ -195,6 +217,36 @@ void monitor_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
  * SDL main thread. All SDL related task have to be handled here!
  * It initializes SDL, handles drawing and the mouse.
  */
+#if __APPLE__ && TARGET_OS_MAC
+static int sdl_refr(void * param)
+{
+    (void)param;
+
+	/*Run until quit event not arrives*/
+	while(sdl_quit_qry == false) {
+		/*Refresh handling*/
+		if(sdl_refr_qry != false) {
+            sdl_refr_qry = false;
+            SDL_UpdateTexture(texture, NULL, tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
+            SDL_RenderClear(renderer);
+            SDL_RenderCopy(renderer, texture, NULL, NULL);
+            SDL_RenderPresent(renderer);
+		}
+
+		/*Sleep some time*/
+		SDL_Delay(SDL_REFR_PERIOD);
+	}
+
+	SDL_DestroyTexture(texture);
+	SDL_DestroyRenderer(renderer);
+	SDL_DestroyWindow(window);
+	SDL_Quit();
+
+	exit(0);
+
+	return 0;
+}
+#else
 static int sdl_refr(void * param)
 {
     (void)param;
@@ -220,7 +272,6 @@ static int sdl_refr(void * param)
 
 	/*Run until quit event not arrives*/
 	while(sdl_quit_qry == false) {
-
 		/*Refresh handling*/
 		if(sdl_refr_qry != false) {
             sdl_refr_qry = false;
@@ -254,6 +305,7 @@ static int sdl_refr(void * param)
 
 	return 0;
 }
+#endif
 
 int quit_filter (void *userdata, SDL_Event * event)
 {
