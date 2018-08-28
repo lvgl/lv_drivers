@@ -9,7 +9,6 @@
 #include "mouse.h"
 #if USE_MOUSE != 0
 
-#include <SDL2/SDL.h>
 
 /*********************
  *      DEFINES

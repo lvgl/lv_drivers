@@ -19,6 +19,7 @@ extern "C" {
 #if USE_MOUSE
 #include <stdint.h>
 #include <stdbool.h>
+#include <SDL2/SDL.h>
 #include "lvgl/lv_hal/lv_hal_indev.h"
 
 /*********************
