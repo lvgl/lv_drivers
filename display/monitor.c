@@ -30,17 +30,6 @@
  **********************/
 static int sdl_refr(void * param);
 
-/***********************
- *   GLOBAL PROTOTYPES
- ***********************/
-#if USE_MOUSE
-void mouse_handler(SDL_Event *event);
-#endif
-
-#if USE_KEYBOARD
-void keyboard_handler(SDL_Event *event);
-#endif
-
 /**********************
  *  STATIC VARIABLES
  **********************/

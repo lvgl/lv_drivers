@@ -44,6 +44,10 @@ void mouse_init(void);
  */
 bool mouse_read(lv_indev_data_t * data);
 
+/**
+ * It will be called from the main SDL thread
+ */
+void mouse_handler(SDL_Event *event);
 
 /**********************
  *      MACROS
