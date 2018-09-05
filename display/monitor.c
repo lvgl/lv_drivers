@@ -279,6 +279,21 @@ static int sdl_refr(void * param)
 #if USE_KEYBOARD
             keyboard_handler(&event);
 #endif
+            if ((&event)->type == SDL_WINDOWEVENT) {
+                switch ((&event)->window.event) {
+                    case SDL_WINDOWEVENT_TAKE_FOCUS:
+                    case SDL_WINDOWEVENT_EXPOSED:
+                        SDL_UpdateTexture(texture, NULL, tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
+                        SDL_RenderClear(renderer);
+                        SDL_RenderCopy(renderer, texture, NULL, NULL);
+                        SDL_RenderPresent(renderer);
+                        break;
+                    default:
+                        break;
+                }
+                        
+            }
+            }
 	    }
 
 		/*Sleep some time*/
