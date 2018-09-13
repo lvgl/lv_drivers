@@ -13,9 +13,14 @@ extern "C" {
 /*********************
  *      INCLUDES
  *********************/
-#include "../../lv_drv_conf.h"
-
 #if USE_MONITOR != 0
+
+#ifdef LV_CONF_INCLUDE_SIMPLE
+#include "lv_drv_conf.h"
+#else
+#include "../../lv_drv_conf.h"
+#endif
+
 #include "lvgl/lv_misc/lv_color.h"
 
 /*********************

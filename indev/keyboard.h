@@ -13,8 +13,13 @@ extern "C" {
 /*********************
  *      INCLUDES
  *********************/
-#include "../../lv_drv_conf.h"
 #if USE_KEYBOARD
+
+#ifdef LV_CONF_INCLUDE_SIMPLE
+#include "lv_drv_conf.h"
+#else
+#include "../../lv_drv_conf.h"
+#endif
 
 #include <stdbool.h>
 #include <SDL2/SDL.h>

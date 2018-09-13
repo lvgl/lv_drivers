@@ -1,7 +1,7 @@
 
 /**
  * @file AD_touch.h
- * 
+ *
  */
 
 #ifndef AD_TOUCH_H
@@ -14,8 +14,13 @@ extern "C" {
 /*********************
  *      INCLUDES
  *********************/
-#include "../../lv_drv_conf.h"
 #if USE_AD_TOUCH != 0
+
+#ifdef LV_CONF_INCLUDE_SIMPLE
+#include "lv_drv_conf.h"
+#else
+#include "../../lv_drv_conf.h"
+#endif
 
 #define  _SUPPRESS_PLIB_WARNING
 #include <plib.h>
