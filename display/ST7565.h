@@ -1,6 +1,6 @@
 /**
  * @file ST7565.h
- * 
+ *
  */
 
 #ifndef ST7565_H
@@ -13,8 +13,13 @@ extern "C" {
 /*********************
  *      INCLUDES
  *********************/
+#ifdef LV_CONF_INCLUDE_SIMPLE
+#include "lv_drv_conf.h"
+#else
 #include "../../lv_drv_conf.h"
-#if USE_ST7565 != 0
+#endif
+
+#if USE_ST7565
 
 #include <stdint.h>
 #include "lvgl/lv_misc/lv_color.h"
