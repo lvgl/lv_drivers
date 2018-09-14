@@ -1,4 +1,3 @@
-
 /**
  * @file AD_touch.h
  *

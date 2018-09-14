@@ -90,7 +90,6 @@ void monitor_init(void)
 #endif
 
     SDL_CreateThread(sdl_refr, "sdl_refr", NULL);
-
     while(sdl_inited == false); /*Wait until 'sdl_refr' initializes the SDL*/
 }
 
@@ -261,14 +260,15 @@ static int sdl_refr(void * param)
                               MONITOR_HOR_RES, MONITOR_VER_RES, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
 
 #if MONITOR_VIRTUAL_MACHINE == 1
-	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
 #else
-	renderer = SDL_CreateRenderer(window, -1, 0);
+    renderer = SDL_CreateRenderer(window, -1, 0);
 #endif
 
-	texture = SDL_CreateTexture(renderer,
-		SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, MONITOR_HOR_RES, MONITOR_VER_RES);
-	SDL_SetTextureBlendMode( texture, SDL_BLENDMODE_BLEND);
+    texture = SDL_CreateTexture(renderer,
+                                SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, MONITOR_HOR_RES, MONITOR_VER_RES);
+    SDL_SetTextureBlendMode( texture, SDL_BLENDMODE_BLEND);
+
     /*Initialize the frame buffer to gray (77 is an empirical value) */
     memset(tft_fb, 77, MONITOR_HOR_RES * MONITOR_VER_RES * sizeof(uint32_t));
     SDL_UpdateTexture(texture, NULL, tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
@@ -277,7 +277,6 @@ static int sdl_refr(void * param)
 
     /*Run until quit event not arrives*/
     while(sdl_quit_qry == false) {
-
         /*Refresh handling*/
         if(sdl_refr_qry != false) {
             sdl_refr_qry = false;
