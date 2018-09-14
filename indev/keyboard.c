@@ -58,7 +58,6 @@ bool keyboard_read(lv_indev_data_t * data)
     return false;		/*No more data to read so return false*/
 }
 
-
 /**
  * It is called periodically from the SDL thread to check a key is pressed/released
  * @param event describes the event

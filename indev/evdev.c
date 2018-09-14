@@ -47,13 +47,13 @@ int evdev_button;
  */
 void evdev_init(void)
 {
-    evdev_fd = open(EVDEV_NAME, O_RDWR|O_NOCTTY|O_NDELAY);
-    if (evdev_fd == -1) {
+    evdev_fd = open(EVDEV_NAME, O_RDWR | O_NOCTTY | O_NDELAY);
+    if(evdev_fd == -1) {
         perror("unable open evdev interface:");
         return;
     }
 
-    fcntl(evdev_fd, F_SETFL, O_ASYNC|O_NONBLOCK);
+    fcntl(evdev_fd, F_SETFL, O_ASYNC | O_NONBLOCK);
 
     evdev_root_x = 0;
     evdev_root_y = 0;
@@ -70,34 +70,34 @@ bool evdev_read(lv_indev_data_t * data)
     struct input_event in;
 
     while(read(evdev_fd, &in, sizeof(struct input_event)) > 0) {
-        if (in.type == EV_REL) {
-            if (in.code == REL_X)
+        if(in.type == EV_REL) {
+            if(in.code == REL_X)
                 evdev_root_x += in.value;
-            else if (in.code == REL_Y)
+            else if(in.code == REL_Y)
                 evdev_root_y += in.value;
-        } else if (in.type == EV_ABS) {
-            if (in.code == ABS_X)
+        } else if(in.type == EV_ABS) {
+            if(in.code == ABS_X)
                 evdev_root_x = in.value;
-            else if (in.code == ABS_Y)
+            else if(in.code == ABS_Y)
                 evdev_root_y = in.value;
-        } else if (in.type == EV_KEY) {
-            if (in.code == BTN_MOUSE || in.code == BTN_TOUCH) {
-                if (in.value == 0)
+        } else if(in.type == EV_KEY) {
+            if(in.code == BTN_MOUSE || in.code == BTN_TOUCH) {
+                if(in.value == 0)
                     evdev_button = LV_INDEV_STATE_REL;
-                else if (in.value == 1)
+                else if(in.value == 1)
                     evdev_button = LV_INDEV_STATE_PR;
             }
         }
     }
 
 
-    if (evdev_root_x < 0)
+    if(evdev_root_x < 0)
         evdev_root_x = 0;
-    if (evdev_root_y < 0)
+    if(evdev_root_y < 0)
         evdev_root_y = 0;
-    if (evdev_root_x >= LV_HOR_RES)
+    if(evdev_root_x >= LV_HOR_RES)
         evdev_root_x = LV_HOR_RES - 1;
-    if (evdev_root_y >= LV_VER_RES)
+    if(evdev_root_y >= LV_VER_RES)
         evdev_root_y = LV_VER_RES - 1;
 
     /*Store the collected data*/

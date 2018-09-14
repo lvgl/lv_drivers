@@ -9,7 +9,6 @@
 #include "mouse.h"
 #if USE_MOUSE != 0
 
-
 /*********************
  *      DEFINES
  *********************/
@@ -63,15 +62,15 @@ bool mouse_read(lv_indev_data_t * data)
 /**
  * It will be called from the main SDL thread
  */
-void mouse_handler(SDL_Event *event)
+void mouse_handler(SDL_Event * event)
 {
-    switch (event->type) {
+    switch(event->type) {
         case SDL_MOUSEBUTTONUP:
-            if (event->button.button == SDL_BUTTON_LEFT)
+            if(event->button.button == SDL_BUTTON_LEFT)
                 left_button_down = false;
             break;
         case SDL_MOUSEBUTTONDOWN:
-            if (event->button.button == SDL_BUTTON_LEFT) {
+            if(event->button.button == SDL_BUTTON_LEFT) {
                 left_button_down = true;
                 last_x = event->motion.x;
                 last_y = event->motion.y;

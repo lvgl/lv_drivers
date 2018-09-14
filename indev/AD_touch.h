@@ -37,16 +37,16 @@ extern "C" {
 
 /*GetMaxX Macro*/
 #if (DISP_ORIENTATION == 90) || (DISP_ORIENTATION == 270)
-    #define GetMaxX()   (DISP_VER_RESOLUTION - 1)
+#define GetMaxX()   (DISP_VER_RESOLUTION - 1)
 #elif (DISP_ORIENTATION == 0) || (DISP_ORIENTATION == 180)
-    #define GetMaxX()   (DISP_HOR_RESOLUTION - 1)
+#define GetMaxX()   (DISP_HOR_RESOLUTION - 1)
 #endif
 
 /*GetMaxY Macro*/
 #if (DISP_ORIENTATION == 90) || (DISP_ORIENTATION == 270)
-    #define GetMaxY()   (DISP_HOR_RESOLUTION - 1)
+#define GetMaxY()   (DISP_HOR_RESOLUTION - 1)
 #elif (DISP_ORIENTATION == 0) || (DISP_ORIENTATION == 180)
-    #define GetMaxY()   (DISP_VER_RESOLUTION - 1)
+#define GetMaxY()   (DISP_VER_RESOLUTION - 1)
 #endif
 
 /*********************************************************************
