@@ -13,12 +13,17 @@ extern "C" {
 /*********************
  *      INCLUDES
  *********************/
-
+#ifdef LV_CONF_INCLUDE_SIMPLE
+#include "lv_drv_conf.h"
+#else
 #include "../../lv_drv_conf.h"
+#endif
 
 #if USE_MOUSE
+
 #include <stdint.h>
 #include <stdbool.h>
+#include <SDL2/SDL.h>
 #include "lvgl/lv_hal/lv_hal_indev.h"
 
 /*********************
@@ -44,6 +49,10 @@ void mouse_init(void);
  */
 bool mouse_read(lv_indev_data_t * data);
 
+/**
+ * It will be called from the main SDL thread
+ */
+void mouse_handler(SDL_Event *event);
 
 /**********************
  *      MACROS

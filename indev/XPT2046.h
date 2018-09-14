@@ -13,8 +13,13 @@ extern "C" {
 /*********************
  *      INCLUDES
  *********************/
+#ifdef LV_CONF_INCLUDE_SIMPLE
+#include "lv_drv_conf.h"
+#else
 #include "../../lv_drv_conf.h"
-#if USE_XPT2046 != 0
+#endif
+
+#if USE_XPT2046
 
 #include <stdint.h>
 #include <stdbool.h>
