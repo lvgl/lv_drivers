@@ -109,9 +109,10 @@ static uint32_t keycode_to_ascii(uint32_t sdl_key)
         case SDLK_ESCAPE:
             return LV_GROUP_KEY_ESC;
 
+#ifdef  LV_GROUP_KEY_DEL        /*For backward compatibility*/
         case SDLK_BACKSPACE:
         	return LV_GROUP_KEY_DEL;
-
+#endif
         case SDLK_KP_ENTER:
         case '\r':
             return LV_GROUP_KEY_ENTER;
