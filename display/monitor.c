@@ -70,7 +70,7 @@ void monitor_init(void)
     renderer = SDL_CreateRenderer(window, -1, 0);
     texture = SDL_CreateTexture(renderer,
                                 SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, MONITOR_HOR_RES, MONITOR_VER_RES);
-
+    SDL_SetTextureBlendMode( texture, SDL_BLENDMODE_BLEND);
     /*Initialize the frame buffer to gray (77 is an empirical value) */
     memset(tft_fb, 77, MONITOR_HOR_RES * MONITOR_VER_RES * sizeof(uint32_t));
     SDL_UpdateTexture(texture, NULL, tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
@@ -252,6 +252,7 @@ static int sdl_refr(void * param)
     renderer = SDL_CreateRenderer(window, -1, 0);
     texture = SDL_CreateTexture(renderer,
                                 SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, MONITOR_HOR_RES, MONITOR_VER_RES);
+    SDL_SetTextureBlendMode( texture, SDL_BLENDMODE_BLEND);
 
     /*Initialize the frame buffer to gray (77 is an empirical value) */
     memset(tft_fb, 77, MONITOR_HOR_RES * MONITOR_VER_RES * sizeof(uint32_t));
