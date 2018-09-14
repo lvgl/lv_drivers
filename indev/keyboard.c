@@ -64,7 +64,7 @@ bool keyboard_read(lv_indev_data_t * data)
 }
 
 /**
- * It is called periodically to check a key is pressed/released
+ * It is called periodically from the SDL thread to check a key is pressed/released
  * @param event describes the event
  */
 void keyboard_handler(SDL_Event *event)
