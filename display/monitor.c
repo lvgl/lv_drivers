@@ -33,7 +33,7 @@
 /**********************
  *  STATIC PROTOTYPES
  **********************/
-static int sdl_refr(void * param);
+static int monitor_sdl_refr_thread(void * param);
 
 
 /***********************
@@ -52,6 +52,9 @@ static volatile bool sdl_refr_qry = false;
 static volatile bool sdl_quit_qry = false;
 
 int quit_filter(void * userdata, SDL_Event * event);
+static void monitor_sdl_clean_up(void);
+static void monitor_sdl_init(void);
+static void monitor_sdl_refr_core(void);
 
 /**********************
  *      MACROS
@@ -67,29 +70,10 @@ int quit_filter(void * userdata, SDL_Event * event);
 void monitor_init(void)
 {
 #if __APPLE__ && TARGET_OS_MAC
-
-    /*Initialize the SDL*/
-    SDL_Init(SDL_INIT_VIDEO);
-
-    SDL_SetEventFilter(quit_filter, NULL);
-
-    window = SDL_CreateWindow("TFT Simulator",
-                              SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                              MONITOR_HOR_RES, MONITOR_VER_RES, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
-
-    renderer = SDL_CreateRenderer(window, -1, 0);
-    texture = SDL_CreateTexture(renderer,
-                                SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, MONITOR_HOR_RES, MONITOR_VER_RES);
-    SDL_SetTextureBlendMode( texture, SDL_BLENDMODE_BLEND);
-    /*Initialize the frame buffer to gray (77 is an empirical value) */
-    memset(tft_fb, 77, MONITOR_HOR_RES * MONITOR_VER_RES * sizeof(uint32_t));
-    SDL_UpdateTexture(texture, NULL, tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
-    sdl_refr_qry = true;
-    sdl_inited = true;
-
+    monitor_sdl_init();
 #endif
 
-    SDL_CreateThread(sdl_refr, "sdl_refr", NULL);
+    SDL_CreateThread(monitor_sdl_refr_thread, "sdl_refr", NULL);
     while(sdl_inited == false); /*Wait until 'sdl_refr' initializes the SDL*/
 }
 
@@ -217,108 +201,35 @@ void monitor_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
  * It initializes SDL, handles drawing and the mouse.
  */
 #if __APPLE__ && TARGET_OS_MAC
-static int sdl_refr(void * param)
+static int monitor_sdl_refr_thread(void * param)
 {
     (void)param;
 
     /*Run until quit event not arrives*/
     while(sdl_quit_qry == false) {
-        /*Refresh handling*/
-        if(sdl_refr_qry != false) {
-            sdl_refr_qry = false;
-            SDL_UpdateTexture(texture, NULL, tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
-            SDL_RenderClear(renderer);
-            SDL_RenderCopy(renderer, texture, NULL, NULL);
-            SDL_RenderPresent(renderer);
-        }
-
-        /*Sleep some time*/
-        SDL_Delay(SDL_REFR_PERIOD);
+        monitor_sdl_refr_core();
     }
 
-    SDL_DestroyTexture(texture);
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
+    monitor_sdl_clean_up();
 
     exit(0);
 
     return 0;
 }
 #else
-static int sdl_refr(void * param)
+
+static int monitor_sdl_refr_thread(void * param)
 {
     (void)param;
-
-    /*Initialize the SDL*/
-    SDL_Init(SDL_INIT_VIDEO);
-
-    SDL_SetEventFilter(quit_filter, NULL);
-
-    window = SDL_CreateWindow("TFT Simulator",
-                              SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                              MONITOR_HOR_RES, MONITOR_VER_RES, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
-
-#if MONITOR_VIRTUAL_MACHINE == 1
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
-#else
-    renderer = SDL_CreateRenderer(window, -1, 0);
-#endif
-
-    texture = SDL_CreateTexture(renderer,
-                                SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, MONITOR_HOR_RES, MONITOR_VER_RES);
-    SDL_SetTextureBlendMode( texture, SDL_BLENDMODE_BLEND);
-
-    /*Initialize the frame buffer to gray (77 is an empirical value) */
-    memset(tft_fb, 77, MONITOR_HOR_RES * MONITOR_VER_RES * sizeof(uint32_t));
-    SDL_UpdateTexture(texture, NULL, tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
-    sdl_refr_qry = true;
-    sdl_inited = true;
+    monitor_sdl_init();
 
     /*Run until quit event not arrives*/
     while(sdl_quit_qry == false) {
         /*Refresh handling*/
-        if(sdl_refr_qry != false) {
-            sdl_refr_qry = false;
-            SDL_UpdateTexture(texture, NULL, tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
-            SDL_RenderClear(renderer);
-            SDL_RenderCopy(renderer, texture, NULL, NULL);
-            SDL_RenderPresent(renderer);
-        }
-
-        SDL_Event event;
-        while(SDL_PollEvent(&event)) {
-#if USE_MOUSE != 0
-            mouse_handler(&event);
-#endif
-
-#if USE_KEYBOARD
-            keyboard_handler(&event);
-#endif
-            if((&event)->type == SDL_WINDOWEVENT) {
-                switch((&event)->window.event) {
-                    case SDL_WINDOWEVENT_TAKE_FOCUS:
-                    case SDL_WINDOWEVENT_EXPOSED:
-                        SDL_UpdateTexture(texture, NULL, tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
-                        SDL_RenderClear(renderer);
-                        SDL_RenderCopy(renderer, texture, NULL, NULL);
-                        SDL_RenderPresent(renderer);
-                        break;
-                    default:
-                        break;
-                }
-            }
-        }
-
-        /*Sleep some time*/
-        SDL_Delay(SDL_REFR_PERIOD);
+        monitor_sdl_refr_core();
     }
 
-    SDL_DestroyTexture(texture);
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
-
+    monitor_sdl_clean_up();
     exit(0);
 
     return 0;
@@ -334,6 +245,80 @@ int quit_filter(void * userdata, SDL_Event * event)
     }
 
     return 1;
+}
+
+static void monitor_sdl_clean_up(void)
+{
+    SDL_DestroyTexture(texture);
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+}
+
+static void monitor_sdl_init(void)
+{
+    /*Initialize the SDL*/
+    SDL_Init(SDL_INIT_VIDEO);
+
+    SDL_SetEventFilter(quit_filter, NULL);
+
+    window = SDL_CreateWindow("TFT Simulator",
+            SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+            MONITOR_HOR_RES, MONITOR_VER_RES, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
+
+#if MONITOR_VIRTUAL_MACHINE == 1
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+#else
+    renderer = SDL_CreateRenderer(window, -1, 0);
+#endif
+
+    texture = SDL_CreateTexture(renderer,
+            SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, MONITOR_HOR_RES, MONITOR_VER_RES);
+    SDL_SetTextureBlendMode( texture, SDL_BLENDMODE_BLEND);
+
+    /*Initialize the frame buffer to gray (77 is an empirical value) */
+    memset(tft_fb, 77, MONITOR_HOR_RES * MONITOR_VER_RES * sizeof(uint32_t));
+    SDL_UpdateTexture(texture, NULL, tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
+    sdl_refr_qry = true;
+    sdl_inited = true;
+}
+
+static void monitor_sdl_refr_core(void)
+{
+    if(sdl_refr_qry != false) {
+        sdl_refr_qry = false;
+        SDL_UpdateTexture(texture, NULL, tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
+        SDL_RenderClear(renderer);
+        SDL_RenderCopy(renderer, texture, NULL, NULL);
+        SDL_RenderPresent(renderer);
+    }
+
+    SDL_Event event;
+    while(SDL_PollEvent(&event)) {
+#if USE_MOUSE != 0
+        mouse_handler(&event);
+#endif
+
+#if USE_KEYBOARD
+        keyboard_handler(&event);
+#endif
+        if((&event)->type == SDL_WINDOWEVENT) {
+            switch((&event)->window.event) {
+                case SDL_WINDOWEVENT_TAKE_FOCUS:
+                case SDL_WINDOWEVENT_EXPOSED:
+                    SDL_UpdateTexture(texture, NULL, tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
+                    SDL_RenderClear(renderer);
+                    SDL_RenderCopy(renderer, texture, NULL, NULL);
+                    SDL_RenderPresent(renderer);
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    /*Sleep some time*/
+    SDL_Delay(SDL_REFR_PERIOD);
 }
 
 #endif
