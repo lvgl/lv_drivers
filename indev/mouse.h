@@ -13,10 +13,14 @@ extern "C" {
 /*********************
  *      INCLUDES
  *********************/
-
+#ifdef LV_CONF_INCLUDE_SIMPLE
+#include "lv_drv_conf.h"
+#else
 #include "../../lv_drv_conf.h"
+#endif
 
 #if USE_MOUSE
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <SDL2/SDL.h>

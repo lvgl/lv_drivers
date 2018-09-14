@@ -1,6 +1,6 @@
 /**
  * @file FT5406EE8.h
- * 
+ *
  */
 
 #ifndef FT5406EE8_H
@@ -13,7 +13,12 @@ extern "C" {
 /*********************
  *      INCLUDES
  *********************/
+#ifdef LV_CONF_INCLUDE_SIMPLE
+#include "lv_drv_conf.h"
+#else
 #include "../../lv_drv_conf.h"
+#endif
+
 #if USE_FT5406EE8
 
 #include <stdbool.h>
