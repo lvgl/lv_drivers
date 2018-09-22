@@ -264,7 +264,7 @@ static void monitor_sdl_init(void)
 
     window = SDL_CreateWindow("TFT Simulator",
             SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-            MONITOR_HOR_RES, MONITOR_VER_RES, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
+            MONITOR_HOR_RES * MONITOR_ZOOM, MONITOR_VER_RES * MONITOR_ZOOM, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
 
 #if MONITOR_VIRTUAL_MACHINE == 1
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
