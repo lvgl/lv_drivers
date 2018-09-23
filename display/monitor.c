@@ -95,11 +95,11 @@ void monitor_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
     }
 
     int32_t y;
-#if LV_COLOR_DEPTH != 24
+#if LV_COLOR_DEPTH != 24 || LV_COLOR_DEPTH != 32    /*32 is valid but support 24 for backward compatibility too*/
     int32_t x;
     for(y = y1; y <= y2; y++) {
         for(x = x1; x <= x2; x++) {
-            tft_fb[y * MONITOR_HOR_RES + x] = lv_color_to24(*color_p);
+            tft_fb[y * MONITOR_HOR_RES + x] = lv_color_to32(*color_p);
             color_p++;
         }
 
@@ -144,11 +144,11 @@ void monitor_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t col
 
     int32_t x;
     int32_t y;
-    uint32_t color24 = lv_color_to24(color);
+    uint32_t color32 = lv_color_to32(color);
 
     for(x = act_x1; x <= act_x2; x++) {
         for(y = act_y1; y <= act_y2; y++) {
-            tft_fb[y * MONITOR_HOR_RES + x] = color24;
+            tft_fb[y * MONITOR_HOR_RES + x] = color32;
         }
     }
 
@@ -182,7 +182,7 @@ void monitor_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
 
     for(y = act_y1; y <= act_y2; y++) {
         for(x = act_x1; x <= act_x2; x++) {
-            tft_fb[y * MONITOR_HOR_RES + x] = lv_color_to24(*color_p);
+            tft_fb[y * MONITOR_HOR_RES + x] = lv_color_to32(*color_p);
             color_p++;
         }
 
@@ -271,7 +271,6 @@ static void monitor_sdl_init(void)
 #else
     renderer = SDL_CreateRenderer(window, -1, 0);
 #endif
-
     texture = SDL_CreateTexture(renderer,
             SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, MONITOR_HOR_RES, MONITOR_VER_RES);
     SDL_SetTextureBlendMode( texture, SDL_BLENDMODE_BLEND);
@@ -289,6 +288,13 @@ static void monitor_sdl_refr_core(void)
         sdl_refr_qry = false;
         SDL_UpdateTexture(texture, NULL, tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
         SDL_RenderClear(renderer);
+        /*Test: Draw a background to test transparent screens (LV_COLOR_SCREEN_TRANSP)*/
+//        SDL_SetRenderDrawColor(renderer, 0xff, 0, 0, 0xff);
+//        SDL_Rect r;
+//        r.x = 0; r.y = 0; r.w = MONITOR_HOR_RES; r.w = MONITOR_VER_RES;
+//        SDL_RenderDrawRect(renderer, &r);
+
+        /*Update the renderer with the texture containing the rendered image*/
         SDL_RenderCopy(renderer, texture, NULL, NULL);
         SDL_RenderPresent(renderer);
     }

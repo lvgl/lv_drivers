@@ -193,7 +193,7 @@
  *------------------------------------------------*/
 #define USE_EVDEV    0
 #if USE_EVDEV
-#define EVDEV_NAME   "/dev/input/event0"
+#define EVDEV_NAME   "/dev/input/event0"        /*You can use the "evtest" Linux tool to get the list of devices and test them*/
 #endif
 
 /*-------------------------------
