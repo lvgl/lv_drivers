@@ -72,13 +72,13 @@ void mouse_handler(SDL_Event * event)
         case SDL_MOUSEBUTTONDOWN:
             if(event->button.button == SDL_BUTTON_LEFT) {
                 left_button_down = true;
-                last_x = event->motion.x;
-                last_y = event->motion.y;
+                last_x = event->motion.x / MONITOR_ZOOM;
+                last_y = event->motion.y / MONITOR_ZOOM;
             }
             break;
         case SDL_MOUSEMOTION:
-            last_x = event->motion.x;
-            last_y = event->motion.y;
+            last_x = event->motion.x / MONITOR_ZOOM;
+            last_y = event->motion.y / MONITOR_ZOOM;
 
             break;
     }
