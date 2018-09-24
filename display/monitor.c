@@ -26,6 +26,10 @@
  *********************/
 #define SDL_REFR_PERIOD     50  /*ms*/
 
+#ifndef MONITOR_ZOOM
+#define MONITOR_ZOOM        1
+#endif
+
 /**********************
  *      TYPEDEFS
  **********************/
