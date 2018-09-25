@@ -304,7 +304,9 @@ static void monitor_sdl_refr_core(void)
 #endif
         if((&event)->type == SDL_WINDOWEVENT) {
             switch((&event)->window.event) {
+#if SDL_VERSION_ATLEAST(2, 0, 5)
                 case SDL_WINDOWEVENT_TAKE_FOCUS:
+#endif
                 case SDL_WINDOWEVENT_EXPOSED:
                     SDL_UpdateTexture(texture, NULL, tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
                     SDL_RenderClear(renderer);
