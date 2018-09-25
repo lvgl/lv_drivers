@@ -188,6 +188,14 @@
 /*No settings*/
 #endif
 
+/*-------------------------------------------
+ * Mousewheel as encoder on PC (using SDL)
+ *------------------------------------------*/
+#define USE_ENCODER     1
+#if USE_ENCODER
+/*No settings*/
+#endif
+
 /*-------------------------------------------------
  * Mouse or touchpad as evdev interface (for Linux based systems)
  *------------------------------------------------*/

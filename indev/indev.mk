@@ -1,6 +1,7 @@
 CSRCS += FT5406EE8.c
 CSRCS += keyboard.c
 CSRCS += mouse.c
+CSRCS += encoder.c
 CSRCS += evdev.c
 CSRCS += XPT2046.c
 
