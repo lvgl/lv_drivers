@@ -261,8 +261,8 @@ static void monitor_sdl_init(void)
     SDL_SetEventFilter(quit_filter, NULL);
 
     window = SDL_CreateWindow("TFT Simulator",
-            SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-            MONITOR_HOR_RES * MONITOR_ZOOM, MONITOR_VER_RES * MONITOR_ZOOM, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
+                              SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+                              MONITOR_HOR_RES * MONITOR_ZOOM, MONITOR_VER_RES * MONITOR_ZOOM, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
 
 #if MONITOR_VIRTUAL_MACHINE
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
@@ -270,8 +270,8 @@ static void monitor_sdl_init(void)
     renderer = SDL_CreateRenderer(window, -1, 0);
 #endif
     texture = SDL_CreateTexture(renderer,
-            SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, MONITOR_HOR_RES, MONITOR_VER_RES);
-    SDL_SetTextureBlendMode( texture, SDL_BLENDMODE_BLEND);
+                                SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, MONITOR_HOR_RES, MONITOR_VER_RES);
+    SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
 
     /*Initialize the frame buffer to gray (77 is an empirical value) */
     memset(tft_fb, 77, MONITOR_HOR_RES * MONITOR_VER_RES * sizeof(uint32_t));

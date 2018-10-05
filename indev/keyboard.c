@@ -55,23 +55,23 @@ bool keyboard_read(lv_indev_data_t * data)
     data->state = state;
     data->key = keycode_to_ascii(last_key);
 
-    return false;		/*No more data to read so return false*/
+    return false;       /*No more data to read so return false*/
 }
 
 /**
  * It is called periodically from the SDL thread to check a key is pressed/released
  * @param event describes the event
  */
-void keyboard_handler(SDL_Event *event)
+void keyboard_handler(SDL_Event * event)
 {
     /* We only care about SDL_KEYDOWN and SDL_KEYUP events */
-    switch( event->type ){
-        case SDL_KEYDOWN:						/*Button press*/
-            last_key = event->key.keysym.sym;	/*Save the pressed key*/
-            state = LV_INDEV_STATE_PR;			/*Save the key is pressed now*/
+    switch(event->type) {
+        case SDL_KEYDOWN:                       /*Button press*/
+            last_key = event->key.keysym.sym;   /*Save the pressed key*/
+            state = LV_INDEV_STATE_PR;          /*Save the key is pressed now*/
             break;
-        case SDL_KEYUP:							/*Button release*/
-            state = LV_INDEV_STATE_REL;			/*Save the key is released but keep the last key*/
+        case SDL_KEYUP:                         /*Button release*/
+            state = LV_INDEV_STATE_REL;         /*Save the key is released but keep the last key*/
             break;
         default:
             break;
@@ -111,14 +111,14 @@ static uint32_t keycode_to_ascii(uint32_t sdl_key)
 
 #ifdef  LV_GROUP_KEY_DEL        /*For backward compatibility*/
         case SDLK_BACKSPACE:
-        	return LV_GROUP_KEY_DEL;
+            return LV_GROUP_KEY_DEL;
 #endif
         case SDLK_KP_ENTER:
         case '\r':
             return LV_GROUP_KEY_ENTER;
 
         default:
-        	return sdl_key;
+            return sdl_key;
     }
 }
 #endif

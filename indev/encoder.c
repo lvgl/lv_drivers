@@ -55,16 +55,16 @@ bool encoder_read(lv_indev_data_t * data)
     data->enc_diff = enc_diff;
     enc_diff = 0;
 
-    return false;		/*No more data to read so return false*/
+    return false;       /*No more data to read so return false*/
 }
 
 /**
  * It is called periodically from the SDL thread to check mouse wheel state
  * @param event describes the event
  */
-void encoder_handler(SDL_Event *event)
+void encoder_handler(SDL_Event * event)
 {
-    switch( event->type ){
+    switch(event->type) {
         case SDL_MOUSEWHEEL:
             // Scroll down (y = -1) means positive encoder turn,
             // so invert it

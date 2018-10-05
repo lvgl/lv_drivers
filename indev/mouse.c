@@ -13,7 +13,7 @@
  *      DEFINES
  *********************/
 #ifndef MONITOR_ZOOM
-#define MONITOR_ZOOM	1
+#define MONITOR_ZOOM    1
 #endif
 
 /**********************
