@@ -31,6 +31,12 @@
 #define MONITOR_ZOOM        1
 #endif
 
+#if defined(__APPLE__) && defined(TARGET_OS_MAC)
+# if __APPLE__ && TARGET_OS_MAC
+#define MONITOR_APPLE
+# endif
+#endif
+
 /**********************
  *      TYPEDEFS
  **********************/
@@ -74,7 +80,8 @@ static void monitor_sdl_refr_core(void);
  */
 void monitor_init(void)
 {
-#if __APPLE__ && TARGET_OS_MAC
+    /*OSX needs to initialize SDL here*/
+#ifdef MONITOR_APPLE
     monitor_sdl_init();
 #endif
 
@@ -205,28 +212,15 @@ void monitor_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
  * SDL main thread. All SDL related task have to be handled here!
  * It initializes SDL, handles drawing and the mouse.
  */
-#if __APPLE__ && TARGET_OS_MAC
-static int monitor_sdl_refr_thread(void * param)
-{
-    (void)param;
-
-    /*Run until quit event not arrives*/
-    while(sdl_quit_qry == false) {
-        monitor_sdl_refr_core();
-    }
-
-    monitor_sdl_clean_up();
-
-    exit(0);
-
-    return 0;
-}
-#else
 
 static int monitor_sdl_refr_thread(void * param)
 {
     (void)param;
+
+    /*If not OSX initialize SDL in the Thread*/
+#ifndef MONITOR_APPLE
     monitor_sdl_init();
+#endif
 
     /*Run until quit event not arrives*/
     while(sdl_quit_qry == false) {
@@ -239,7 +233,6 @@ static int monitor_sdl_refr_thread(void * param)
 
     return 0;
 }
-#endif
 
 int quit_filter(void * userdata, SDL_Event * event)
 {
@@ -271,7 +264,7 @@ static void monitor_sdl_init(void)
             SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
             MONITOR_HOR_RES * MONITOR_ZOOM, MONITOR_VER_RES * MONITOR_ZOOM, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
 
-#if MONITOR_VIRTUAL_MACHINE == 1
+#if MONITOR_VIRTUAL_MACHINE
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
 #else
     renderer = SDL_CreateRenderer(window, -1, 0);

@@ -3,7 +3,11 @@
  *
  */
 
-#if 0 /*Remove this to enable the content*/
+/*
+ * COPY THIS FILE AS lv_drv_conf.h
+ */
+
+#if 0 /*Set it to "1" to enable the content*/
 
 #ifndef LV_DRV_CONF_H
 #define LV_DRV_CONF_H
@@ -82,8 +86,9 @@
 #if USE_MONITOR
 #define MONITOR_HOR_RES     LV_HOR_RES
 #define MONITOR_VER_RES     LV_VER_RES
-#define MONITOR_ZOOM        2                   /* Scale window by this factor (useful when simulating small screens) */
-#define MONITOR_SDL_INCLUDE_PATH	<SDL.h>     /*Eclipse: <SDL2/SDL.h>    Visual Studio: <SDL.h>*/
+#define MONITOR_ZOOM        2                       /* Scale window by this factor (useful when simulating small screens) */
+#define MONITOR_SDL_INCLUDE_PATH	<SDL2/SDL.h>    /*Eclipse: <SDL2/SDL.h>    Visual Studio: <SDL.h>*/
+#define MONITOR_VIRTUAL_MACHINE 0                   /*Different rendering should be used if running in a Virtual machine*/
 #endif
 
 /*----------------
@@ -214,4 +219,4 @@
 
 #endif  /*LV_DRV_CONF_H*/
 
-#endif /*Remove this to enable the content*/
+#endif /*End of "Content enable"*/
