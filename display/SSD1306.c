@@ -138,11 +138,11 @@ void ssd1306_vdb_wr(uint8_t * buf, lv_coord_t buf_w, lv_coord_t x, lv_coord_t y,
     buf += buf_w * (y >> 3) + x;
     if(color.full)
     {
-        (*buf) &= ~(1 << (y % 8));
+        (*buf) |= (1 << (y % 8));
     }
     else
     {
-        (*buf) |= (1 << (y % 8));
+        (*buf) &= ~(1 << (y % 8));
     }
 }
 
