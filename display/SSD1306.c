@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "lvgl/lv_core/lv_vdb.h"
+#include "lvgl/lv_core/lv_refr.h"
 
 /*********************
  *      DEFINES
@@ -94,6 +95,7 @@
 /**********************
  *  STATIC PROTOTYPES
  **********************/
+static void inline _rounder(lv_area_t *a);
 static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t* buf, uint8_t x1, uint8_t y1,  uint8_t x2, uint8_t y2);
 
 /**********************
@@ -126,13 +128,6 @@ static const ssd1306_t* _dev;
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
-void ssd1306_rounder(lv_area_t *a)
-{
-    /*Make the area bigger in y*/
-    a->y1 = a->y1 & ~(0x7);
-    a->y2 = a->y2 |  (0x7);
-}
-
 void ssd1306_vdb_wr(uint8_t * buf, lv_coord_t buf_w, lv_coord_t x, lv_coord_t y, lv_color_t color, lv_opa_t opa)
 {
     buf += buf_w * (y >> 3) + x;
@@ -238,6 +233,13 @@ int ssd1306_init(const ssd1306_t *dev)
     default:
         debug("Unsupported screen witdh");
         return -ENOTSUP;
+    }
+
+    //We send 8 pixel at once (page coordinate ). If VDB is not set correctly,
+    //we need round the y coordinate
+    if(LV_VDB_SIZE%8)
+    {
+        lv_refr_set_round_cb(_rounder);
     }
 
     switch (dev->protocol)
@@ -600,6 +602,13 @@ int ssd1306_start_scroll_hori_vert(const ssd1306_t *dev, bool way, uint8_t start
 /**********************
  *   STATIC FUNCTIONS
  **********************/
+static void inline _rounder(lv_area_t *a)
+{
+    /*Make the area bigger in y*/
+    a->y1 = a->y1 & ~(0x7);
+    a->y2 = a->y2 |  (0x7);
+}
+
 static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t* buf, uint8_t x1, uint8_t y1,  uint8_t x2, uint8_t y2)
 {
     uint8_t i;

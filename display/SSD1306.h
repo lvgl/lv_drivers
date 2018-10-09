@@ -118,11 +118,6 @@ typedef enum
  * GLOBAL PROTOTYPES
  **********************/
 
-/* Called when an area is invalidated to modify the coordinates of the area
- * @param a Coordinate Area pointer to modify
- */
-void ssd1306_rounder(lv_area_t *a);
-
 /* Custom VDB write to use 1 bit by pixel
  * @param buf Buffer pointer
  * @param buf_w Buffer size
