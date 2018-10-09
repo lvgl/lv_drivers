@@ -154,14 +154,14 @@ void ssd1306_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
         lv_flush_ready();
         return;
     }
+    /*Return if the screen is uninitialized*/
+    if(!_dev)
+    {
+        lv_flush_ready();
+        return;
+    }
 
-    /*Truncate the area to the screen*/
-    int32_t act_x1 = x1 < 0 ? 0 : x1;
-    int32_t act_y1 = y1 < 0 ? 0 : y1;
-    int32_t act_x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
-    int32_t act_y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
-
-    _load_frame_buffer(_dev, (uint8_t*)color_p, act_x1, act_y1, act_x2, act_y2);
+    _load_frame_buffer(_dev, (uint8_t*)color_p, x1, y1, x2, y2);
     lv_flush_ready();
 }
 
@@ -203,11 +203,10 @@ int ssd1306_command(const ssd1306_t *dev, uint8_t cmd)
  * to SSD1306 datasheet from adafruit.com */
 int ssd1306_init(const ssd1306_t *dev)
 {
-    if(_dev)
+    if(_dev) //already init
     {
         return -ENXIO;
     }
-    _dev = dev;
     //Reset pin setup if needed
     if(dev->rst_pin != LV_DRIVER_NOPIN)
     {
@@ -230,6 +229,17 @@ int ssd1306_init(const ssd1306_t *dev)
         debug("Unsupported screen height");
         return -ENOTSUP;
     }
+    switch (dev->width)
+    {
+    case 128:
+        break;
+    case 96:
+        break;
+    default:
+        debug("Unsupported screen witdh");
+        return -ENOTSUP;
+    }
+
     switch (dev->protocol)
     {
 #if (SSD1306_I2C_SUPPORT)
@@ -268,6 +278,7 @@ int ssd1306_init(const ssd1306_t *dev)
             && !ssd1306_set_inversion(dev, false)
             && !ssd1306_display_on(dev, true))
         {
+            _dev = dev;
             return 0;
         }
         break;
@@ -289,6 +300,7 @@ int ssd1306_init(const ssd1306_t *dev)
             && !ssd1306_set_inversion(dev, false)
             && !ssd1306_display_on(dev, true))
         {
+            _dev = dev;
             return 0;
         }
         break;
@@ -303,7 +315,6 @@ int ssd1306_deinit(const ssd1306_t *dev)
     {
         return -ENXIO;
     }
-    _dev = NULL;
     //Reset pin to clear all configs
     if(dev->rst_pin != LV_DRIVER_NOPIN)
     {
@@ -317,6 +328,7 @@ int ssd1306_deinit(const ssd1306_t *dev)
     {
         return err;
     }
+    _dev = NULL;
     return 0;
 }
 
@@ -590,7 +602,7 @@ int ssd1306_start_scroll_hori_vert(const ssd1306_t *dev, bool way, uint8_t start
  **********************/
 static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t* buf, uint8_t x1, uint8_t y1,  uint8_t x2, uint8_t y2)
 {
-    uint16_t i;
+    uint8_t i;
     uint16_t j;
     //convert to page
     y1 = y1 >> 3;
