@@ -237,10 +237,7 @@ int ssd1306_init(const ssd1306_t *dev)
 
     //We send 8 pixel at once (page coordinate ). If VDB is not set correctly,
     //we need round the y coordinate
-    if(LV_VDB_SIZE%8)
-    {
-        lv_refr_set_round_cb(_rounder);
-    }
+    lv_refr_set_round_cb(_rounder);
 
     switch (dev->protocol)
     {
