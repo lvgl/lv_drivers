@@ -59,6 +59,7 @@ static inline int i2c_send(const lv_i2c_handle_t i2c_dev, uint8_t reg, uint8_t* 
     return lv_i2c_write(i2c_dev, &reg, data, len);
 }
 
+#if LV_DRIVER_ENABLE_PAR
 static inline int par_send(const lv_spi_handle_t spi_dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize)
 {
     lv_par_wr_cs(spi_dev, false);
@@ -67,7 +68,9 @@ static inline int par_send(const lv_spi_handle_t spi_dev, bool dc, uint8_t* data
     lv_par_wr_cs(spi_dev, true);
     return err;
 }
+#endif
 
+#if LV_DRIVER_ENABLE_SPI
 static inline int spi3wire_send(const lv_spi_handle_t spi_dev, bool dc, uint8_t* data, uint8_t len, uint8_t wordsize)
 {
     lv_spi_wr_cs(spi_dev, false);
@@ -86,6 +89,7 @@ static inline int spi4wire_send(const lv_spi_handle_t spi_dev, bool dc, uint8_t*
     lv_spi_wr_cs(spi_dev, true);
     return err;
 }
+#endif
 
 static inline int common_indev_calibration(lv_indev_limit_t *cal, lv_point_t* pts, uint16_t width, uint16_t heigth, int16_t offset)
 {
