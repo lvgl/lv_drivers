@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "lvgl/lv_core/lv_vdb.h"
+#include "lvgl/lv_core/lv_refr.h"
 
 /*********************
  *      DEFINES
@@ -94,13 +95,13 @@
 /**********************
  *  STATIC PROTOTYPES
  **********************/
-static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y1,  uint8_t x2, uint8_t y2);
+static void inline _rounder(lv_area_t *a);
+static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t* buf, uint8_t x1, uint8_t y1,  uint8_t x2, uint8_t y2);
 
 /**********************
  *  STATIC VARIABLES
  **********************/
-static uint8_t* _buffer; //FIXME: To remove when pixel by bit will be released  (5.3)
-static uint8_t _flag_redraw; //FIXME: Used to optimize the screen update, need to be remove.
+static const ssd1306_t* _dev;
 
 /**********************
  *      MACROS
@@ -117,9 +118,28 @@ static uint8_t _flag_redraw; //FIXME: Used to optimize the screen update, need t
 #else
 #define err_control(fn) (fn)
 #endif
+
+#if LV_COLOR_DEPTH != 1 || LV_VDB_PX_BPP != 1
+#error "LV_COLOR_DEPTH and LV_VDB_PX_BPP need to be set to 1"
+#endif
+#if LV_VDB_SIZE < ( 8 * LV_HOR_RES)
+#error "LV_VDB_SIZE with 8*LV_HOR_RES minimum is needed (MAX: LV_HOR_RES*LV_VER_RES)"
+#endif
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
+void ssd1306_vdb_wr(uint8_t * buf, lv_coord_t buf_w, lv_coord_t x, lv_coord_t y, lv_color_t color, lv_opa_t opa)
+{
+    buf += buf_w * (y >> 3) + x;
+    if(color.full)
+    {
+        (*buf) |= (1 << (y % 8));
+    }
+    else
+    {
+        (*buf) &= ~(1 << (y % 8));
+    }
+}
 
 void ssd1306_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
 {
@@ -129,147 +149,15 @@ void ssd1306_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
         lv_flush_ready();
         return;
     }
-    if (!_buffer)
+    /*Return if the screen is uninitialized*/
+    if(!_dev)
     {
         lv_flush_ready();
         return;
     }
 
-    /*Truncate the area to the screen*/
-    int32_t act_x1 = x1 < 0 ? 0 : x1;
-    int32_t act_y1 = y1 < 0 ? 0 : y1;
-    int32_t act_x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
-    int32_t act_y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
-
-    int32_t x;
-    int32_t y;
-    unsigned int p;
-
-    for (y = act_y1; y <= act_y2; y++)
-    {
-        for (x = act_x1; x <= act_x2; x++)
-        {
-            p = 0;
-            p = y >> 3; /* :8 */
-            p = p << 7; /* *128 */
-            p += x;
-            if (lv_color_to1(*color_p) != 0)
-            {
-                _buffer[p] &= ~(1 << (y % 8));
-            }
-            else
-            {
-                _buffer[p] |= 1 << (y % 8);
-            }
-            color_p++;
-        }
-    }
-     _flag_redraw = 1;
+    _load_frame_buffer(_dev, (uint8_t*)color_p, x1, y1, x2, y2);
     lv_flush_ready();
-}
-
-void ssd1306_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t color)
-{
-    /*The most simple case (but also the slowest) to put all pixels to the screen one-by-one*/
-
-    /*Return if the area is out the screen*/
-    if (x2 < 0 || y2 < 0 || x1 > LV_HOR_RES - 1 || y1 > LV_VER_RES - 1)
-    {
-        return;
-    }
-    if (!_buffer)
-    {
-        return;
-    }
-
-    /*Truncate the area to the screen*/
-    int32_t act_x1 = x1 < 0 ? 0 : x1;
-    int32_t act_y1 = y1 < 0 ? 0 : y1;
-    int32_t act_x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
-    int32_t act_y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
-
-    int32_t x;
-    int32_t y;
-    unsigned int p;
-
-    if (lv_color_to1(color) != 0)
-    {
-        for (y = act_y1; y <= act_y2; y++)
-        {
-            for (x = act_x1; x <= act_x2; x++)
-            {
-                p = 0;
-                p = y >> 3; /* :8 */
-                p = p << 7; /* *128 */
-                p += x;
-                _buffer[p] &= ~(1 << (y % 8));
-            }
-        }
-    }
-    else
-    {
-        for (y = act_y1; y <= act_y2; y++)
-        {
-            for (x = act_x1; x <= act_x2; x++)
-            {
-                p = 0;
-                p = y >> 3; /* :8 */
-                p = p << 7; /* *128 */
-                p += x;
-                _buffer[p] |= 1 << (y % 8);
-            }
-        }
-    }
-     _flag_redraw = 1;
-}
-
-void ssd1306_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
-{
-    /*Return if the area is out the screen*/
-    if (x2 < 0 || y2 < 0 || x1 > LV_HOR_RES - 1 || y1 > LV_VER_RES - 1)
-    {
-        return;
-    }
-    if (!_buffer)
-    {
-        return;
-    }
-
-    /*Truncate the area to the screen*/
-    int32_t act_x1 = x1 < 0 ? 0 : x1;
-    int32_t act_y1 = y1 < 0 ? 0 : y1;
-    int32_t act_x2 = x2 > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : x2;
-    int32_t act_y2 = y2 > LV_VER_RES - 1 ? LV_VER_RES - 1 : y2;
-
-    int32_t x;
-    int32_t y;
-    unsigned int p;
-
-    for (y = act_y1; y <= act_y2; y++)
-    {
-        for (x = act_x1; x <= act_x2; x++)
-        {
-            p = 0;
-            p = y >> 3; /* :8 */
-            p = p << 7; /* *128 */
-            p += x;
-            if (lv_color_to1(*color_p) != 0)
-            {
-                _buffer[p] &= ~(1 << (y % 8));
-            }
-            else
-            {
-                _buffer[p] |= 1 << (y % 8);
-            }
-            color_p++;
-        }
-    }
-     _flag_redraw = 1;
-}
-
-bool ssd1306_need_redraw(void)
-{
-    return _flag_redraw;
 }
 
 /* Issue a command to SSD1306 device
@@ -310,17 +198,10 @@ int ssd1306_command(const ssd1306_t *dev, uint8_t cmd)
  * to SSD1306 datasheet from adafruit.com */
 int ssd1306_init(const ssd1306_t *dev)
 {
-    if (_buffer)
+    if(_dev) //already init
     {
-       free((void*)_buffer);
-       _buffer = NULL;
+        return -ENXIO;
     }
-    _buffer = malloc(dev->height*dev->width/8);
-    if (!_buffer)
-    {
-        return -ENOMEM;
-    }
-
     //Reset pin setup if needed
     if(dev->rst_pin != LV_DRIVER_NOPIN)
     {
@@ -343,6 +224,20 @@ int ssd1306_init(const ssd1306_t *dev)
         debug("Unsupported screen height");
         return -ENOTSUP;
     }
+    switch (dev->width)
+    {
+    case 128:
+        break;
+    case 96:
+        break;
+    default:
+        debug("Unsupported screen witdh");
+        return -ENOTSUP;
+    }
+
+    //We send 8 pixel at once (page coordinate ). If VDB is not set correctly,
+    //we need round the y coordinate
+    lv_refr_set_round_cb(_rounder);
 
     switch (dev->protocol)
     {
@@ -382,6 +277,7 @@ int ssd1306_init(const ssd1306_t *dev)
             && !ssd1306_set_inversion(dev, false)
             && !ssd1306_display_on(dev, true))
         {
+            _dev = dev;
             return 0;
         }
         break;
@@ -403,6 +299,7 @@ int ssd1306_init(const ssd1306_t *dev)
             && !ssd1306_set_inversion(dev, false)
             && !ssd1306_display_on(dev, true))
         {
+            _dev = dev;
             return 0;
         }
         break;
@@ -417,11 +314,6 @@ int ssd1306_deinit(const ssd1306_t *dev)
     {
         return -ENXIO;
     }
-    if (_buffer)
-    {
-       free((void*)_buffer);
-       _buffer = NULL;
-    }
     //Reset pin to clear all configs
     if(dev->rst_pin != LV_DRIVER_NOPIN)
     {
@@ -429,13 +321,13 @@ int ssd1306_deinit(const ssd1306_t *dev)
         lv_delay_us(10);
         lv_gpio_write(dev->rst_pin, 1);
     }
-
     //Display off
     err = ssd1306_display_on(dev, false);
     if(err)
     {
         return err;
     }
+    _dev = NULL;
     return 0;
 }
 
@@ -445,22 +337,11 @@ static int sh1106_go_coordinate(const ssd1306_t *dev, uint8_t x, uint8_t y)
         return -EINVAL;
     int err = 0;
     x += 2; /* offset : panel is 128 ; RAM is 132 for sh1106 */
-    if ((err = ssd1306_command(dev, SH1106_SET_PAGE_ADDRESS + y))) /* Set row */
+    if ((err = ssd1306_command(dev, SH1106_SET_PAGE_ADDRESS + y ))) /* Set row */
         return err;
     if ((err = ssd1306_command(dev, SH1106_SET_LOW_COL_ADDR | (x & 0xf)))) /* Set lower column address */
         return err;
     return ssd1306_command(dev, SH1106_SET_HIGH_COL_ADDR | (x >> 4)); /* Set higher column address */
-}
-
-int ssd1306_load_frame_buffer(const ssd1306_t *dev)
-{
-    return _load_frame_buffer(dev, 0, 0,  dev->width-1, dev->height-1);
-}
-
-int ssd1306_clear_screen(const ssd1306_t *dev)
-{
-    memset((void*)_buffer,0,dev->width*dev->height/8);
-    return _load_frame_buffer(dev, 0, 0,  dev->width-1, dev->height-1);
 }
 
 int ssd1306_display_on(const ssd1306_t *dev, bool on)
@@ -718,15 +599,25 @@ int ssd1306_start_scroll_hori_vert(const ssd1306_t *dev, bool way, uint8_t start
 /**********************
  *   STATIC FUNCTIONS
  **********************/
-static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y1,  uint8_t x2, uint8_t y2)
+static void inline _rounder(lv_area_t *a)
 {
-    uint16_t i;
+    /*Make the area bigger in y*/
+    a->y1 = a->y1 & ~(0x7);
+    a->y2 = a->y2 |  (0x7);
+}
+
+static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t* buf, uint8_t x1, uint8_t y1,  uint8_t x2, uint8_t y2)
+{
+    uint8_t i;
     uint16_t j;
     //convert to page
     y1 = y1 >> 3;
     y2 = y2 >> 3;
     //if(y1 != 0) y1/=8;
     //if(y2 != 0) y2/=8;
+
+    uint8_t xlen = x2-x1;
+    uint8_t plen = y2-y1;
 
     if (dev->screen == SSD1306_SCREEN)
     {
@@ -740,18 +631,18 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y
     case SSD1306_PROTO_I2C:
         if (dev->screen == SSD1306_SCREEN)
         {
-            for (j = y1; j <= y2; j++)
+            for (j = 0; j <= plen; j++)
             {
-                for (i = x1; i <= x2 ; ) //column
+                for (i = 0; i <= xlen; ) //column
                 {
                     if((x2-i) >= 15) //(x2-i+1) >= 16
                     {
-                        err_control(i2c_send(dev->i2c_dev, 0x40, &_buffer[j*dev->width+i], 16));
+                        err_control(i2c_send(dev->i2c_dev, 0x40, &buf[j*dev->width+i], 16));
                         i+=16;
                     }
                     else
                     {
-                        err_control(i2c_send(dev->i2c_dev, 0x40, &_buffer[j*dev->width+i], x2-i+1));
+                        err_control(i2c_send(dev->i2c_dev, 0x40, &buf[j*dev->width+i], x2-i+1));
                         break; //Last data for this page
                     }
                 }
@@ -759,19 +650,19 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y
         }
         else
         {
-            for (j = y1; j <= y2; j++)
+            for (j = 0; j <= plen ; j++)
             {
-                err_control(sh1106_go_coordinate(dev, x1, j));
-                for (i = x1; i <= x2 ; ) //column
+                err_control(sh1106_go_coordinate(dev, x1, j+y1));
+                for (i = 0; i <= xlen ; ) //column
                 {
                      if((x2-i) >= 15) //(x2-i+1) >= 16
                     {
-                        err_control(i2c_send(dev->i2c_dev, 0x40, &_buffer[j*dev->width+i], 16));
+                        err_control(i2c_send(dev->i2c_dev, 0x40, &buf[j*dev->width+i], 16));
                         i+=16;
                     }
                     else
                     {
-                        err_control(i2c_send(dev->i2c_dev, 0x40, &_buffer[j*dev->width+i], x2-i+1));
+                        err_control(i2c_send(dev->i2c_dev, 0x40, &buf[j*dev->width+i], x2-i+1));
                         break; //Last data send for this page
                     }
                 }
@@ -783,17 +674,17 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y
     case SSD1306_PROTO_SPI4:
         if (dev->screen == SSD1306_SCREEN)
         {
-            for(j = y1;  j <= y2 ; j++) //page
+            for(j = 0;  j <= plen ; j++) //page
             {
-                err_control(spi4wire_send(dev->spi_dev, 1, &_buffer[j*dev->width+x1], x2-x1, 1));
+                err_control(spi4wire_send(dev->spi_dev, 1, &buf[j*dev->width+x1], xlen, 1));
             }
         }
         else
         {
-            for (j = y1; j <= y2; j++)
+            for (j = 0; j <= plen; j++)
             {
-                err_control(sh1106_go_coordinate(dev, x1, j));
-                err_control(spi4wire_send(dev->spi_dev, 1, &_buffer[j*dev->width + x1], x2-x1, 1));
+                err_control(sh1106_go_coordinate(dev, x1, j+y1));
+                err_control(spi4wire_send(dev->spi_dev, 1, &buf[j*dev->width + x1], xlen, 1));
             }
         }
         break;
@@ -802,22 +693,22 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y
     case SSD1306_PROTO_SPI3:
         if (dev->screen == SSD1306_SCREEN)
         {
-            for(j = y1;  j <= y2 ; j++) //page
+            for(j = 0;  j <= plen ; j++) //page
             {
-                for (i = x1; i <= x2; i++) //column
+                for (i = 0; i <= xlen ; i++) //column
                 {
-                    err_control(spi3wire_send(dev->spi_dev, 1,  &_buffer[j*dev->width+i], 1, 1));
+                    err_control(spi3wire_send(dev->spi_dev, 1,  &buf[j*dev->width+i], 1, 1));
                 }
             }
         }
         else
         {
-            for (j = y1; j <= y2; j++)
+            for (j = 0; j <= plen; j++)
             {
-                err_control(sh1106_go_coordinate(dev, x1, j));
-                for (i = x1; i <= x2; i++) //column
+                err_control(sh1106_go_coordinate(dev, x1, j+y1));
+                for (i = 0; i <= xlen ; i++) //column
                 {
-                    err_control(spi3wire_send(dev->spi_dev, 1,  &_buffer[j*dev->width+i], 1, 1));
+                    err_control(spi3wire_send(dev->spi_dev, 1,  &buf[j*dev->width+i], 1, 1));
                 }
             }
         }
@@ -827,7 +718,6 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t x1, uint8_t y
         debug("Unsupported protocol");
         return -EPROTONOSUPPORT;
     }
-    _flag_redraw = 0;
     return 0;
 }
 

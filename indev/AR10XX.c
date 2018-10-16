@@ -576,6 +576,7 @@ bool ar10xx_input_get_calib(lv_indev_data_t * data)
     //ar10xx_t* dev = (ar10xx_t*)data->user_data;
 #if (AR10XX_USE_IRQ)
     if (!_device->count_irq) //no irq, return false
+    {
         if(_device->p == LV_INDEV_STATE_PR) //Protection if last input read was pressed state
         {
             _device->p = LV_INDEV_STATE_REL;
@@ -584,6 +585,7 @@ bool ar10xx_input_get_calib(lv_indev_data_t * data)
             data->state =  _device->p;
         }
         return false;
+    }
 #endif
 
     /*Get coordinate*/
@@ -627,6 +629,7 @@ bool ar10xx_input_get_raw(lv_indev_data_t * data)
     //ar10xx_t* dev = (ar10xx_t*)data->user_data;
 #if (AR10XX_USE_IRQ)
     if (!_device->count_irq) //no irq, return false
+    {
         if(_device->p == LV_INDEV_STATE_PR) //Protection if last input read was pressed state
         {
             _device->p = LV_INDEV_STATE_REL;
@@ -635,6 +638,7 @@ bool ar10xx_input_get_raw(lv_indev_data_t * data)
             data->state =  _device->p;
         }
         return false;
+    }
 #endif
 
     /*Get coordinate*/

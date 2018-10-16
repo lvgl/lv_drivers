@@ -117,11 +117,16 @@ typedef enum
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
-/**
- * Ask if the screen need be redraw.
- * @return true if the screen need to be updated
+
+/* Custom VDB write to use 1 bit by pixel
+ * @param buf Buffer pointer
+ * @param buf_w Buffer size
+ * @param x X coordinate
+ * @param y Y coordinate
+ * @param color Pixel color
+ * @param opa Pixel opacity
  */
-bool ssd1306_need_redraw(void);
+void ssd1306_vdb_wr(uint8_t * buf, lv_coord_t buf_w, lv_coord_t x, lv_coord_t y, lv_color_t color, lv_opa_t opa);
 
 /* Flush the content of the internal buffer the specific area on the display
  * This function is required only when LV_VDB_SIZE != 0 in lv_conf.h
@@ -132,26 +137,6 @@ bool ssd1306_need_redraw(void);
  * @param color_p Pointer to VDB buffer (color sized)
  */
 void ssd1306_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p);
-
-/* Write a color (called 'fill') to the a specific area on the display
- * This function is required only when LV_VDB_SIZE == 0 in lv_conf.h
- * @param x1 First x point coordinate
- * @param y1 First y point coordinate
- * @param x2 Second x point coordinate
- * @param y2 Second y point coordinate
- * @param color Color to fill
- */
-void ssd1306_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t  color);
-
-/* Write a pixel array (called 'map') to the a specific area on the display
- * This function is required only when LV_VDB_SIZE == 0 in lv_conf.h
- * @param x1 First x point coordinate
- * @param y1 First y point coordinate
- * @param x2 Second x point coordinate
- * @param y2 Second y point coordinate
- * @param color_p Pointer to VDB buffer (color sized)
- */
-void ssd1306_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p);
 
 /**
  * Issue a single command on SSD1306.
@@ -174,20 +159,6 @@ int ssd1306_init(const ssd1306_t *dev);
  * @return Non-zero if error occured
  */
 int ssd1306_deinit(const ssd1306_t *dev);
-
-/**
- * Load local framebuffer into the SSD1306 RAM.
- * @param dev Pointer to device descriptor
- * @return Non-zero if error occured
- */
-int ssd1306_load_frame_buffer(const ssd1306_t *dev);
-
-/**
- * Clear SSD1306 RAM.
- * @param dev Pointer to device descriptor
- * @return Non-zero if error occured
- */
-int ssd1306_clear_screen(const ssd1306_t *dev);
 
 /**
  * Turn display on or off.
