@@ -122,8 +122,8 @@ static const ssd1306_t* _dev;
 #if LV_COLOR_DEPTH != 1 || LV_VDB_PX_BPP != 1
 #error "LV_COLOR_DEPTH and LV_VDB_PX_BPP need to be set to 1"
 #endif
-#if !LV_VDB_SIZE
-#error "LV_VDB_SIZE is needed to use this driver. MAX: HEIGHT*WITDH"
+#if LV_VDB_SIZE < ( 8 * LV_HOR_RES)
+#error "LV_VDB_SIZE with 8*LV_HOR_RES minimum is needed (MAX: LV_HOR_RES*LV_VER_RES)"
 #endif
 /**********************
  *   GLOBAL FUNCTIONS
