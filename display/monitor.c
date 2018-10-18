@@ -296,7 +296,7 @@ static void monitor_sdl_refr_core(void)
         SDL_RenderCopy(renderer, texture, NULL, NULL);
         SDL_RenderPresent(renderer);
     }
-
+#ifndef MONITOR_APPLE 
     SDL_Event event;
     while(SDL_PollEvent(&event)) {
 #if USE_MOUSE != 0
@@ -326,9 +326,11 @@ static void monitor_sdl_refr_core(void)
             }
         }
     }
+#endif /*MONITOR_APPLE*/
 
     /*Sleep some time*/
     SDL_Delay(SDL_REFR_PERIOD);
+
 }
 
-#endif
+#endif /*USE_MONITOR*/
