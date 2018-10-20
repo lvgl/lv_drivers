@@ -615,9 +615,8 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t* buf, uint8_t
     y2 = y2 >> 3;
     //if(y1 != 0) y1/=8;
     //if(y2 != 0) y2/=8;
-
-    uint8_t xlen = x2-x1;
-    uint8_t plen = y2-y1;
+    uint8_t xlen = x2-x1+1;
+    uint8_t plen = y2-y1+1;
 
     if (dev->screen == SSD1306_SCREEN)
     {
@@ -631,18 +630,18 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t* buf, uint8_t
     case SSD1306_PROTO_I2C:
         if (dev->screen == SSD1306_SCREEN)
         {
-            for (j = 0; j <= plen; j++)
+            for (j = 0; j < plen; j++)
             {
-                for (i = 0; i <= xlen; ) //column
+                for (i = 0; i < xlen; ) //column
                 {
                     if((x2-i) >= 15) //(x2-i+1) >= 16
                     {
-                        err_control(i2c_send(dev->i2c_dev, 0x40, &buf[j*dev->width+i], 16));
+                        err_control(i2c_send(dev->i2c_dev, 0x40, &buf[j*xlen+i], 16));
                         i+=16;
                     }
                     else
                     {
-                        err_control(i2c_send(dev->i2c_dev, 0x40, &buf[j*dev->width+i], x2-i+1));
+                        err_control(i2c_send(dev->i2c_dev, 0x40, &buf[j*xlen+i], x2-i+1));
                         break; //Last data for this page
                     }
                 }
@@ -650,19 +649,19 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t* buf, uint8_t
         }
         else
         {
-            for (j = 0; j <= plen ; j++)
+            for (j = 0; j < plen ; j++)
             {
                 err_control(sh1106_go_coordinate(dev, x1, j+y1));
-                for (i = 0; i <= xlen ; ) //column
+                for (i = 0; i < xlen ; ) //column
                 {
                      if((x2-i) >= 15) //(x2-i+1) >= 16
                     {
-                        err_control(i2c_send(dev->i2c_dev, 0x40, &buf[j*dev->width+i], 16));
+                        err_control(i2c_send(dev->i2c_dev, 0x40, &buf[j*xlen+i], 16));
                         i+=16;
                     }
                     else
                     {
-                        err_control(i2c_send(dev->i2c_dev, 0x40, &buf[j*dev->width+i], x2-i+1));
+                        err_control(i2c_send(dev->i2c_dev, 0x40, &buf[j*xlen+i], x2-i+1));
                         break; //Last data send for this page
                     }
                 }
@@ -674,17 +673,17 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t* buf, uint8_t
     case SSD1306_PROTO_SPI4:
         if (dev->screen == SSD1306_SCREEN)
         {
-            for(j = 0;  j <= plen ; j++) //page
+            for(j = 0;  j < plen ; j++) //page
             {
-                err_control(spi4wire_send(dev->spi_dev, 1, &buf[j*dev->width+x1], xlen, 1));
+                err_control(spi4wire_send(dev->spi_dev, 1, &buf[j*xlen+x1], xlen, 1));
             }
         }
         else
         {
-            for (j = 0; j <= plen; j++)
+            for (j = 0; j < plen; j++)
             {
                 err_control(sh1106_go_coordinate(dev, x1, j+y1));
-                err_control(spi4wire_send(dev->spi_dev, 1, &buf[j*dev->width + x1], xlen, 1));
+                err_control(spi4wire_send(dev->spi_dev, 1, &buf[j*xlen + x1], xlen, 1));
             }
         }
         break;
@@ -693,22 +692,22 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t* buf, uint8_t
     case SSD1306_PROTO_SPI3:
         if (dev->screen == SSD1306_SCREEN)
         {
-            for(j = 0;  j <= plen ; j++) //page
+            for(j = 0;  j < plen ; j++) //page
             {
-                for (i = 0; i <= xlen ; i++) //column
+                for (i = 0; i < xlen ; i++) //column
                 {
-                    err_control(spi3wire_send(dev->spi_dev, 1,  &buf[j*dev->width+i], 1, 1));
+                    err_control(spi3wire_send(dev->spi_dev, 1,  &buf[j*xlen+i], 1, 1));
                 }
             }
         }
         else
         {
-            for (j = 0; j <= plen; j++)
+            for (j = 0; j < plen; j++)
             {
                 err_control(sh1106_go_coordinate(dev, x1, j+y1));
-                for (i = 0; i <= xlen ; i++) //column
+                for (i = 0; i < xlen ; i++) //column
                 {
-                    err_control(spi3wire_send(dev->spi_dev, 1,  &buf[j*dev->width+i], 1, 1));
+                    err_control(spi3wire_send(dev->spi_dev, 1,  &buf[j*xlen+i], 1, 1));
                 }
             }
         }
