@@ -88,6 +88,11 @@ void fbdev_init(void)
 
 }
 
+void fbdev_exit(void)
+{
+    close(fbfd);
+}
+
 /**
  * Flush a buffer to the marked area
  * @param x1 left coordinate
