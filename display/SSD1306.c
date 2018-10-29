@@ -634,14 +634,14 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t* buf, uint8_t
             {
                 for (i = 0; i < xlen; ) //column
                 {
-                    if((x2-i) >= 15) //(x2-i+1) >= 16
+                    if(xlen >= (i+16))
                     {
                         err_control(i2c_send(dev->i2c_dev, 0x40, &buf[j*xlen+i], 16));
                         i+=16;
                     }
                     else
                     {
-                        err_control(i2c_send(dev->i2c_dev, 0x40, &buf[j*xlen+i], x2-i+1));
+                        err_control(i2c_send(dev->i2c_dev, 0x40, &buf[j*xlen+i], xlen-i));
                         break; //Last data for this page
                     }
                 }
@@ -654,14 +654,14 @@ static int inline _load_frame_buffer(const ssd1306_t *dev, uint8_t* buf, uint8_t
                 err_control(sh1106_go_coordinate(dev, x1, j+y1));
                 for (i = 0; i < xlen ; ) //column
                 {
-                     if((x2-i) >= 15) //(x2-i+1) >= 16
+                    if(xlen >= (i+16))
                     {
                         err_control(i2c_send(dev->i2c_dev, 0x40, &buf[j*xlen+i], 16));
                         i+=16;
                     }
                     else
                     {
-                        err_control(i2c_send(dev->i2c_dev, 0x40, &buf[j*xlen+i], x2-i+1));
+                        err_control(i2c_send(dev->i2c_dev, 0x40, &buf[j*xlen+i], xlen-i));
                         break; //Last data send for this page
                     }
                 }
