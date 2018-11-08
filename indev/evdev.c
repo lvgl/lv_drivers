@@ -90,20 +90,24 @@ bool evdev_read(lv_indev_data_t * data)
         }
     }
 
-
-    if(evdev_root_x < 0)
-        evdev_root_x = 0;
-    if(evdev_root_y < 0)
-        evdev_root_y = 0;
-    if(evdev_root_x >= LV_HOR_RES)
-        evdev_root_x = LV_HOR_RES - 1;
-    if(evdev_root_y >= LV_VER_RES)
-        evdev_root_y = LV_VER_RES - 1;
-
     /*Store the collected data*/
+#if SCALE_EVDEV
+    data->point.x = (evdev_root_x * LV_HOR_RES) / SCALE_EVDEV_HOR_RES;
+    data->point.y = (evdev_root_y * LV_VER_RES) / SCALE_EVDEV_VER_RES;
+#else
     data->point.x = evdev_root_x;
     data->point.y = evdev_root_y;
+#endif
     data->state = evdev_button;
+
+    if(data->point.x < 0)
+      data->point.x = 0;
+    if(data->point.y < 0)
+      data->point.y = 0;
+    if(data->point.x >= LV_HOR_RES)
+      data->point.x = LV_HOR_RES - 1;
+    if(data->point.y >= LV_VER_RES)
+      data->point.y = LV_VER_RES - 1;
 
     return false;
 }
