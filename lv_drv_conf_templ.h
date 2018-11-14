@@ -207,20 +207,22 @@
 #define USE_EVDEV    0
 #if USE_EVDEV
 #define EVDEV_NAME   "/dev/input/event0"        /*You can use the "evtest" Linux tool to get the list of devices and test them*/
-#define EVDEV_SWAP_AXES 1                       /*Swap the x and y axes of the touchscreen*/
-#define EVDEV_SCALE  0                          /* Scale input, e.g. if touchscreen resolution does not match display resolution */
+#define EVDEV_SWAP_AXES         0               /*Swap the x and y axes of the touchscreen*/
+
+#define EVDEV_SCALE             0               /* Scale input, e.g. if touchscreen resolution does not match display resolution */
 #if EVDEV_SCALE
 #define EVDEV_SCALE_HOR_RES     (4096)          /* Horizontal resolution of touchscreen */
 #define EVDEV_SCALE_VER_RES     (4096)          /* Vertical resolution of touchscreen */
-#endif
-#define EVDEV_CALIBRATE 1                       /*Scale and offset the touchscreen coordinates by using maximum and minimum values for each axis*/
+#endif  /*EVDEV_SCALE*/
+
+#define EVDEV_CALIBRATE         0               /*Scale and offset the touchscreen coordinates by using maximum and minimum values for each axis*/
 #if EVDEV_CALIBRATE
-#define EVDEV_HOR_MIN 3800                         /*If EVDEV_XXX_MIN > EVDEV_XXX_MAX the XXX axis is automatically inverted*/
-#define EVDEV_HOR_MAX 200
-#define EVDEV_VER_MIN 200
-#define EVDEV_VER_MAX 3800
-#endif
-#endif
+#define EVDEV_HOR_MIN   3800                    /*If EVDEV_XXX_MIN > EVDEV_XXX_MAX the XXX axis is automatically inverted*/
+#define EVDEV_HOR_MAX   200
+#define EVDEV_VER_MIN   200
+#define EVDEV_VER_MAX   3800
+#endif  /*EVDEV_SCALE*/
+#endif  /*USE_EVDEV*/
 
 /*-------------------------------
  *   Keyboard of a PC (using SDL)
