@@ -25,6 +25,7 @@
 /**********************
  *  STATIC PROTOTYPES
  **********************/
+int map(int x, int in_min, int in_max, int out_min, int out_max);
 
 /**********************
  *  STATIC VARIABLES
@@ -72,14 +73,30 @@ bool evdev_read(lv_indev_data_t * data)
     while(read(evdev_fd, &in, sizeof(struct input_event)) > 0) {
         if(in.type == EV_REL) {
             if(in.code == REL_X)
-                evdev_root_x += in.value;
+				#if EVDEV_SWAP_AXES
+					evdev_root_y += in.value;
+				#else
+					evdev_root_x += in.value;
+				#endif
             else if(in.code == REL_Y)
-                evdev_root_y += in.value;
+				#if EVDEV_SWAP_AXES
+					evdev_root_x += in.value;
+				#else
+					evdev_root_y += in.value;
+				#endif
         } else if(in.type == EV_ABS) {
             if(in.code == ABS_X)
-                evdev_root_x = in.value;
+				#if EVDEV_SWAP_AXES
+					evdev_root_y = in.value;
+				#else
+					evdev_root_x = in.value;
+				#endif
             else if(in.code == ABS_Y)
-                evdev_root_y = in.value;
+				#if EVDEV_SWAP_AXES
+					evdev_root_x = in.value;
+				#else
+					evdev_root_y = in.value;
+				#endif
         } else if(in.type == EV_KEY) {
             if(in.code == BTN_MOUSE || in.code == BTN_TOUCH) {
                 if(in.value == 0)
@@ -91,13 +108,20 @@ bool evdev_read(lv_indev_data_t * data)
     }
 
     /*Store the collected data*/
-#if SCALE_EVDEV
-    data->point.x = (evdev_root_x * LV_HOR_RES) / SCALE_EVDEV_HOR_RES;
-    data->point.y = (evdev_root_y * LV_VER_RES) / SCALE_EVDEV_VER_RES;
+
+#if EVDEV_SCALE
+    data->point.x = map(evdev_root_x, 0, EVDEV_SCALE_HOR_RES, 0, LV_HOR_RES);
+    data->point.y = map(evdev_root_y, 0, EVDEV_SCALE_VER_RES, 0, LV_VER_RES);
+#else
+#if EVDEV_CALIBRATE
+	data->point.x = map(evdev_root_x, EVDEV_HOR_MIN, EVDEV_HOR_MAX, 0, LV_HOR_RES);
+	data->point.y = map(evdev_root_y, EVDEV_VER_MIN, EVDEV_VER_MAX, 0, LV_VER_RES);
 #else
     data->point.x = evdev_root_x;
     data->point.y = evdev_root_y;
 #endif
+#endif
+
     data->state = evdev_button;
 
     if(data->point.x < 0)
@@ -115,5 +139,9 @@ bool evdev_read(lv_indev_data_t * data)
 /**********************
  *   STATIC FUNCTIONS
  **********************/
+int map(int x, int in_min, int in_max, int out_min, int out_max)
+{
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
 
 #endif
