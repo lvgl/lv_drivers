@@ -73,26 +73,26 @@ bool evdev_read(lv_indev_data_t * data)
     while(read(evdev_fd, &in, sizeof(struct input_event)) > 0) {
         if(in.type == EV_REL) {
             if(in.code == REL_X)
-				#if SWAP_AXES_EVDEV
+				#if EVDEV_SWAP_AXES
 					evdev_root_y += in.value;
 				#else
 					evdev_root_x += in.value;
 				#endif
             else if(in.code == REL_Y)
-				#if SWAP_AXES_EVDEV
+				#if EVDEV_SWAP_AXES
 					evdev_root_x += in.value;
 				#else
 					evdev_root_y += in.value;
 				#endif
         } else if(in.type == EV_ABS) {
             if(in.code == ABS_X)
-				#if SWAP_AXES_EVDEV
+				#if EVDEV_SWAP_AXES
 					evdev_root_y = in.value;
 				#else
 					evdev_root_x = in.value;
 				#endif
             else if(in.code == ABS_Y)
-				#if SWAP_AXES_EVDEV
+				#if EVDEV_SWAP_AXES
 					evdev_root_x = in.value;
 				#else
 					evdev_root_y = in.value;
@@ -113,9 +113,9 @@ bool evdev_read(lv_indev_data_t * data)
     data->point.x = map(evdev_root_x, 0, SCALE_EVDEV_HOR_RES, 0, LV_HOR_RES);
     data->point.y = map(evdev_root_y, 0, SCALE_EVDEV_VER_RES, 0, LV_VER_RES);
 #else
-#if CALIBRATE_EVDEV
-	data->point.x = map(evdev_root_x, LV_HOR_MIN, LV_HOR_MAX, 0, LV_HOR_RES);
-	data->point.y = map(evdev_root_y, LV_VER_MIN, LV_VER_MAX, 0, LV_VER_RES);
+#if EVDEV_CALIBRATE
+	data->point.x = map(evdev_root_x, EVDEV_HOR_MIN, EVDEV_HOR_MAX, 0, LV_HOR_RES);
+	data->point.y = map(evdev_root_y, EVDEV_VER_MIN, EVDEV_VER_MAX, 0, LV_VER_RES);
 #else
     data->point.x = evdev_root_x;
     data->point.y = evdev_root_y;
