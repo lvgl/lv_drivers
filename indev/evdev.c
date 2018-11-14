@@ -109,9 +109,9 @@ bool evdev_read(lv_indev_data_t * data)
 
     /*Store the collected data*/
 
-#if SCALE_EVDEV
-    data->point.x = map(evdev_root_x, 0, SCALE_EVDEV_HOR_RES, 0, LV_HOR_RES);
-    data->point.y = map(evdev_root_y, 0, SCALE_EVDEV_VER_RES, 0, LV_VER_RES);
+#if EVDEV_SCALE
+    data->point.x = map(evdev_root_x, 0, EVDEV_SCALE_HOR_RES, 0, LV_HOR_RES);
+    data->point.y = map(evdev_root_y, 0, EVDEV_SCALE_VER_RES, 0, LV_VER_RES);
 #else
 #if EVDEV_CALIBRATE
 	data->point.x = map(evdev_root_x, EVDEV_HOR_MIN, EVDEV_HOR_MAX, 0, LV_HOR_RES);
