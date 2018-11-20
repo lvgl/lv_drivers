@@ -107,7 +107,7 @@ void monitor_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
     }
 
     int32_t y;
-#if LV_COLOR_DEPTH != 24 || LV_COLOR_DEPTH != 32    /*32 is valid but support 24 for backward compatibility too*/
+#if LV_COLOR_DEPTH != 24 && LV_COLOR_DEPTH != 32    /*32 is valid but support 24 for backward compatibility too*/
     int32_t x;
     for(y = y1; y <= y2; y++) {
         for(x = x1; x <= x2; x++) {
