@@ -1,5 +1,5 @@
 /**
- * @file encoder.h
+ * @file mousewheel.h
  *
  */
 
