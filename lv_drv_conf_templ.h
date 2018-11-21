@@ -82,7 +82,9 @@
 /*-------------------
  *  Monitor of PC
  *-------------------*/
+#ifndef USE_MONITOR
 #define USE_MONITOR         0
+#endif
 #if USE_MONITOR
 #define MONITOR_HOR_RES     LV_HOR_RES
 #define MONITOR_VER_RES     LV_VER_RES
@@ -94,7 +96,9 @@
 /*----------------
  *    SSD1963
  *--------------*/
+#ifndef USE_SSD1963
 #define USE_SSD1963         0
+#endif
 #if USE_SSD1963
 #define SSD1963_HOR_RES     LV_HOR_RES
 #define SSD1963_VER_RES     LV_VER_RES
@@ -115,8 +119,10 @@
 /*----------------
  *    R61581
  *--------------*/
+#ifndef USE_R61581
 #define USE_R61581          0
-#if USE_R61581 != 0
+#endif
+#if USE_R61581
 #define R61581_HOR_RES      LV_HOR_RES
 #define R61581_VER_RES      LV_VER_RES
 #define R61581_HSPL         0       /*HSYNC signal polarity*/
@@ -136,16 +142,20 @@
 /*------------------------------
  *  ST7565 (Monochrome, low res.)
  *-----------------------------*/
+#ifndef USE_ST7565
 #define USE_ST7565          0
-#if USE_ST7565 != 0
+#endif
+#if USE_ST7565
 /*No settings*/
 #endif  /*USE_ST7565*/
 
 /*-----------------------------------------
  *  Linux frame buffer device (/dev/fbx)
  *-----------------------------------------*/
+#ifndef USE_FBDEV
 #define USE_FBDEV           0
-#if USE_FBDEV != 0
+#endif
+#if USE_FBDEV
 #define FBDEV_PATH          "/dev/fb0"
 #endif
 
@@ -156,8 +166,10 @@
 /*--------------
  *    XPT2046
  *--------------*/
+#ifndef USE_XPT2046
 #define USE_XPT2046         0
-#if USE_XPT2046 != 0
+#endif
+#if USE_XPT2046
 #define XPT2046_HOR_RES     480
 #define XPT2046_VER_RES     320
 #define XPT2046_X_MIN       200
@@ -171,7 +183,9 @@
 /*-----------------
  *    FT5406EE8
  *-----------------*/
+#ifndef USE_FT5406EE8
 #define USE_FT5406EE8       0
+#endif
 #if USE_FT5406EE8
 #define FT5406EE8_I2C_ADR   0x38                  /*7 bit address*/
 #endif
@@ -179,8 +193,10 @@
 /*---------------
  *  AD TOUCH
  *--------------*/
-#define USE_AD_TOUCH   0
-#if USE_AD_TOUCH != 0
+#ifndef USE_AD_TOUCH
+#define USE_AD_TOUCH        0
+#endif
+#if USE_AD_TOUCH
 /*No settings*/
 #endif
 
@@ -188,7 +204,9 @@
 /*---------------------------------------
  * Mouse or touchpad on PC (using SDL)
  *-------------------------------------*/
-#define USE_MOUSE       0
+#ifndef USE_MOUSE
+#define USE_MOUSE           0
+#endif
 #if USE_MOUSE
 /*No settings*/
 #endif
@@ -196,7 +214,9 @@
 /*-------------------------------------------
  * Mousewheel as encoder on PC (using SDL)
  *------------------------------------------*/
-#define USE_MOUSEWHEEL     1
+#ifndef USE_MOUSEWHEEL
+#define USE_MOUSEWHEEL      0
+#endif
 #if USE_MOUSEWHEEL
 /*No settings*/
 #endif
@@ -204,7 +224,9 @@
 /*-------------------------------------------------
  * Mouse or touchpad as evdev interface (for Linux based systems)
  *------------------------------------------------*/
-#define USE_EVDEV    0
+#ifndef USE_EVDEV
+#define USE_EVDEV           0
+#endif
 #if USE_EVDEV
 #define EVDEV_NAME   "/dev/input/event0"        /*You can use the "evtest" Linux tool to get the list of devices and test them*/
 #define EVDEV_SWAP_AXES         0               /*Swap the x and y axes of the touchscreen*/
@@ -227,7 +249,9 @@
 /*-------------------------------
  *   Keyboard of a PC (using SDL)
  *------------------------------*/
-#define USE_KEYBOARD    0
+#ifndef USE_KEYBOARD
+#define USE_KEYBOARD        0
+#endif
 #if USE_KEYBOARD
 /*No settings*/
 #endif
