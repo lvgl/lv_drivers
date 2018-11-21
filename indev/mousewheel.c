@@ -1,13 +1,13 @@
 /**
- * @file encoder.c
+ * @file mousewheel.c
  *
  */
 
 /*********************
  *      INCLUDES
  *********************/
-#include "encoder.h"
-#if USE_ENCODER
+#include "mousewheel.h"
+#if USE_MOUSEWHEEL
 
 #include "lvgl/lv_core/lv_group.h"
 /*********************
@@ -37,9 +37,9 @@ static lv_indev_state_t state = LV_INDEV_STATE_REL;
  **********************/
 
 /**
- * Initialize the encoder
+ * Initialize the mousewheel
  */
-void encoder_init(void)
+void mousewheel_init(void)
 {
     /*Nothing to init*/
 }
@@ -49,7 +49,7 @@ void encoder_init(void)
  * @param data store the read data here
  * @return false: all ticks and button state are handled
  */
-bool encoder_read(lv_indev_data_t * data)
+bool mousewheel_read(lv_indev_data_t * data)
 {
     data->state = state;
     data->enc_diff = enc_diff;
@@ -62,7 +62,7 @@ bool encoder_read(lv_indev_data_t * data)
  * It is called periodically from the SDL thread to check mouse wheel state
  * @param event describes the event
  */
-void encoder_handler(SDL_Event * event)
+void mousewheel_handler(SDL_Event * event)
 {
     switch(event->type) {
         case SDL_MOUSEWHEEL:

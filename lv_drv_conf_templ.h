@@ -196,8 +196,8 @@
 /*-------------------------------------------
  * Mousewheel as encoder on PC (using SDL)
  *------------------------------------------*/
-#define USE_ENCODER     1
-#if USE_ENCODER
+#define USE_MOUSEWHEEL     1
+#if USE_MOUSEWHEEL
 /*No settings*/
 #endif
 

@@ -3,8 +3,8 @@
  *
  */
 
-#ifndef ENCODER_H
-#define ENCODER_H
+#ifndef MOUSEWHEEL_H
+#define MOUSEWHEEL_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,7 +19,7 @@ extern "C" {
 #include "../../lv_drv_conf.h"
 #endif
 
-#if USE_ENCODER
+#if USE_MOUSEWHEEL
 
 #include <stdbool.h>
 #include "lvgl/lv_hal/lv_hal_indev.h"
@@ -45,29 +45,29 @@ extern "C" {
 /**
  * Initialize the encoder
  */
-void encoder_init(void);
+void mousewheel_init(void);
 
 /**
  * Get the mouse wheel position change.
  * @param data store the read data here
  * @return false: all ticks and button state are handled
  */
-bool encoder_read(lv_indev_data_t * data);
+bool mousewheel_read(lv_indev_data_t * data);
 
 /**
  * It is called periodically from the SDL thread to check a key is pressed/released
  * @param event describes the event
  */
-void encoder_handler(SDL_Event *event);
+void mousewheel_handler(SDL_Event *event);
 
 /**********************
  *      MACROS
  **********************/
 
-#endif /*USE_ENCODER*/
+#endif /*USE_MOUSEWHEEL*/
 
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
 
-#endif /*ENCODER_H*/
+#endif /*MOUSEWHEEL_H*/

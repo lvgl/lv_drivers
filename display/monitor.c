@@ -20,7 +20,7 @@
 #include "lvgl/lv_core/lv_vdb.h"
 #include "../indev/mouse.h"
 #include "../indev/keyboard.h"
-#include "../indev/encoder.h"
+#include "../indev/mousewheel.h"
 
 /*********************
  *      DEFINES
@@ -303,8 +303,8 @@ static void monitor_sdl_refr_core(void)
         mouse_handler(&event);
 #endif
 
-#if USE_ENCODER != 0
-        encoder_handler(&event);
+#if USE_MOUSEWHEEL != 0
+        mousewheel_handler(&event);
 #endif
 
 #if USE_KEYBOARD
