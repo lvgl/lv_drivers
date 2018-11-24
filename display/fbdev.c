@@ -76,7 +76,7 @@ void fbdev_init(void)
     printf("%dx%d, %dbpp\n", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);
 
     // Figure out the size of the screen in bytes
-    screensize = vinfo.xres * vinfo.yres * vinfo.bits_per_pixel / 8;
+    screensize =  finfo.line_length * vinfo.yres;
 
     // Map the device to memory
     fbp = (char *)mmap(0, screensize, PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, 0);
@@ -129,7 +129,7 @@ void fbdev_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
         int32_t y;
         for(y = act_y1; y <= act_y2; y++) {
             for(x = act_x1; x <= act_x2; x++) {
-                location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * vinfo.xres;
+                location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * finfo.line_length / 4;
                 fbp32[location] = color_p->full;
                 color_p++;
             }
@@ -144,7 +144,7 @@ void fbdev_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
         int32_t y;
         for(y = act_y1; y <= act_y2; y++) {
             for(x = act_x1; x <= act_x2; x++) {
-                location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * vinfo.xres;
+                location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * finfo.line_length / 2;
                 fbp16[location] = color_p->full;
                 color_p++;
             }
@@ -159,7 +159,7 @@ void fbdev_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
         int32_t y;
         for(y = act_y1; y <= act_y2; y++) {
             for(x = act_x1; x <= act_x2; x++) {
-                location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * vinfo.xres;
+                location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * finfo.line_length;
                 fbp8[location] = color_p->full;
                 color_p++;
             }
