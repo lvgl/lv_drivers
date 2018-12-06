@@ -42,6 +42,13 @@ extern "C" {
  */
 void evdev_init(void);
 /**
+ * reconfigure the device file for evdev
+ * @param dev_name set the evdev device filename
+ * @return true: the device file set complete
+ *         false: the device file doesn't exist current system
+ */
+bool evdev_set_file(char* dev_name);
+/**
  * Get the current position and state of the evdev
  * @param data store the evdev data here
  * @return false: because the points are not buffered, so no more data to be read

@@ -60,7 +60,32 @@ void evdev_init(void)
     evdev_root_y = 0;
     evdev_button = LV_INDEV_STATE_REL;
 }
+/**
+ * reconfigure the device file for evdev
+ * @param dev_name set the evdev device filename
+ * @return true: the device file set complete
+ *         false: the device file doesn't exist current system
+ */
+bool evdev_set_file(char* dev_name)
+{ 
+     if(evdev_fd != -1) {
+        close(evdev_fd);
+     }
+     evdev_fd = open(dev_name, O_RDWR | O_NOCTTY | O_NDELAY);
 
+     if(evdev_fd == -1) {
+        perror("unable open evdev interface:");
+        return false;
+     }
+
+     fcntl(evdev_fd, F_SETFL, O_ASYNC | O_NONBLOCK);
+
+     evdev_root_x = 0;
+     evdev_root_y = 0;
+     evdev_button = LV_INDEV_STATE_REL;
+
+     return true;
+}
 /**
  * Get the current position and state of the evdev
  * @param data store the evdev data here
