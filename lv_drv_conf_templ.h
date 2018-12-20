@@ -82,11 +82,13 @@
 /*-------------------
  *  Monitor of PC
  *-------------------*/
+#ifndef USE_MONITOR
 #define USE_MONITOR         0
+#endif
 #if USE_MONITOR
 #define MONITOR_HOR_RES     LV_HOR_RES
 #define MONITOR_VER_RES     LV_VER_RES
-#define MONITOR_ZOOM        2                       /* Scale window by this factor (useful when simulating small screens) */
+#define MONITOR_ZOOM        1                       /* Scale window by this factor (useful when simulating small screens) */
 #define MONITOR_SDL_INCLUDE_PATH    <SDL2/SDL.h>    /*Eclipse: <SDL2/SDL.h>    Visual Studio: <SDL.h>*/
 #define MONITOR_VIRTUAL_MACHINE 0                   /*Different rendering should be used if running in a Virtual machine*/
 #endif
@@ -94,7 +96,9 @@
 /*----------------
  *    SSD1963
  *--------------*/
+#ifndef USE_SSD1963
 #define USE_SSD1963         0
+#endif
 #if USE_SSD1963
 #define SSD1963_HOR_RES     LV_HOR_RES
 #define SSD1963_VER_RES     LV_VER_RES
@@ -115,8 +119,10 @@
 /*----------------
  *    R61581
  *--------------*/
+#ifndef USE_R61581
 #define USE_R61581          0
-#if USE_R61581 != 0
+#endif
+#if USE_R61581
 #define R61581_HOR_RES      LV_HOR_RES
 #define R61581_VER_RES      LV_VER_RES
 #define R61581_HSPL         0       /*HSYNC signal polarity*/
@@ -136,16 +142,20 @@
 /*------------------------------
  *  ST7565 (Monochrome, low res.)
  *-----------------------------*/
+#ifndef USE_ST7565
 #define USE_ST7565          0
-#if USE_ST7565 != 0
+#endif
+#if USE_ST7565
 /*No settings*/
 #endif  /*USE_ST7565*/
 
 /*-----------------------------------------
  *  Linux frame buffer device (/dev/fbx)
  *-----------------------------------------*/
+#ifndef USE_FBDEV
 #define USE_FBDEV           0
-#if USE_FBDEV != 0
+#endif
+#if USE_FBDEV
 #define FBDEV_PATH          "/dev/fb0"
 #endif
 
@@ -156,8 +166,10 @@
 /*--------------
  *    XPT2046
  *--------------*/
+#ifndef USE_XPT2046
 #define USE_XPT2046         0
-#if USE_XPT2046 != 0
+#endif
+#if USE_XPT2046
 #define XPT2046_HOR_RES     480
 #define XPT2046_VER_RES     320
 #define XPT2046_X_MIN       200
@@ -171,7 +183,9 @@
 /*-----------------
  *    FT5406EE8
  *-----------------*/
+#ifndef USE_FT5406EE8
 #define USE_FT5406EE8       0
+#endif
 #if USE_FT5406EE8
 #define FT5406EE8_I2C_ADR   0x38                  /*7 bit address*/
 #endif
@@ -179,8 +193,10 @@
 /*---------------
  *  AD TOUCH
  *--------------*/
-#define USE_AD_TOUCH   0
-#if USE_AD_TOUCH != 0
+#ifndef USE_AD_TOUCH
+#define USE_AD_TOUCH        0
+#endif
+#if USE_AD_TOUCH
 /*No settings*/
 #endif
 
@@ -188,7 +204,9 @@
 /*---------------------------------------
  * Mouse or touchpad on PC (using SDL)
  *-------------------------------------*/
-#define USE_MOUSE       0
+#ifndef USE_MOUSE
+#define USE_MOUSE           0
+#endif
 #if USE_MOUSE
 /*No settings*/
 #endif
@@ -196,23 +214,44 @@
 /*-------------------------------------------
  * Mousewheel as encoder on PC (using SDL)
  *------------------------------------------*/
-#define USE_ENCODER     1
-#if USE_ENCODER
+#ifndef USE_MOUSEWHEEL
+#define USE_MOUSEWHEEL      0
+#endif
+#if USE_MOUSEWHEEL
 /*No settings*/
 #endif
 
 /*-------------------------------------------------
  * Mouse or touchpad as evdev interface (for Linux based systems)
  *------------------------------------------------*/
-#define USE_EVDEV    0
+#ifndef USE_EVDEV
+#define USE_EVDEV           0
+#endif
 #if USE_EVDEV
 #define EVDEV_NAME   "/dev/input/event0"        /*You can use the "evtest" Linux tool to get the list of devices and test them*/
-#endif
+#define EVDEV_SWAP_AXES         0               /*Swap the x and y axes of the touchscreen*/
+
+#define EVDEV_SCALE             0               /* Scale input, e.g. if touchscreen resolution does not match display resolution */
+#if EVDEV_SCALE
+#define EVDEV_SCALE_HOR_RES     (4096)          /* Horizontal resolution of touchscreen */
+#define EVDEV_SCALE_VER_RES     (4096)          /* Vertical resolution of touchscreen */
+#endif  /*EVDEV_SCALE*/
+
+#define EVDEV_CALIBRATE         0               /*Scale and offset the touchscreen coordinates by using maximum and minimum values for each axis*/
+#if EVDEV_CALIBRATE
+#define EVDEV_HOR_MIN   3800                    /*If EVDEV_XXX_MIN > EVDEV_XXX_MAX the XXX axis is automatically inverted*/
+#define EVDEV_HOR_MAX   200
+#define EVDEV_VER_MIN   200
+#define EVDEV_VER_MAX   3800
+#endif  /*EVDEV_SCALE*/
+#endif  /*USE_EVDEV*/
 
 /*-------------------------------
  *   Keyboard of a PC (using SDL)
  *------------------------------*/
-#define USE_KEYBOARD    0
+#ifndef USE_KEYBOARD
+#define USE_KEYBOARD        0
+#endif
 #if USE_KEYBOARD
 /*No settings*/
 #endif

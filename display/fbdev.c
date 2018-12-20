@@ -76,7 +76,7 @@ void fbdev_init(void)
     printf("%dx%d, %dbpp\n", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);
 
     // Figure out the size of the screen in bytes
-    screensize = vinfo.xres * vinfo.yres * vinfo.bits_per_pixel / 8;
+    screensize =  finfo.line_length * vinfo.yres;
 
     // Map the device to memory
     fbp = (char *)mmap(0, screensize, PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, 0);
@@ -86,6 +86,11 @@ void fbdev_init(void)
     }
     printf("The framebuffer device was mapped to memory successfully.\n");
 
+}
+
+void fbdev_exit(void)
+{
+    close(fbfd);
 }
 
 /**
@@ -114,6 +119,8 @@ void fbdev_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
     int32_t act_y2 = y2 > (int32_t)vinfo.yres - 1 ? (int32_t)vinfo.yres - 1 : y2;
 
     long int location = 0;
+    long int byte_location = 0;
+    unsigned char bit_location = 0;
 
     /*32 or 24 bit per pixel*/
     if(vinfo.bits_per_pixel == 32 || vinfo.bits_per_pixel == 24) {
@@ -122,7 +129,7 @@ void fbdev_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
         int32_t y;
         for(y = act_y1; y <= act_y2; y++) {
             for(x = act_x1; x <= act_x2; x++) {
-                location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * vinfo.xres;
+                location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * finfo.line_length / 4;
                 fbp32[location] = color_p->full;
                 color_p++;
             }
@@ -137,7 +144,7 @@ void fbdev_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
         int32_t y;
         for(y = act_y1; y <= act_y2; y++) {
             for(x = act_x1; x <= act_x2; x++) {
-                location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * vinfo.xres;
+                location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * finfo.line_length / 2;
                 fbp16[location] = color_p->full;
                 color_p++;
             }
@@ -152,8 +159,26 @@ void fbdev_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_
         int32_t y;
         for(y = act_y1; y <= act_y2; y++) {
             for(x = act_x1; x <= act_x2; x++) {
-                location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * vinfo.xres;
+                location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * finfo.line_length;
                 fbp8[location] = color_p->full;
+                color_p++;
+            }
+
+            color_p += x2 - act_x2;
+        }
+    }
+    /*1 bit per pixel*/
+    else if(vinfo.bits_per_pixel == 1) {
+        uint8_t * fbp8 = (uint8_t *)fbp;
+        int32_t x;
+        int32_t y;
+        for(y = act_y1; y <= act_y2; y++) {
+            for(x = act_x1; x <= act_x2; x++) {
+                location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * vinfo.xres;
+                byte_location = location / 8; /* find the byte we need to change */
+                bit_location = location % 8; /* inside the byte found, find the bit we need to change */
+                fbp8[byte_location] &= ~(((uint8_t)(1)) << bit_location);
+                fbp8[byte_location] |= ((uint8_t)(color_p->full)) << bit_location;
                 color_p++;
             }
 
@@ -197,6 +222,8 @@ void fbdev_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t color
     int32_t y;
 
     long int location = 0;
+    long int byte_location = 0;
+    unsigned char bit_location = 0;
 
     /*32 or 24 bit per pixel*/
     if(vinfo.bits_per_pixel == 32 || vinfo.bits_per_pixel == 24) {
@@ -221,6 +248,19 @@ void fbdev_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t color
             for(y = act_y1; y <= act_y2; y++) {
                 location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * vinfo.xres;
                 fbp8[location] = color.full;
+            }
+        }
+    }
+    /*1 bit per pixel*/
+    else if(vinfo.bits_per_pixel == 1) {
+        uint8_t * fbp8 = (uint8_t *)fbp;
+        for(y = act_y1; y <= act_y2; y++) {
+            for(x = act_x1; x <= act_x2; x++) {
+                location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * vinfo.xres;
+                byte_location = location / 8; /* find the byte we need to change */
+                bit_location = location % 8; /* inside the byte found, find the bit we need to change */
+                fbp8[byte_location] &= ~(((uint8_t)(1)) << bit_location);
+                fbp8[byte_location] |= ((uint8_t)(color.full)) << bit_location;
             }
         }
     } else {
@@ -258,6 +298,8 @@ void fbdev_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t 
     int32_t act_y2 = y2 > (int32_t)vinfo.yres - 1 ? (int32_t)vinfo.yres - 1 : y2;
 
     long int location = 0;
+    long int byte_location = 0;
+    unsigned char bit_location = 0;
 
     /*32 or 24 bit per pixel*/
     if(vinfo.bits_per_pixel == 32 || vinfo.bits_per_pixel == 24) {
@@ -298,6 +340,24 @@ void fbdev_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t 
             for(x = act_x1; x <= act_x2; x++) {
                 location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * vinfo.xres;
                 fbp8[location] = color_p->full;
+                color_p++;
+            }
+
+            color_p += x2 - act_x2;
+        }
+    }
+    /*1 bit per pixel*/
+    else if(vinfo.bits_per_pixel == 1) {
+        uint8_t * fbp8 = (uint8_t *)fbp;
+        int32_t x;
+        int32_t y;
+        for(y = act_y1; y <= act_y2; y++) {
+            for(x = act_x1; x <= act_x2; x++) {
+                location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * vinfo.xres;
+                byte_location = location / 8; /* find the byte we need to change */
+                bit_location = location % 8; /* inside the byte found, find the bit we need to change */
+                fbp8[byte_location] &= ~(((uint8_t)(1)) << bit_location);
+                fbp8[byte_location] |= ((uint8_t)(color_p->full)) << bit_location;
                 color_p++;
             }
 

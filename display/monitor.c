@@ -20,7 +20,7 @@
 #include "lvgl/lv_core/lv_vdb.h"
 #include "../indev/mouse.h"
 #include "../indev/keyboard.h"
-#include "../indev/encoder.h"
+#include "../indev/mousewheel.h"
 
 /*********************
  *      DEFINES
@@ -107,7 +107,7 @@ void monitor_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
     }
 
     int32_t y;
-#if LV_COLOR_DEPTH != 24 || LV_COLOR_DEPTH != 32    /*32 is valid but support 24 for backward compatibility too*/
+#if LV_COLOR_DEPTH != 24 && LV_COLOR_DEPTH != 32    /*32 is valid but support 24 for backward compatibility too*/
     int32_t x;
     for(y = y1; y <= y2; y++) {
         for(x = x1; x <= x2; x++) {
@@ -296,15 +296,15 @@ static void monitor_sdl_refr_core(void)
         SDL_RenderCopy(renderer, texture, NULL, NULL);
         SDL_RenderPresent(renderer);
     }
-
+#ifndef MONITOR_APPLE 
     SDL_Event event;
     while(SDL_PollEvent(&event)) {
 #if USE_MOUSE != 0
         mouse_handler(&event);
 #endif
 
-#if USE_ENCODER != 0
-        encoder_handler(&event);
+#if USE_MOUSEWHEEL != 0
+        mousewheel_handler(&event);
 #endif
 
 #if USE_KEYBOARD
@@ -326,9 +326,11 @@ static void monitor_sdl_refr_core(void)
             }
         }
     }
+#endif /*MONITOR_APPLE*/
 
     /*Sleep some time*/
     SDL_Delay(SDL_REFR_PERIOD);
+
 }
 
-#endif
+#endif /*USE_MONITOR*/
