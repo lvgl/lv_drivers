@@ -88,9 +88,15 @@
 #if USE_MONITOR
 #define MONITOR_HOR_RES     LV_HOR_RES
 #define MONITOR_VER_RES     LV_VER_RES
-#define MONITOR_ZOOM        1                       /* Scale window by this factor (useful when simulating small screens) */
-#define MONITOR_SDL_INCLUDE_PATH    <SDL2/SDL.h>    /*Eclipse: <SDL2/SDL.h>    Visual Studio: <SDL.h>*/
-#define MONITOR_VIRTUAL_MACHINE 0                   /*Different rendering should be used if running in a Virtual machine*/
+/* Scale window by this factor (useful when simulating small screens) */
+#define MONITOR_ZOOM        1
+/* Used to test true double buffering with only address changing.
+ * Set LV_VDB_SIZE = (LV_HOR_RES * LV_VER_RES) and  LV_VDB_DOUBLE = 1 and LV_COLOR_DEPTH = 32" */
+#define MONITOR_DOUBLE_BUFFERED 0
+/*Eclipse: <SDL2/SDL.h>    Visual Studio: <SDL.h>*/
+#define MONITOR_SDL_INCLUDE_PATH    <SDL2/SDL.h>
+/*Different rendering might be used if running in a Virtual machine*/
+#define MONITOR_VIRTUAL_MACHINE 0
 #endif
 
 /*----------------
