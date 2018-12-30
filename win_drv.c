@@ -61,7 +61,7 @@ static const BITMAPINFO dib_info = {
           .biWidth = WINDOW_HOR_RES,
           .biHeight = WINDOW_VER_RES,
           .biPlanes = 1,
-          .biBitCount = LV_COLOR_DEPTH,
+          .biBitCount = 24,
           .biCompression = BI_RGB,
           .biSizeImage = 0,
           .biXPelsPerMeter = 39 * LV_DPI,
@@ -145,7 +145,21 @@ void windrv_init(void)
 /**********************
  *   STATIC FUNCTIONS
  **********************/
+#include <stdio.h>
+ static void update_dib(void)
+ {
+    // Creating temp bitmap
+    HBITMAP bmp = CreateBitmap(WINDOW_HOR_RES, WINDOW_VER_RES, 1, sizeof(COLORREF), fbp);
 
+    // Temp HDC to copy picture
+    HDC tmp = CreateCompatibleDC(NULL);
+    HBITMAP old_bmp = SelectObject(tmp, bmp);
+    // Copy image from temp HDC to window
+    BitBlt(hwnd_dc, 0, 0, WINDOW_HOR_RES, WINDOW_VER_RES, tmp, 0, 0, SRCCOPY);
+    SelectObject(tmp, old_bmp);
+    DeleteObject(bmp);
+    DeleteDC(tmp);
+}
 /**
  * Flush a buffer to the marked area
  * @param x1 left coordinate
@@ -192,19 +206,16 @@ static void win_drv_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_colo
  */
 static void win_drv_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
 {
-#if 0
-    SetDIBitsToDevice(hwnd_dc, x1, y1, x2 - x1 + 1, y2 - y1 + 1, 0, y2 - y1, 0, y2 - y1 + 1, )
-#else
+    COLORREF *fbp_color = fbp;
     for(int y = y1; y <= y2; y++)
     {
         for(int x = x1; x <= x2; x++)
         {
-
-            SetPixel(hwnd_dc, x, y, lv_color_to_colorref(*color_p));
+            fbp_color[y*WINDOW_VER_RES+x] = RGB(0, 0, 0); //lv_color_to_colorref(*color_p);
             color_p++;
         }
     }
-    #endif
+    update_dib();
 }
 
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -213,6 +224,9 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
     PAINTSTRUCT ps;
     switch(msg) {
     case WM_CREATE:
+        fbp = malloc(sizeof(COLORREF)*WINDOW_HOR_RES*WINDOW_VER_RES);
+        if(fbp == NULL)
+            return 1;
         hwnd_dc = GetDC(hwnd);
         SetTimer(hwnd, 0, 10, (TIMERPROC)lv_task_handler);
         SetTimer(hwnd, 1, 1, NULL);
@@ -226,12 +240,16 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
     case WM_CLOSE:
         ReleaseDC(hwnd, hwnd_dc);
         hwnd_dc = NULL;
+        free(fbp);
+        fbp = NULL;
         DestroyWindow(hwnd);
         return 0;
     case WM_PAINT:
-        hdc = BeginPaint(hwnd, &ps);
-        //lv_refr_now();
+        hdc = hwnd_dc;
+        hwnd_dc = BeginPaint(hwnd, &ps);
+        update_dib();
         EndPaint(hwnd, &ps);
+        hwnd_dc = hdc;
         return 0;
     case WM_TIMER:
         lv_tick_inc(1);
