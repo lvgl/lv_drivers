@@ -45,7 +45,7 @@ static HDC hwnd_dc; /* Window itself */
 static HDC target_dc; /* Temporary buffer DC */
 static HBITMAP dib; /* Framebuffer bitmap */
 static HBITMAP old_bitmap;
-static void *fbp = NULL; /* Raw framebuffer memory */
+static uint32_t *fbp = NULL; /* Raw framebuffer memory */
 
 static struct {
     int xres;
@@ -145,20 +145,35 @@ void windrv_init(void)
 /**********************
  *   STATIC FUNCTIONS
  **********************/
-#include <stdio.h>
- static void update_dib(void)
+
+ static void on_paint(void)
  {
     // Creating temp bitmap
-    HBITMAP bmp = CreateBitmap(WINDOW_HOR_RES, WINDOW_VER_RES, 1, sizeof(COLORREF), fbp);
+    HBITMAP bmp = CreateBitmap(WINDOW_HOR_RES, WINDOW_VER_RES, 1, 32, fbp);
+    //HBITMAP bmp = LoadImage( NULL, "C:/ts/sample.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
+    PAINTSTRUCT ps;
 
-    // Temp HDC to copy picture
-    HDC tmp = CreateCompatibleDC(NULL);
-    HBITMAP old_bmp = SelectObject(tmp, bmp);
-    // Copy image from temp HDC to window
-    BitBlt(hwnd_dc, 0, 0, WINDOW_HOR_RES, WINDOW_VER_RES, tmp, 0, 0, SRCCOPY);
-    SelectObject(tmp, old_bmp);
+    HDC hdc = BeginPaint(hwnd, &ps);
+
+    HDC hdcMem = CreateCompatibleDC(hdc);
+    HBITMAP hbmOld = SelectObject(hdcMem, bmp);
+
+    BitBlt(hdc, 0, 0, WINDOW_HOR_RES, WINDOW_VER_RES, hdcMem, 0, 0, SRCCOPY);
+    #if 0
+    for(int y = 0; y < WINDOW_VER_RES; y++)
+    {
+        for(int x = 0; x < WINDOW_HOR_RES; x++)
+        {
+            SetPixel(hdc, x, y, ((COLORREF *)fbp)[y*WINDOW_VER_RES+x]);
+        }
+    }
+    #endif
+    SelectObject(hdcMem, hbmOld);
+    DeleteDC(hdcMem);
+
+    EndPaint(hwnd, &ps);
     DeleteObject(bmp);
-    DeleteDC(tmp);
+
 }
 /**
  * Flush a buffer to the marked area
@@ -206,16 +221,16 @@ static void win_drv_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_colo
  */
 static void win_drv_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
 {
-    COLORREF *fbp_color = fbp;
     for(int y = y1; y <= y2; y++)
     {
         for(int x = x1; x <= x2; x++)
         {
-            fbp_color[y*WINDOW_VER_RES+x] = RGB(0, 0, 0); //lv_color_to_colorref(*color_p);
+            fbp[y*WINDOW_HOR_RES+x] = lv_color_to32(*color_p);
             color_p++;
         }
     }
-    update_dib();
+    InvalidateRect(hwnd, NULL, FALSE);
+    UpdateWindow(hwnd);
 }
 
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -224,7 +239,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
     PAINTSTRUCT ps;
     switch(msg) {
     case WM_CREATE:
-        fbp = malloc(sizeof(COLORREF)*WINDOW_HOR_RES*WINDOW_VER_RES);
+        fbp = malloc(4*WINDOW_HOR_RES*WINDOW_VER_RES);
         if(fbp == NULL)
             return 1;
         hwnd_dc = GetDC(hwnd);
@@ -245,11 +260,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         DestroyWindow(hwnd);
         return 0;
     case WM_PAINT:
-        hdc = hwnd_dc;
-        hwnd_dc = BeginPaint(hwnd, &ps);
-        update_dib();
-        EndPaint(hwnd, &ps);
-        hwnd_dc = hdc;
+        on_paint();
         return 0;
     case WM_TIMER:
         lv_tick_inc(1);
