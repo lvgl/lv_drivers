@@ -10,6 +10,7 @@
 #if 1 // FIXME USE_WINDOWS
 
 #include <windows.h>
+#include <windowsx.h>
 #include "lvgl/lv_core/lv_vdb.h"
 #include "lvgl/lvgl.h"
 #include "lvgl/lv_core/lv_refr.h"
@@ -32,6 +33,7 @@
 static void win_drv_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p);
 static void win_drv_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t color);
 static void win_drv_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p);
+static bool win_drv_read(lv_indev_data_t * data);
 
 static COLORREF lv_color_to_colorref(const lv_color_t color);
 
@@ -41,35 +43,10 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
  *  STATIC VARIABLES
  **********************/
 static HWND hwnd;
-static HDC hwnd_dc; /* Window itself */
-static HDC target_dc; /* Temporary buffer DC */
-static HBITMAP dib; /* Framebuffer bitmap */
-static HBITMAP old_bitmap;
 static uint32_t *fbp = NULL; /* Raw framebuffer memory */
+static bool mouse_pressed;
+static int mouse_x, mouse_y;
 
-static struct {
-    int xres;
-    int yres;
-    int xoffset;
-    int yoffset;
-    int bits_per_pixel;
-} vinfo;
-
-static const BITMAPINFO dib_info = {
-    .bmiHeader = {
-        .biSize = sizeof(BITMAPINFOHEADER),
-          .biWidth = WINDOW_HOR_RES,
-          .biHeight = WINDOW_VER_RES,
-          .biPlanes = 1,
-          .biBitCount = 24,
-          .biCompression = BI_RGB,
-          .biSizeImage = 0,
-          .biXPelsPerMeter = 39 * LV_DPI,
-          .biYPelsPerMeter = 39 * LV_DPI,
-          .biClrUsed = 0,
-          .biClrImportant = 0
-    }
-};
 
 /**********************
  *      MACROS
@@ -136,21 +113,23 @@ void windrv_init(void)
     disp_drv.disp_fill = win_drv_fill;
     disp_drv.disp_map = win_drv_map;
     lv_disp_drv_register(&disp_drv);
-    vinfo.xres = WINDOW_HOR_RES;
-    vinfo.yres = WINDOW_VER_RES;
-    vinfo.bits_per_pixel = LV_COLOR_DEPTH;
-    vinfo.xoffset = vinfo.yoffset = 0;
 }
 
 /**********************
  *   STATIC FUNCTIONS
  **********************/
 
+ static bool win_drv_read(lv_indev_data_t * data)
+{
+    data->state = mouse_pressed ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
+    data->point.x = mouse_x;
+    data->point.y = mouse_y;
+    return false;
+}
+
  static void on_paint(void)
  {
-    // Creating temp bitmap
     HBITMAP bmp = CreateBitmap(WINDOW_HOR_RES, WINDOW_VER_RES, 1, 32, fbp);
-    //HBITMAP bmp = LoadImage( NULL, "C:/ts/sample.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
     PAINTSTRUCT ps;
 
     HDC hdc = BeginPaint(hwnd, &ps);
@@ -159,15 +138,7 @@ void windrv_init(void)
     HBITMAP hbmOld = SelectObject(hdcMem, bmp);
 
     BitBlt(hdc, 0, 0, WINDOW_HOR_RES, WINDOW_VER_RES, hdcMem, 0, 0, SRCCOPY);
-    #if 0
-    for(int y = 0; y < WINDOW_VER_RES; y++)
-    {
-        for(int x = 0; x < WINDOW_HOR_RES; x++)
-        {
-            SetPixel(hdc, x, y, ((COLORREF *)fbp)[y*WINDOW_VER_RES+x]);
-        }
-    }
-    #endif
+
     SelectObject(hdcMem, hbmOld);
     DeleteDC(hdcMem);
 
@@ -199,6 +170,7 @@ static void win_drv_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const 
  */
 static void win_drv_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t color)
 {
+    #if 0
     HBRUSH brush = CreateSolidBrush(lv_color_to_colorref(color));
     HPEN pen = SelectObject(hwnd_dc, NULL_PEN);
     RECT rect;
@@ -209,6 +181,7 @@ static void win_drv_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_colo
     FillRect(hwnd_dc, &rect, brush);
     SelectObject(hwnd_dc, pen);
     DeleteObject(brush);
+    #endif
 }
 
 /**
@@ -242,19 +215,30 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         fbp = malloc(4*WINDOW_HOR_RES*WINDOW_VER_RES);
         if(fbp == NULL)
             return 1;
-        hwnd_dc = GetDC(hwnd);
         SetTimer(hwnd, 0, 10, (TIMERPROC)lv_task_handler);
-        SetTimer(hwnd, 1, 1, NULL);
+        SetTimer(hwnd, 1, 25, NULL);
         lv_disp_drv_t disp_drv;
         lv_disp_drv_init(&disp_drv);            /*Basic initialization*/
         disp_drv.disp_flush = win_drv_flush;
         disp_drv.disp_fill = win_drv_fill;
         disp_drv.disp_map = win_drv_map;
         lv_disp_drv_register(&disp_drv);
+        lv_indev_drv_t indev_drv;
+        lv_indev_drv_init(&indev_drv);
+        indev_drv.type = LV_INDEV_TYPE_POINTER;
+        indev_drv.read = win_drv_read;
+        lv_indev_drv_register(&indev_drv);
+        return 0;
+    case WM_MOUSEMOVE:
+    case WM_LBUTTONDOWN:
+    case WM_LBUTTONUP:
+        mouse_x = GET_X_LPARAM(lParam);
+        mouse_y = GET_Y_LPARAM(lParam);
+        if(msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP) {
+            mouse_pressed = (msg == WM_LBUTTONDOWN);
+        }
         return 0;
     case WM_CLOSE:
-        ReleaseDC(hwnd, hwnd_dc);
-        hwnd_dc = NULL;
         free(fbp);
         fbp = NULL;
         DestroyWindow(hwnd);
@@ -263,7 +247,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         on_paint();
         return 0;
     case WM_TIMER:
-        lv_tick_inc(1);
+        lv_tick_inc(25);
         return 0;
     case WM_DESTROY:
         PostQuitMessage(0);
