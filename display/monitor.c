@@ -37,11 +37,15 @@
 # endif
 #endif
 
-#if defined(__EMSCRIPTEN__) && !defined(MONITOR_APPLE)
+#if defined(__EMSCRIPTEN__)
+
+#if !defined(MONITOR_APPLE)
 #define MONITOR_APPLE
+#endif /* !defined(MONITOR_APPLE) */
 #if !MONITOR_VIRTUAL_MACHINE
 #error Emscripten requires MONITOR_VIRTUAL_MACHINE to be enabled
-#endif
+#endif /* !MONITOR_VIRTUAL_MACHINE */
+#define MONITOR_EMSCRIPTEN 1
 #endif
 
 /**********************
