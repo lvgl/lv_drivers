@@ -37,6 +37,13 @@
 # endif
 #endif
 
+#if defined(__EMSCRIPTEN__) && !defined(MONITOR_APPLE)
+#define MONITOR_APPLE
+#if !MONITOR_VIRTUAL_MACHINE
+#error Emscripten requires MONITOR_VIRTUAL_MACHINE to be enabled
+#endif
+#endif
+
 /**********************
  *      TYPEDEFS
  **********************/
@@ -65,7 +72,11 @@ static volatile bool sdl_quit_qry = false;
 int quit_filter(void * userdata, SDL_Event * event);
 static void monitor_sdl_clean_up(void);
 static void monitor_sdl_init(void);
+#if MONITOR_EMSCRIPTEN
+void monitor_sdl_refr_core(void); /* called from Emscripten loop */
+#else
 static void monitor_sdl_refr_core(void);
+#endif
 
 /**********************
  *      MACROS
@@ -85,8 +96,10 @@ void monitor_init(void)
     monitor_sdl_init();
 #endif
 
+#ifndef __EMSCRIPTEN__
     SDL_CreateThread(monitor_sdl_refr_thread, "sdl_refr", NULL);
     while(sdl_inited == false); /*Wait until 'sdl_refr' initializes the SDL*/
+#endif
 }
 
 
@@ -221,7 +234,6 @@ static int monitor_sdl_refr_thread(void * param)
 #ifndef MONITOR_APPLE
     monitor_sdl_init();
 #endif
-
     /*Run until quit event not arrives*/
     while(sdl_quit_qry == false) {
         /*Refresh handling*/
@@ -280,7 +292,11 @@ static void monitor_sdl_init(void)
     sdl_inited = true;
 }
 
+#if MONITOR_EMSCRIPTEN
+void monitor_sdl_refr_core(void)
+#else
 static void monitor_sdl_refr_core(void)
+#endif
 {
     if(sdl_refr_qry != false) {
         sdl_refr_qry = false;
