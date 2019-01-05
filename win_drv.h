@@ -20,6 +20,7 @@ extern "C" {
 #endif
 
 #if USE_WINDOWS
+#include <windows.h>
 
 #include "lvgl/lv_misc/lv_color.h"
 
@@ -34,7 +35,7 @@ extern "C" {
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
-void windrv_init(void);
+HWND windrv_init(void);
 
 /**********************
  *      MACROS

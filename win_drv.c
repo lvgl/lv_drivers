@@ -34,6 +34,7 @@ static void win_drv_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const 
 static void win_drv_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t color);
 static void win_drv_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p);
 static bool win_drv_read(lv_indev_data_t * data);
+static void msg_handler(void *param);
 
 static COLORREF lv_color_to_colorref(const lv_color_t color);
 
@@ -57,7 +58,7 @@ static int mouse_x, mouse_y;
  **********************/
 const char g_szClassName[] = "LittlevGL";
 
-void windrv_init(void)
+HWND windrv_init(void)
 {
     WNDCLASSEX wc;
     RECT winrect;
@@ -78,9 +79,7 @@ void windrv_init(void)
 
     if(!RegisterClassEx(&wc))
     {
-        MessageBox(NULL, "Window Registration Failed!", "Error!",
-            MB_ICONEXCLAMATION | MB_OK);
-        return 0;
+        return NULL;
     }
 
     winrect.left = 0;
@@ -100,9 +99,7 @@ void windrv_init(void)
 
     if(hwnd == NULL)
     {
-        MessageBox(NULL, "Window Creation Failed!", "Error!",
-            MB_ICONEXCLAMATION | MB_OK);
-        return 0;
+        return NULL;
     }
 
     ShowWindow(hwnd, SW_SHOWDEFAULT);
@@ -113,11 +110,32 @@ void windrv_init(void)
     disp_drv.disp_fill = win_drv_fill;
     disp_drv.disp_map = win_drv_map;
     lv_disp_drv_register(&disp_drv);
+    lv_task_create(msg_handler, 0, LV_TASK_PRIO_HIGHEST, NULL);
 }
 
 /**********************
  *   STATIC FUNCTIONS
  **********************/
+
+static void msg_handler(void *param)
+{
+    (void)param;
+
+    MSG msg;
+    BOOL bRet;
+    while( (bRet = PeekMessage( &msg, NULL, 0, 0, TRUE )) != 0)
+    {
+        if (bRet == -1)
+        {
+            return;
+        }
+        else
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+    }
+}
 
  static bool win_drv_read(lv_indev_data_t * data)
 {
