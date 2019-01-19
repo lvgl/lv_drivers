@@ -7,7 +7,7 @@
  *      INCLUDES
  *********************/
 #include "win_drv.h"
-#if 1 // FIXME USE_WINDOWS
+#if USE_WINDOWS
 
 #include <windows.h>
 #include <windowsx.h>
@@ -22,6 +22,8 @@
 /**********************
  *       DEFINES
  **********************/
+
+ #define WINDOW_STYLE (WS_OVERLAPPEDWINDOW & ~(WS_SIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME))
 
 /**********************
  *      TYPEDEFS
@@ -39,6 +41,13 @@ static void msg_handler(void *param);
 static COLORREF lv_color_to_colorref(const lv_color_t color);
 
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+
+/**********************
+ *  GLOBAL VARIABLES
+ **********************/
+
+bool lv_win_exit_flag = false;
 
 /**********************
  *  STATIC VARIABLES
@@ -86,14 +95,14 @@ HWND windrv_init(void)
     winrect.right = WINDOW_HOR_RES - 1;
     winrect.top = 0;
     winrect.bottom = WINDOW_VER_RES - 1;
-    AdjustWindowRectEx(&winrect, WS_OVERLAPPEDWINDOW & ~(WS_SIZEBOX), FALSE, WS_EX_CLIENTEDGE);
+    AdjustWindowRectEx(&winrect, WINDOW_STYLE, FALSE, WS_EX_CLIENTEDGE);
     OffsetRect(&winrect, -winrect.left, -winrect.top);
     // Step 2: Creating the Window
     hwnd = CreateWindowEx(
         WS_EX_CLIENTEDGE,
         g_szClassName,
         "The title of my window",
-        WS_OVERLAPPEDWINDOW & ~(WS_SIZEBOX),
+        WINDOW_STYLE,
         CW_USEDEFAULT, CW_USEDEFAULT, winrect.right, winrect.bottom,
         NULL, NULL, GetModuleHandle(NULL), NULL);
 
@@ -111,6 +120,7 @@ HWND windrv_init(void)
     disp_drv.disp_map = win_drv_map;
     lv_disp_drv_register(&disp_drv);
     lv_task_create(msg_handler, 0, LV_TASK_PRIO_HIGHEST, NULL);
+    lv_win_exit_flag = false;
 }
 
 /**********************
@@ -135,6 +145,8 @@ static void msg_handler(void *param)
             DispatchMessage(&msg);
         }
     }
+    if(msg.message == WM_QUIT)
+        lv_win_exit_flag = true;
 }
 
  static bool win_drv_read(lv_indev_data_t * data)

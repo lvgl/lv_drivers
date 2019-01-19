@@ -21,6 +21,7 @@ extern "C" {
 
 #if USE_WINDOWS
 #include <windows.h>
+#include <stdbool.h>
 
 #include "lvgl/lv_misc/lv_color.h"
 
@@ -35,6 +36,8 @@ extern "C" {
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
+extern bool lv_win_exit_flag;
+
 HWND windrv_init(void);
 
 /**********************
