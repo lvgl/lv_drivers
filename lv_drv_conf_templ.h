@@ -99,6 +99,12 @@
 #define MONITOR_VIRTUAL_MACHINE 0
 #endif
 
+#define USE_WINDOWS         1
+#if USE_WINDOWS
+#define WINDOW_HOR_RES      LV_HOR_RES
+#define WINDOW_VER_RES      LV_VER_RES
+#endif
+
 /*----------------
  *    SSD1963
  *--------------*/
