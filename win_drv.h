@@ -50,4 +50,4 @@ HWND windrv_init(void);
 } /* extern "C" */
 #endif
 
-#endif /*FBDEV_H*/
+#endif /*WIN_DRV_H*/
