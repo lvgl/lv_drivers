@@ -118,7 +118,7 @@ void st7565_init(void)
     st7565_command(CMD_SET_POWER_CONTROL | 0x7);
     LV_DRV_DELAY_MS(10);
 
-    st7565_command(CMD_SET_RESISTOR_RATIO | 0x6);
+    st7565_command(CMD_SET_RESISTOR_RATIO | 0x6); // Defaulted to 0x26 (but could also be between 0x20-0x27 based on display's specs)
 
     st7565_command(CMD_DISPLAY_ON);
     st7565_command(CMD_SET_ALLPTS_NORMAL);
@@ -133,7 +133,7 @@ void st7565_init(void)
 }
 
 
-void st7565_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t * color_p)
+void st7565_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
 {
     /*Return if the area is out the screen*/
     if(x2 < 0) return;
@@ -202,7 +202,7 @@ void st7565_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t colo
     st7565_sync(act_x1, act_y1, act_x2, act_y2);
 }
 
-void st7565_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t * color_p)
+void st7565_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
 {
     /*Return if the area is out the screen*/
     if(x2 < 0) return;
@@ -273,7 +273,7 @@ static void st7565_sync(int32_t x1, int32_t y1, int32_t x2, int32_t y2)
 static void st7565_command(uint8_t cmd)
 {
     LV_DRV_DISP_CMD_DATA(ST7565_CMD_MODE);
-    LV_DRV_DISP_SPI_WR_BYTE(data);
+    LV_DRV_DISP_SPI_WR_BYTE(cmd);
 }
 
 /**
