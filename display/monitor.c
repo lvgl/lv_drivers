@@ -38,13 +38,6 @@
 #endif
 
 #if defined(__EMSCRIPTEN__)
-
-#if !defined(MONITOR_APPLE)
-#define MONITOR_APPLE
-#endif /* !defined(MONITOR_APPLE) */
-#if !MONITOR_VIRTUAL_MACHINE
-#error Emscripten requires MONITOR_VIRTUAL_MACHINE to be enabled
-#endif /* !MONITOR_VIRTUAL_MACHINE */
 #define MONITOR_EMSCRIPTEN 1
 #endif
 
@@ -96,11 +89,11 @@ static void monitor_sdl_refr_core(void);
 void monitor_init(void)
 {
     /*OSX needs to initialize SDL here*/
-#ifdef MONITOR_APPLE
+#if defined(MONITOR_APPLE) || defined(MONITOR_EMSCRIPTEN)
     monitor_sdl_init();
 #endif
 
-#ifndef __EMSCRIPTEN__
+#ifndef MONITOR_EMSCRIPTEN
     SDL_CreateThread(monitor_sdl_refr_thread, "sdl_refr", NULL);
     while(sdl_inited == false); /*Wait until 'sdl_refr' initializes the SDL*/
 #endif
@@ -280,7 +273,7 @@ static void monitor_sdl_init(void)
                               SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                               MONITOR_HOR_RES * MONITOR_ZOOM, MONITOR_VER_RES * MONITOR_ZOOM, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
 
-#if MONITOR_VIRTUAL_MACHINE
+#if MONITOR_VIRTUAL_MACHINE || defined(MONITOR_EMSCRIPTEN)
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
 #else
     renderer = SDL_CreateRenderer(window, -1, 0);
@@ -316,7 +309,7 @@ static void monitor_sdl_refr_core(void)
         SDL_RenderCopy(renderer, texture, NULL, NULL);
         SDL_RenderPresent(renderer);
     }
-#ifndef MONITOR_APPLE 
+#if !defined(MONITOR_APPLE) && !defined(MONITOR_EMSCRIPTEN)
     SDL_Event event;
     while(SDL_PollEvent(&event)) {
 #if USE_MOUSE != 0
