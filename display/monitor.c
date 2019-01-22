@@ -37,6 +37,10 @@
 # endif
 #endif
 
+#if defined(__EMSCRIPTEN__)
+#define MONITOR_EMSCRIPTEN 1
+#endif
+
 /**********************
  *      TYPEDEFS
  **********************/
@@ -72,7 +76,11 @@ static volatile bool sdl_quit_qry = false;
 int quit_filter(void * userdata, SDL_Event * event);
 static void monitor_sdl_clean_up(void);
 static void monitor_sdl_init(void);
+#if MONITOR_EMSCRIPTEN
+void monitor_sdl_refr_core(void); /* called from Emscripten loop */
+#else
 static void monitor_sdl_refr_core(void);
+#endif
 
 /**********************
  *      MACROS
@@ -88,12 +96,14 @@ static void monitor_sdl_refr_core(void);
 void monitor_init(void)
 {
     /*OSX needs to initialize SDL here*/
-#ifdef MONITOR_APPLE
+#if defined(MONITOR_APPLE) || defined(MONITOR_EMSCRIPTEN)
     monitor_sdl_init();
 #endif
 
+#ifndef MONITOR_EMSCRIPTEN
     SDL_CreateThread(monitor_sdl_refr_thread, "sdl_refr", NULL);
     while(sdl_inited == false); /*Wait until 'sdl_refr' initializes the SDL*/
+#endif
 }
 
 
@@ -238,7 +248,6 @@ static int monitor_sdl_refr_thread(void * param)
 #ifndef MONITOR_APPLE
     monitor_sdl_init();
 #endif
-
     /*Run until quit event not arrives*/
     while(sdl_quit_qry == false) {
         /*Refresh handling*/
@@ -281,7 +290,7 @@ static void monitor_sdl_init(void)
                               SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                               MONITOR_HOR_RES * MONITOR_ZOOM, MONITOR_VER_RES * MONITOR_ZOOM, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
 
-#if MONITOR_VIRTUAL_MACHINE
+#if MONITOR_VIRTUAL_MACHINE || defined(MONITOR_EMSCRIPTEN)
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
 #else
     renderer = SDL_CreateRenderer(window, -1, 0);
@@ -304,7 +313,11 @@ static void monitor_sdl_init(void)
     sdl_inited = true;
 }
 
+#if MONITOR_EMSCRIPTEN
+void monitor_sdl_refr_core(void)
+#else
 static void monitor_sdl_refr_core(void)
+#endif
 {
     if(sdl_refr_qry != false) {
         sdl_refr_qry = false;
@@ -325,7 +338,7 @@ static void monitor_sdl_refr_core(void)
         SDL_RenderCopy(renderer, texture, NULL, NULL);
         SDL_RenderPresent(renderer);
     }
-#ifndef MONITOR_APPLE 
+#if !defined(MONITOR_APPLE) && !defined(MONITOR_EMSCRIPTEN)
     SDL_Event event;
     while(SDL_PollEvent(&event)) {
 #if USE_MOUSE != 0
