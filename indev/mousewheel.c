@@ -68,7 +68,13 @@ void mousewheel_handler(SDL_Event * event)
         case SDL_MOUSEWHEEL:
             // Scroll down (y = -1) means positive encoder turn,
             // so invert it
-            enc_diff += -(event->wheel.y);
+#if __EMSCRIPTEN__
+            /*Escripten scales it wrong*/
+            if(event->wheel.y < 0) enc_diff++;
+            if(event->wheel.y > 0) enc_diff--;
+#else
+            enc_diff = -event->wheel.y;
+#endif
             break;
         case SDL_MOUSEBUTTONDOWN:
             if(event->button.button == SDL_BUTTON_MIDDLE) {
