@@ -358,7 +358,11 @@ static void monitor_sdl_refr_core(void)
                 case SDL_WINDOWEVENT_TAKE_FOCUS:
 #endif
                 case SDL_WINDOWEVENT_EXPOSED:
+#if MONITOR_DOUBLE_BUFFERED == 0
                     SDL_UpdateTexture(texture, NULL, tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
+#else
+                    SDL_UpdateTexture(texture, NULL, tft_fb_act, MONITOR_HOR_RES * sizeof(uint32_t));
+#endif
                     SDL_RenderClear(renderer);
                     SDL_RenderCopy(renderer, texture, NULL, NULL);
                     SDL_RenderPresent(renderer);
