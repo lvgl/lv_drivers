@@ -68,7 +68,7 @@ void mousewheel_handler(SDL_Event * event)
         case SDL_MOUSEWHEEL:
             // Scroll down (y = -1) means positive encoder turn,
             // so invert it
-#if __EMSCRIPTEN__
+#ifdef __EMSCRIPTEN__
             /*Escripten scales it wrong*/
             if(event->wheel.y < 0) enc_diff++;
             if(event->wheel.y > 0) enc_diff--;

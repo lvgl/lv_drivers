@@ -10,7 +10,7 @@
 #if USE_MONITOR
 
 #ifndef MONITOR_SDL_INCLUDE_PATH
-#define MONITOR_SDL_INCLUDE_PATH <SDL2/SDL.h>
+#  define MONITOR_SDL_INCLUDE_PATH <SDL2/SDL.h>
 #endif
 
 #include <stdlib.h>
@@ -32,13 +32,13 @@
 #endif
 
 #if defined(__APPLE__) && defined(TARGET_OS_MAC)
-# if __APPLE__ && TARGET_OS_MAC
+#  if __APPLE__ && TARGET_OS_MAC
 #define MONITOR_APPLE
-# endif
+#  endif
 #endif
 
 #if defined(__EMSCRIPTEN__)
-#define MONITOR_EMSCRIPTEN 1
+#  define MONITOR_EMSCRIPTEN
 #endif
 
 /**********************
@@ -76,7 +76,7 @@ static volatile bool sdl_quit_qry = false;
 int quit_filter(void * userdata, SDL_Event * event);
 static void monitor_sdl_clean_up(void);
 static void monitor_sdl_init(void);
-#if MONITOR_EMSCRIPTEN
+#ifdef MONITOR_EMSCRIPTEN
 void monitor_sdl_refr_core(void); /* called from Emscripten loop */
 #else
 static void monitor_sdl_refr_core(void);
@@ -313,7 +313,7 @@ static void monitor_sdl_init(void)
     sdl_inited = true;
 }
 
-#if MONITOR_EMSCRIPTEN
+#ifdef MONITOR_EMSCRIPTEN
 void monitor_sdl_refr_core(void)
 #else
 static void monitor_sdl_refr_core(void)
