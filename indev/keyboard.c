@@ -55,7 +55,9 @@ bool keyboard_read(lv_indev_data_t * data)
     data->state = state;
     data->key = keycode_to_ascii(last_key);
 
-    return false;       /*No more data to read so return false*/
+    /* Tell there is more data when pressed. The next data will the releases state. */
+    state = LV_INDEV_STATE_REL;
+    return data->state == LV_INDEV_STATE_PR ? true : false;
 }
 
 /**
