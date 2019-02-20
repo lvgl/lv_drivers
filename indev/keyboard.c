@@ -47,11 +47,13 @@ void keyboard_init(void)
 
 /**
  * Get the last pressed or released character from the PC's keyboard
+ * @param indev pointer to the related input device
  * @param data store the read data here
  * @return false: because the points are not buffered, so no more data to be read
  */
-bool keyboard_read(lv_indev_data_t * data)
+bool keyboard_read(lv_indev_t * indev, lv_indev_data_t * data)
 {
+    (void) indev;      /*Unused*/
     data->state = state;
     data->key = keycode_to_ascii(last_key);
 

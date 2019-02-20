@@ -48,12 +48,14 @@ extern "C" {
  * Initialize the mouse
  */
 void mouse_init(void);
+
 /**
  * Get the current position and state of the mouse
+ * @param indev pointer to the related input device
  * @param data store the mouse data here
  * @return false: because the points are not buffered, so no more data to be read
  */
-bool mouse_read(lv_indev_data_t * data);
+bool mouse_read(lv_indev_t * indev, lv_indev_data_t * data);
 
 /**
  * It will be called from the main SDL thread

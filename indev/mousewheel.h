@@ -48,11 +48,12 @@ extern "C" {
 void mousewheel_init(void);
 
 /**
- * Get the mouse wheel position change.
+ * Get encoder (i.e. mouse wheel) ticks difference and pressed state
+ * @param indev pointer to the related input device
  * @param data store the read data here
  * @return false: all ticks and button state are handled
  */
-bool mousewheel_read(lv_indev_data_t * data);
+bool mousewheel_read(lv_indev_t * indev, lv_indev_data_t * data);
 
 /**
  * It is called periodically from the SDL thread to check a key is pressed/released

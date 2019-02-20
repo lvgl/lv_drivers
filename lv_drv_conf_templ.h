@@ -102,6 +102,9 @@
 
 /*Different rendering might be used if running in a Virtual machine*/
 #  define MONITOR_VIRTUAL_MACHINE 0
+
+/*Open two windows to test multi display support*/
+#  define MONITOR_DUAL            0
 #endif
 
 /*-----------------------------------
