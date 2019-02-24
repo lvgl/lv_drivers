@@ -119,11 +119,11 @@ void monitor_init(void)
  * @param y2 bottom coordinate
  * @param color_p array of colors to be flushed
  */
-void monitor_flush(lv_disp_t * disp, const lv_area_t * area, lv_color_t * color_p)
+void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
     /*Return if the area is out the screen*/
     if(area->x2 < 0 || area->y2 < 0 || area->x1 > MONITOR_HOR_RES - 1 || area->y1 > MONITOR_VER_RES - 1) {
-        lv_disp_flush_ready(disp);
+        lv_disp_flush_ready(disp_drv);
         return;
     }
 
@@ -157,7 +157,7 @@ void monitor_flush(lv_disp_t * disp, const lv_area_t * area, lv_color_t * color_
     monitor.sdl_refr_qry = true;
 
     /*IMPORTANT! It must be called to tell the system the flush is ready*/
-    lv_disp_flush_ready(disp);
+    lv_disp_flush_ready(disp_drv);
 #endif
 }
 
@@ -171,11 +171,11 @@ void monitor_flush(lv_disp_t * disp, const lv_area_t * area, lv_color_t * color_
  * @param y2 bottom coordinate
  * @param color_p array of colors to be flushed
  */
-void monitor_flush2(lv_disp_t * disp, const lv_area_t * area, lv_color_t * color_p)
+void monitor_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
     /*Return if the area is out the screen*/
     if(area->x2 < 0 || area->y2 < 0 || area->x1 > MONITOR_HOR_RES - 1 || area->y1 > MONITOR_VER_RES - 1) {
-        lv_disp_flush_ready(disp);
+        lv_disp_flush_ready(disp_drv);
         return;
     }
 
@@ -209,7 +209,7 @@ void monitor_flush2(lv_disp_t * disp, const lv_area_t * area, lv_color_t * color
     monitor2.sdl_refr_qry = true;
 
     /*IMPORTANT! It must be called to tell the system the flush is ready*/
-    lv_disp_flush_ready(disp);
+    lv_disp_flush_ready(disp_drv);
 #endif
 }
 #endif
