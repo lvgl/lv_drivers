@@ -127,13 +127,15 @@ void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t 
         return;
     }
 
+    printf("%d, %d, %d, %d\n", area->x1, area->y1, area->x2, area->y2);
+
 #if MONITOR_DOUBLE_BUFFERED
     monitor.tft_fb_act = (uint32_t *)color_p;
 
     monitor.sdl_refr_qry = true;
 
     /*IMPORTANT! It must be called to tell the system the flush is ready*/
-    lv_flush_ready(disp);
+    lv_disp_flush_ready(disp_drv);
 #else
 
     int32_t y;
@@ -185,7 +187,7 @@ void monitor_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t
     monitor2.sdl_refr_qry = true;
 
     /*IMPORTANT! It must be called to tell the system the flush is ready*/
-    lv_flush_ready(disp);
+    lv_disp_flush_ready(disp_drv);
 #else
 
     int32_t y;
