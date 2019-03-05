@@ -23,7 +23,7 @@ extern "C" {
 #include <windows.h>
 #include <stdbool.h>
 
-#include "lvgl/lv_misc/lv_color.h"
+#include "lvgl/lvgl.h"
 
 /*********************
  *      DEFINES
@@ -37,6 +37,7 @@ extern "C" {
  * GLOBAL PROTOTYPES
  **********************/
 extern bool lv_win_exit_flag;
+extern lv_disp_t *lv_windows_disp;
 
 HWND windrv_init(void);
 
