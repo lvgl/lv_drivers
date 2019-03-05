@@ -127,8 +127,6 @@ void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t 
         return;
     }
 
-    printf("%d, %d, %d, %d\n", area->x1, area->y1, area->x2, area->y2);
-
 #if MONITOR_DOUBLE_BUFFERED
     monitor.tft_fb_act = (uint32_t *)color_p;
 
