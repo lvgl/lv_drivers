@@ -7,7 +7,7 @@
  *      INCLUDES
  *********************/
 #include "win_drv.h"
-#if 1 // USE_WINDOWS
+#if USE_WINDOWS
 
 #include <windows.h>
 #include <windowsx.h>
