@@ -51,7 +51,7 @@ typedef struct {
 #if MONITOR_DOUBLE_BUFFERED
     uint32_t * tft_fb_act;
 #else
-    uint32_t tft_fb[MONITOR_HOR_RES * MONITOR_VER_RES];
+    uint32_t tft_fb[LV_HOR_RES_MAX * LV_VER_RES_MAX];
 #endif
 }monitor_t;
 
@@ -122,7 +122,7 @@ void monitor_init(void)
 void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
     /*Return if the area is out the screen*/
-    if(area->x2 < 0 || area->y2 < 0 || area->x1 > MONITOR_HOR_RES - 1 || area->y1 > MONITOR_VER_RES - 1) {
+    if(area->x2 < 0 || area->y2 < 0 || area->x1 > disp_drv->hor_res - 1 || area->y1 > disp_drv->ver_res - 1) {
         lv_disp_flush_ready(disp_drv);
         return;
     }
@@ -174,7 +174,7 @@ void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t 
 void monitor_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
     /*Return if the area is out the screen*/
-    if(area->x2 < 0 || area->y2 < 0 || area->x1 > MONITOR_HOR_RES - 1 || area->y1 > MONITOR_VER_RES - 1) {
+    if(area->x2 < 0 || area->y2 < 0 || area->x1 > disp_drv->hor_res - 1 || area->y1 > disp_drv->ver_res - 1) {
         lv_disp_flush_ready(disp_drv);
         return;
     }
