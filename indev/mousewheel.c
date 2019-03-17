@@ -9,7 +9,6 @@
 #include "mousewheel.h"
 #if USE_MOUSEWHEEL
 
-#include "lvgl/lv_core/lv_group.h"
 /*********************
  *      DEFINES
  *********************/
