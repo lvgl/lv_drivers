@@ -30,6 +30,7 @@
 /**********************
  *  STATIC PROTOTYPES
  **********************/
+static void do_register(void);
 static void win_drv_flush(lv_disp_t *drv, lv_area_t *area, const lv_color_t * color_p);
 static void win_drv_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t color);
 static void win_drv_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p);
@@ -122,6 +123,7 @@ HWND windrv_init(void)
 
     lv_task_create(msg_handler, 0, LV_TASK_PRIO_HIGHEST, NULL);
     lv_win_exit_flag = false;
+    do_register();
 }
 
 /**********************
@@ -277,7 +279,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
             return 1;
         SetTimer(hwnd, 0, 10, (TIMERPROC)lv_task_handler);
         SetTimer(hwnd, 1, 25, NULL);
-        do_register();
 
         return 0;
     case WM_MOUSEMOVE:
