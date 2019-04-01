@@ -121,8 +121,12 @@ void monitor_init(void)
  */
 void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
+    lv_coord_t hres = disp_drv->rotated == 0 ? disp_drv->hor_res : disp_drv->ver_res;
+    lv_coord_t vres = disp_drv->rotated == 0 ? disp_drv->ver_res : disp_drv->hor_res;
+
     /*Return if the area is out the screen*/
-    if(area->x2 < 0 || area->y2 < 0 || area->x1 > disp_drv->hor_res - 1 || area->y1 > disp_drv->ver_res - 1) {
+    if(area->x2 < 0 || area->y2 < 0 || area->x1 > hres - 1 || area->y1 > vres - 1) {
+
         lv_disp_flush_ready(disp_drv);
         return;
     }
@@ -148,7 +152,7 @@ void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t 
     }
 #else
     uint32_t w = lv_area_get_width(area);
-    for(y = area->y1; y <= area->y2; y++) {
+    for(y = area->y1; y <= area->y2 && y < MONITOR_VER_RES; y++) {
         memcpy(&monitor.tft_fb[y * MONITOR_HOR_RES + area->x1], color_p, w * sizeof(lv_color_t));
         color_p += w;
     }
@@ -173,8 +177,11 @@ void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t 
  */
 void monitor_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
+    lv_coord_t hres = disp_drv->rotated == 0 ? disp_drv->hor_res : disp_drv->ver_res;
+    lv_coord_t vres = disp_drv->rotated == 0 ? disp_drv->ver_res : disp_drv->hor_res;
+
     /*Return if the area is out the screen*/
-    if(area->x2 < 0 || area->y2 < 0 || area->x1 > disp_drv->hor_res - 1 || area->y1 > disp_drv->ver_res - 1) {
+    if(area->x2 < 0 || area->y2 < 0 || area->x1 > hres - 1 || area->y1 > vres - 1) {
         lv_disp_flush_ready(disp_drv);
         return;
     }
@@ -200,7 +207,7 @@ void monitor_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t
     }
 #else
     uint32_t w = lv_area_get_width(area);
-    for(y = area->y1; y <= area->y2; y++) {
+    for(y = area->y1; y <= area->y2 && y < MONITOR_VER_RES; y++) {
         memcpy(&monitor2.tft_fb[y * MONITOR_HOR_RES + area->x1], color_p, w * sizeof(lv_color_t));
         color_p += w;
     }
