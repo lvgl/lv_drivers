@@ -25,6 +25,12 @@
  **********************/
 
 /**********************
+ *  STATIC PROTOTYPES
+ **********************/
+static int open_restricted(const char *path, int flags, void *user_data);
+static void close_restricted(int fd, void *user_data);
+
+/**********************
  *  STATIC VARIABLES
  **********************/
 static int libinput_fd;
@@ -32,6 +38,10 @@ static int libinput_button;
 
 static struct libinput *libinput_context;
 static struct libinput_device *libinput_device;
+const static struct libinput_interface interface = {
+  .open_restricted = open_restricted,
+  .close_restricted = close_restricted,
+};
 
 /**********************
  *      MACROS
@@ -40,22 +50,6 @@ static struct libinput_device *libinput_device;
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
-
-static int open_restricted(const char *path, int flags, void *user_data)
-{
-  int fd = open(path, flags);
-  return fd < 0 ? -errno : fd;
-}
-
-static void close_restricted(int fd, void *user_data)
-{
-  close(fd);
-}
-
-const static struct libinput_interface interface = {
-  .open_restricted = open_restricted,
-  .close_restricted = close_restricted,
-};
 
 /**
  * reconfigure the device file for libinput
@@ -129,6 +123,22 @@ bool libinput_read(lv_indev_data_t * data)
   }
 
   return false;
+}
+
+
+/**********************
+ *   STATIC FUNCTIONS
+ **********************/
+
+static int open_restricted(const char *path, int flags, void *user_data)
+{
+  int fd = open(path, flags);
+  return fd < 0 ? -errno : fd;
+}
+
+static void close_restricted(int fd, void *user_data)
+{
+  close(fd);
 }
 
 #endif
