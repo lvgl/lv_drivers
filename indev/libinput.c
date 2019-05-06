@@ -117,7 +117,6 @@ bool libinput_read(lv_indev_data_t * data)
 {
   struct libinput_event *event;
   struct libinput_event_touch *touch_event = NULL;
-  nfds_t nfds = 1;
   int rc = 0;
   struct pollfd fds[1];
 
