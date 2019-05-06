@@ -62,12 +62,19 @@ bool libinput_set_file(char* dev_name)
   // This check *should* not be necessary, yet applications crashes even on NULL handles.
   // citing libinput.h:libinput_path_remove_device:
   // > If no matching device exists, this function does nothing.
-  if (libinput_device)
+  if (libinput_device) {
+    libinput_device = libinput_device_unref(libinput_device);
     libinput_path_remove_device(libinput_device);
+  }
 
   libinput_device = libinput_path_add_device(libinput_context, dev_name);
   if(!libinput_device) {
     perror("unable to add device to libinput context:");
+    return false;
+  }
+  libinput_device = libinput_device_ref(libinput_device);
+  if(!libinput_device) {
+    perror("unable to reference device within libinput context:");
     return false;
   }
 
