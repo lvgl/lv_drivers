@@ -14,6 +14,8 @@
 #include <linux/limits.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <stdbool.h>
+#include <poll.h>
 #include <libinput.h>
 
 /*********************
@@ -35,6 +37,10 @@ static void close_restricted(int fd, void *user_data);
  **********************/
 static int libinput_fd;
 static int libinput_button;
+static const int timeout = 0.0; // do not block
+static const nfds_t nfds = 1;
+static struct pollfd fds[1];
+static lv_point_t most_recent_touch_point = { .x = 0, .y = 0};
 
 static struct libinput *libinput_context;
 static struct libinput_device *libinput_device;
@@ -95,6 +101,11 @@ void libinput_init(void)
       return;
   }
   libinput_fd = libinput_get_fd(libinput_context);
+
+  /* prepare poll */
+  fds[0].fd = libinput_fd;
+  fds[0].events = POLLIN;
+  fds[0].revents = 0;
 }
 
 /**
@@ -106,28 +117,42 @@ bool libinput_read(lv_indev_data_t * data)
 {
   struct libinput_event *event;
   struct libinput_event_touch *touch_event = NULL;
+  nfds_t nfds = 1;
+  int rc = 0;
+  struct pollfd fds[1];
 
+  rc = poll(fds, nfds, timeout);
+  switch (rc){
+    case 0:
+    case -1:
+      perror(NULL);
+      goto report_most_recent_state;
+    default:
+      break;
+  }
+  libinput_dispatch(libinput_context);
   while((event = libinput_get_event(libinput_context)) != NULL) {
     enum libinput_event_type type = libinput_event_get_type(event);
     switch (type) {
+      case LIBINPUT_EVENT_TOUCH_MOTION:
+      case LIBINPUT_EVENT_TOUCH_DOWN:
+        touch_event = libinput_event_get_touch_event(event);
+        most_recent_touch_point.x = libinput_event_touch_get_x_transformed(touch_event, LV_HOR_SIZE);
+        most_recent_touch_point.y = libinput_event_touch_get_y_transformed(touch_event, LV_VER_SIZE);
+        libinput_button = LV_INDEV_STATE_PR;
+        break;
       case LIBINPUT_EVENT_TOUCH_UP:
         libinput_button = LV_INDEV_STATE_REL;
         break;
-      case LIBINPUT_EVENT_TOUCH_DOWN:
-        libinput_button = LV_INDEV_STATE_PR;
-        break;
       default:
-        continue;
+        break;
     }
-    touch_event = libinput_event_get_touch_event(event);
-
-    data->point.x = libinput_event_touch_get_x_transformed(touch_event, LV_HOR_SIZE);
-    data->point.y = libinput_event_touch_get_y_transformed(touch_event, LV_VER_SIZE);
-    data->state = libinput_button;
-
     libinput_event_destroy(event);
-    libinput_dispatch(libinput_context);
   }
+report_most_recent_state:
+  data->point.x = most_recent_touch_point.x;
+  data->point.y = most_recent_touch_point.y;
+  data->state = libinput_button;
 
   return false;
 }
