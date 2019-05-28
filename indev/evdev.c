@@ -122,6 +122,18 @@ bool evdev_read(lv_indev_data_t * data)
 				#else
 					evdev_root_y = in.value;
 				#endif
+            else if(in.code == ABS_MT_POSITION_X)
+                                #if EVDEV_SWAP_AXES
+                                        evdev_root_y = in.value;
+                                #else
+                                        evdev_root_x = in.value;
+                                #endif
+            else if(in.code == ABS_MT_POSITION_Y)
+                                #if EVDEV_SWAP_AXES
+                                        evdev_root_x = in.value;
+                                #else
+                                        evdev_root_y = in.value;
+                                #endif
         } else if(in.type == EV_KEY) {
             if(in.code == BTN_MOUSE || in.code == BTN_TOUCH) {
                 if(in.value == 0)
