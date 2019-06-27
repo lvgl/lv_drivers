@@ -263,8 +263,6 @@
 
 #if USE_LIBINPUT
 #  define LIBINPUT_NAME   "/dev/input/event0"        /*You can use the "evtest" Linux tool to get the list of devices and test them*/
-#  define LV_HOR_SIZE     (120)                      /*Horizontal screen size in mm*/
-#  define LV_VER_SIZE     (78)                       /*Vertial screen size in mm*/
 #endif  /*USE_LIBINPUT*/
 
 /*-------------------------------------------------
