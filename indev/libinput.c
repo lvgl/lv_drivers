@@ -136,8 +136,8 @@ bool libinput_read(lv_indev_data_t * data)
       case LIBINPUT_EVENT_TOUCH_MOTION:
       case LIBINPUT_EVENT_TOUCH_DOWN:
         touch_event = libinput_event_get_touch_event(event);
-        most_recent_touch_point.x = libinput_event_touch_get_x_transformed(touch_event, LV_HOR_SIZE);
-        most_recent_touch_point.y = libinput_event_touch_get_y_transformed(touch_event, LV_VER_SIZE);
+        most_recent_touch_point.x = libinput_event_touch_get_x_transformed(touch_event, LV_HOR_RES);
+        most_recent_touch_point.y = libinput_event_touch_get_y_transformed(touch_event, LV_VER_RES);
         libinput_button = LV_INDEV_STATE_PR;
         break;
       case LIBINPUT_EVENT_TOUCH_UP:
