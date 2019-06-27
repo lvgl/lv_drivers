@@ -107,7 +107,7 @@ HWND windrv_init(void)
     hwnd = CreateWindowEx(
         WS_EX_CLIENTEDGE,
         g_szClassName,
-        "The title of my window",
+        "LittlevGL Simulator",
         WINDOW_STYLE,
         CW_USEDEFAULT, CW_USEDEFAULT, winrect.right, winrect.bottom,
         NULL, NULL, GetModuleHandle(NULL), NULL);
