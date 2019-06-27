@@ -9,7 +9,6 @@
 #include "keyboard.h"
 #if USE_KEYBOARD
 
-#include "lvgl/lv_core/lv_group.h"
 /*********************
  *      DEFINES
  *********************/
@@ -47,17 +46,17 @@ void keyboard_init(void)
 
 /**
  * Get the last pressed or released character from the PC's keyboard
+ * @param indev_drv pointer to the related input device driver
  * @param data store the read data here
  * @return false: because the points are not buffered, so no more data to be read
  */
-bool keyboard_read(lv_indev_data_t * data)
+bool keyboard_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 {
+    (void) indev_drv;      /*Unused*/
     data->state = state;
     data->key = keycode_to_ascii(last_key);
 
-    /* Tell there is more data when pressed. The next data will the releases state. */
-    state = LV_INDEV_STATE_REL;
-    return data->state == LV_INDEV_STATE_PR ? true : false;
+    return false;
 }
 
 /**
@@ -86,43 +85,43 @@ void keyboard_handler(SDL_Event * event)
  **********************/
 
 /**
- * Convert the key code LV_GROUP_KEY_... "codes" or leave them if they are not control characters
+ * Convert the key code LV_KEY_... "codes" or leave them if they are not control characters
  * @param sdl_key the key code
  * @return
  */
 static uint32_t keycode_to_ascii(uint32_t sdl_key)
 {
-    /*Remap some key to LV_GROUP_KEY_... to manage groups*/
+    /*Remap some key to LV_KEY_... to manage groups*/
     switch(sdl_key) {
         case SDLK_RIGHT:
         case SDLK_KP_PLUS:
-            return LV_GROUP_KEY_RIGHT;
+            return LV_KEY_RIGHT;
 
         case SDLK_LEFT:
         case SDLK_KP_MINUS:
-            return LV_GROUP_KEY_LEFT;
+            return LV_KEY_LEFT;
 
         case SDLK_UP:
-            return LV_GROUP_KEY_UP;
+            return LV_KEY_UP;
 
         case SDLK_DOWN:
-            return LV_GROUP_KEY_DOWN;
+            return LV_KEY_DOWN;
 
         case SDLK_ESCAPE:
-            return LV_GROUP_KEY_ESC;
+            return LV_KEY_ESC;
 
-#ifdef  LV_GROUP_KEY_BACKSPACE        /*For backward compatibility*/
+#ifdef  LV_KEY_BACKSPACE        /*For backward compatibility*/
         case SDLK_BACKSPACE:
-            return LV_GROUP_KEY_BACKSPACE;
+            return LV_KEY_BACKSPACE;
 #endif
 
-#ifdef  LV_GROUP_KEY_DEL        /*For backward compatibility*/
+#ifdef  LV_KEY_DEL        /*For backward compatibility*/
         case SDLK_DELETE:
-            return LV_GROUP_KEY_DEL;
+            return LV_KEY_DEL;
 #endif
         case SDLK_KP_ENTER:
         case '\r':
-            return LV_GROUP_KEY_ENTER;
+            return LV_KEY_ENTER;
 
         default:
             return sdl_key;

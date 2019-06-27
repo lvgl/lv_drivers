@@ -102,6 +102,9 @@
 
 /*Different rendering might be used if running in a Virtual machine*/
 #  define MONITOR_VIRTUAL_MACHINE 0
+
+/*Open two windows to test multi display support*/
+#  define MONITOR_DUAL            0
 #endif
 
 /*-----------------------------------
@@ -113,8 +116,8 @@
 
 #define USE_WINDOWS         0
 #if USE_WINDOWS
-#  define WINDOW_HOR_RES      LV_HOR_RES
-#  define WINDOW_VER_RES      LV_VER_RES
+#  define WINDOW_HOR_RES      480
+#  define WINDOW_VER_RES      320
 #endif
 
 /*----------------
