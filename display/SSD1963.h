@@ -22,7 +22,7 @@ extern "C" {
 #if USE_SSD1963
 
 #include <stdint.h>
-#include "lvgl/lv_misc/lv_color.h"
+#include "lvgl/lvgl.h"
 
 /*********************
  *      DEFINES

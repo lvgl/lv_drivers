@@ -10,7 +10,6 @@
 #if USE_SSD1963
 
 #include <stdbool.h>
-#include "lvgl/lv_core/lv_vdb.h"
 #include LV_DRV_DISP_INCLUDE
 #include LV_DRV_DELAY_INCLUDE
 
@@ -143,12 +142,12 @@ void ssd1963_init(void)
     ssd1963_cmd(0x00d0);
     ssd1963_data(0x000d);
 
-    DisplayBacklightOn();
+    //DisplayBacklightOn();
 
     LV_DRV_DELAY_MS(30);
 }
 
-void ssd1963_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p);
+void ssd1963_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
 
     /*Return if the area is out the screen*/
