@@ -148,21 +148,20 @@ void ssd1963_init(void)
     LV_DRV_DELAY_MS(30);
 }
 
-
-void ssd1963_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
+void ssd1963_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p);
 {
 
     /*Return if the area is out the screen*/
-    if(x2 < 0) return;
-    if(y2 < 0) return;
-    if(x1 > SSD1963_HOR_RES - 1) return;
-    if(y1 > SSD1963_VER_RES - 1) return;
+    if(area->x2 < 0) return;
+    if(area->y2 < 0) return;
+    if(area->x1 > SSD1963_HOR_RES - 1) return;
+    if(area->y1 > SSD1963_VER_RES - 1) return;
 
     /*Truncate the area to the screen*/
-    int32_t act_x1 = x1 < 0 ? 0 : x1;
-    int32_t act_y1 = y1 < 0 ? 0 : y1;
-    int32_t act_x2 = x2 > SSD1963_HOR_RES - 1 ? SSD1963_HOR_RES - 1 : x2;
-    int32_t act_y2 = y2 > SSD1963_VER_RES - 1 ? SSD1963_VER_RES - 1 : y2;
+    int32_t act_x1 = area->x1 < 0 ? 0 : area->x1;
+    int32_t act_y1 = area->y1 < 0 ? 0 : area->y1;
+    int32_t act_x2 = area->x2 > SSD1963_HOR_RES - 1 ? SSD1963_HOR_RES - 1 : area->x2;
+    int32_t act_y2 = area->y2 > SSD1963_VER_RES - 1 ? SSD1963_VER_RES - 1 : area->y2;
 
     //Set the rectangular area
     ssd1963_cmd(0x002A);
@@ -179,7 +178,7 @@ void ssd1963_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
 
     ssd1963_cmd(0x2c);
     int16_t i;
-    uint16_t full_w = x2 - x1 + 1;
+    uint16_t full_w = area->x2 - area->x1 + 1;
 
     ssd1963_data_mode();
     LV_DRV_DISP_PAR_CS(0);
@@ -200,101 +199,7 @@ void ssd1963_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_colo
     }
 #endif
 
-    lv_flush_ready();
-}
-
-void ssd1963_fill(int32_t x1, int32_t y1, int32_t x2, int32_t y2, lv_color_t color)
-{
-    /*Return if the area is out the screen*/
-    if(x2 < 0) return;
-    if(y2 < 0) return;
-    if(x1 > SSD1963_HOR_RES - 1) return;
-    if(y1 > SSD1963_VER_RES - 1) return;
-
-    /*Truncate the area to the screen*/
-    int32_t act_x1 = x1 < 0 ? 0 : x1;
-    int32_t act_y1 = y1 < 0 ? 0 : y1;
-    int32_t act_x2 = x2 > SSD1963_HOR_RES - 1 ? SSD1963_HOR_RES - 1 : x2;
-    int32_t act_y2 = y2 > SSD1963_VER_RES - 1 ? SSD1963_VER_RES - 1 : y2;
-
-    //Set the rectangular area
-    ssd1963_cmd(0x002A);
-    ssd1963_data(act_x1 >> 8);
-    ssd1963_data(0x00FF & act_x1);
-    ssd1963_data(act_x2 >> 8);
-    ssd1963_data(0x00FF & act_x2);
-
-    ssd1963_cmd(0x002B);
-    ssd1963_data(act_y1 >> 8);
-    ssd1963_data(0x00FF & act_y1);
-    ssd1963_data(act_y2 >> 8);
-    ssd1963_data(0x00FF & act_y2);
-
-    ssd1963_cmd(0x2c);
-
-    LV_DRV_DISP_PAR_CS(0);
-    ssd1963_data_mode();
-
-    uint16_t color16 = lv_color_to16(color);
-    uint32_t size = (act_x2 - act_x1 + 1) * (act_y2 - act_y1 + 1);
-    uint32_t i;
-    for(i = 0; i < size; i++) {
-        LV_DRV_DISP_PAR_WR_WORD(color16);
-    }
-    LV_DRV_DISP_PAR_CS(1);
-}
-
-void ssd1963_map(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const lv_color_t * color_p)
-{
-
-    /*Return if the area is out the screen*/
-    if(x2 < 0) return;
-    if(y2 < 0) return;
-    if(x1 > SSD1963_HOR_RES - 1) return;
-    if(y1 > SSD1963_VER_RES - 1) return;
-
-    /*Truncate the area to the screen*/
-    int32_t act_x1 = x1 < 0 ? 0 : x1;
-    int32_t act_y1 = y1 < 0 ? 0 : y1;
-    int32_t act_x2 = x2 > SSD1963_HOR_RES - 1 ? SSD1963_HOR_RES - 1 : x2;
-    int32_t act_y2 = y2 > SSD1963_VER_RES - 1 ? SSD1963_VER_RES - 1 : y2;
-
-    //Set the rectangular area
-    ssd1963_cmd(0x002A);
-    ssd1963_data(act_x1 >> 8);
-    ssd1963_data(0x00FF & act_x1);
-    ssd1963_data(act_x2 >> 8);
-    ssd1963_data(0x00FF & act_x2);
-
-    ssd1963_cmd(0x002B);
-    ssd1963_data(act_y1 >> 8);
-    ssd1963_data(0x00FF & act_y1);
-    ssd1963_data(act_y2 >> 8);
-    ssd1963_data(0x00FF & act_y2);
-
-    ssd1963_cmd(0x2c);
-    int16_t i;
-    uint16_t full_w = x2 - x1 + 1;
-
-    LV_DRV_DISP_PAR_CS(0);
-    ssd1963_data_mode();
-
-#if LV_COLOR_DEPTH == 16
-    uint16_t act_w = act_x2 - act_x1 + 1;
-    for(i = act_y1; i <= act_y2; i++) {
-        LV_DRV_DISP_PAR_WR_ARRAY((uint16_t *)color_p, act_w);
-        color_p += full_w;
-    }
-    LV_DRV_DISP_PAR_CS(1);
-#else
-    int16_t j;
-    for(i = act_y1; i <= act_y2; i++) {
-        for(j = 0; j <= act_x2 - act_x1 + 1; j++) {
-            LV_DRV_DISP_PAR_WR_WORD(color_p[j]);
-            color_p += full_w;
-        }
-    }
-#endif
+    lv_disp_flush_ready(disp_drv);
 }
 
 /**********************
