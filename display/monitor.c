@@ -112,12 +112,10 @@ void monitor_init(void)
 }
 
 /**
- * Flush a buffer to the display. Calls 'lv_flush_ready()' when finished
- * @param x1 left coordinate
- * @param y1 top coordinate
- * @param x2 right coordinate
- * @param y2 bottom coordinate
- * @param color_p array of colors to be flushed
+ * Flush a buffer to the marked area
+ * @param drv pointer to driver where this function belongs
+ * @param area an area where to copy `color_p`
+ * @param color_p an array of pixel to copy to the `area` part of the screen
  */
 void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
@@ -169,13 +167,12 @@ void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t 
 
 
 #if MONITOR_DUAL
+
 /**
- * Flush a buffer to the display. Calls 'lv_flush_ready()' when finished
- * @param x1 left coordinate
- * @param y1 top coordinate
- * @param x2 right coordinate
- * @param y2 bottom coordinate
- * @param color_p array of colors to be flushed
+ * Flush a buffer to the marked area
+ * @param drv pointer to driver where this function belongs
+ * @param area an area where to copy `color_p`
+ * @param color_p an array of pixel to copy to the `area` part of the screen
  */
 void monitor_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
