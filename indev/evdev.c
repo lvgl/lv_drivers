@@ -91,7 +91,7 @@ bool evdev_set_file(char* dev_name)
  * @param data store the evdev data here
  * @return false: because the points are not buffered, so no more data to be read
  */
-bool evdev_read(lv_indev_data_t * data)
+bool evdev_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
 {
     struct input_event in;
 
@@ -140,19 +140,47 @@ bool evdev_read(lv_indev_data_t * data)
                     evdev_button = LV_INDEV_STATE_REL;
                 else if(in.value == 1)
                     evdev_button = LV_INDEV_STATE_PR;
-            }
+            } else if(drv->type == LV_INDEV_TYPE_KEYPAD) {
+		data->state = (in.value) ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
+		switch(in.code) {
+			case KEY_BACKSPACE:
+				data->key = LV_KEY_BACKSPACE;
+				break;
+			case KEY_ENTER:
+				data->key = LV_KEY_ENTER;
+				break;
+			case KEY_UP:
+				data->key = LV_KEY_UP;
+				break;
+			case KEY_LEFT:
+				data->key = LV_KEY_PREV;
+				break;
+			case KEY_RIGHT:
+				data->key = LV_KEY_NEXT;
+				break;
+			case KEY_DOWN:
+				data->key = LV_KEY_DOWN;
+				break;
+			default:
+				data->key = 0;
+				break;
+		}
+		return false;
+	    }
         }
     }
 
+    if(drv->type != LV_INDEV_TYPE_POINTER)
+        return false;
     /*Store the collected data*/
 
 #if EVDEV_SCALE
-    data->point.x = map(evdev_root_x, 0, EVDEV_SCALE_HOR_RES, 0, LV_HOR_RES);
-    data->point.y = map(evdev_root_y, 0, EVDEV_SCALE_VER_RES, 0, LV_VER_RES);
+    data->point.x = map(evdev_root_x, 0, EVDEV_SCALE_HOR_RES, 0, lv_disp_get_hor_res(drv->disp));
+    data->point.y = map(evdev_root_y, 0, EVDEV_SCALE_VER_RES, 0, lv_disp_get_ver_res(drv->disp));
 #else
 #if EVDEV_CALIBRATE
-	data->point.x = map(evdev_root_x, EVDEV_HOR_MIN, EVDEV_HOR_MAX, 0, LV_HOR_RES);
-	data->point.y = map(evdev_root_y, EVDEV_VER_MIN, EVDEV_VER_MAX, 0, LV_VER_RES);
+	data->point.x = map(evdev_root_x, EVDEV_HOR_MIN, EVDEV_HOR_MAX, 0, lv_disp_get_hor_res(drv->disp));
+	data->point.y = map(evdev_root_y, EVDEV_VER_MIN, EVDEV_VER_MAX, 0, lv_disp_get_ver_res(drv->disp));
 #else
     data->point.x = evdev_root_x;
     data->point.y = evdev_root_y;
@@ -165,10 +193,10 @@ bool evdev_read(lv_indev_data_t * data)
       data->point.x = 0;
     if(data->point.y < 0)
       data->point.y = 0;
-    if(data->point.x >= LV_HOR_RES)
-      data->point.x = LV_HOR_RES - 1;
-    if(data->point.y >= LV_VER_RES)
-      data->point.y = LV_VER_RES - 1;
+    if(data->point.x >= lv_disp_get_hor_res(drv->disp))
+      data->point.x = lv_disp_get_hor_res(drv->disp) - 1;
+    if(data->point.y >= lv_disp_get_ver_res(drv->disp))
+      data->point.y = lv_disp_get_ver_res(drv->disp) - 1;
 
     return false;
 }
