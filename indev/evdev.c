@@ -35,6 +35,8 @@ int evdev_root_x;
 int evdev_root_y;
 int evdev_button;
 
+int evdev_key_val;
+
 /**********************
  *      MACROS
  **********************/
@@ -58,6 +60,7 @@ void evdev_init(void)
 
     evdev_root_x = 0;
     evdev_root_y = 0;
+    evdev_key_val = 0;
     evdev_button = LV_INDEV_STATE_REL;
 }
 /**
@@ -82,6 +85,7 @@ bool evdev_set_file(char* dev_name)
 
      evdev_root_x = 0;
      evdev_root_y = 0;
+     evdev_key_val = 0;
      evdev_button = LV_INDEV_STATE_REL;
 
      return true;
@@ -165,11 +169,19 @@ bool evdev_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
 				data->key = 0;
 				break;
 		}
+		evdev_key_val = data->key;
+		evdev_button = data->state;
 		return false;
 	    }
         }
     }
 
+    if(drv->type == LV_INDEV_TYPE_KEYPAD) {
+        /* No data retrieved */
+        data->key = evdev_key_val;
+	data->state = evdev_button;
+	return false;
+    }
     if(drv->type != LV_INDEV_TYPE_POINTER)
         return false;
     /*Store the collected data*/
