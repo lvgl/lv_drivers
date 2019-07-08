@@ -143,16 +143,16 @@ void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t 
     int32_t y;
 #if LV_COLOR_DEPTH != 24 && LV_COLOR_DEPTH != 32    /*32 is valid but support 24 for backward compatibility too*/
     int32_t x;
-    for(y = area->y1; y <= area->y2; y++) {
+    for(y = area->y1; y <= area->y2 && y < disp_drv->ver_res; y++) {
         for(x = area->x1; x <= area->x2; x++) {
-            monitor.tft_fb[y * MONITOR_HOR_RES + x] = lv_color_to32(*color_p);
+            monitor.tft_fb[y * disp_drv->hor_res + x] = lv_color_to32(*color_p);
             color_p++;
         }
 
     }
 #else
     uint32_t w = lv_area_get_width(area);
-    for(y = area->y1; y <= area->y2 && y < MONITOR_VER_RES; y++) {
+    for(y = area->y1; y <= area->y2 && y < disp_drv->ver_res; y++) {
         memcpy(&monitor.tft_fb[y * MONITOR_HOR_RES + area->x1], color_p, w * sizeof(lv_color_t));
         color_p += w;
     }
@@ -197,17 +197,17 @@ void monitor_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t
     int32_t y;
 #if LV_COLOR_DEPTH != 24 && LV_COLOR_DEPTH != 32    /*32 is valid but support 24 for backward compatibility too*/
     int32_t x;
-    for(y = area->y1; y <= area->y2; y++) {
+    for(y = area->y1; y <= area->y2 && y < disp_drv->ver_res; y++) {
         for(x = area->x1; x <= area->x2; x++) {
-            monitor2.tft_fb[y * MONITOR_HOR_RES + x] = lv_color_to32(*color_p);
+            monitor2.tft_fb[y * disp_drv->hor_res + x] = lv_color_to32(*color_p);
             color_p++;
         }
 
     }
 #else
     uint32_t w = lv_area_get_width(area);
-    for(y = area->y1; y <= area->y2 && y < MONITOR_VER_RES; y++) {
-        memcpy(&monitor2.tft_fb[y * MONITOR_HOR_RES + area->x1], color_p, w * sizeof(lv_color_t));
+    for(y = area->y1; y <= area->y2 && y < disp_drv->ver_res; y++) {
+        memcpy(&monitor2.tft_fb[y * disp_drv->hor_res + area->x1], color_p, w * sizeof(lv_color_t));
         color_p += w;
     }
 #endif
