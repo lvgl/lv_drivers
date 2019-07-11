@@ -122,9 +122,9 @@ bool libinput_read(lv_indev_data_t * data)
 
   rc = poll(fds, nfds, timeout);
   switch (rc){
-    case 0:
     case -1:
       perror(NULL);
+    case 0:
       goto report_most_recent_state;
     default:
       break;
