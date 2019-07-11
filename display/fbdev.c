@@ -115,6 +115,8 @@ void fbdev_flush(lv_disp_drv_t * drv, const lv_area_t * area, lv_color_t * color
     int32_t act_x2 = area->x2 > (int32_t)vinfo.xres - 1 ? (int32_t)vinfo.xres - 1 : area->x2;
     int32_t act_y2 = area->y2 > (int32_t)vinfo.yres - 1 ? (int32_t)vinfo.yres - 1 : area->y2;
 
+
+    lv_coord_t w = lv_area_get_width(area);
     long int location = 0;
     long int byte_location = 0;
     unsigned char bit_location = 0;
@@ -122,46 +124,31 @@ void fbdev_flush(lv_disp_drv_t * drv, const lv_area_t * area, lv_color_t * color
     /*32 or 24 bit per pixel*/
     if(vinfo.bits_per_pixel == 32 || vinfo.bits_per_pixel == 24) {
         uint32_t * fbp32 = (uint32_t *)fbp;
-        int32_t x;
         int32_t y;
         for(y = act_y1; y <= act_y2; y++) {
-            for(x = act_x1; x <= act_x2; x++) {
-                location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * finfo.line_length / 4;
-                fbp32[location] = color_p->full;
-                color_p++;
-            }
-
-            color_p += area->x2 - act_x2;
+            location = (act_x1 + vinfo.xoffset) + (y + vinfo.yoffset) * finfo.line_length / 4;
+            memcpy(&fbp32[location], (uint32_t *)color_p, (act_x2 - act_x1 + 1) * 4);
+            color_p += w;
         }
     }
     /*16 bit per pixel*/
     else if(vinfo.bits_per_pixel == 16) {
         uint16_t * fbp16 = (uint16_t *)fbp;
-        int32_t x;
         int32_t y;
         for(y = act_y1; y <= act_y2; y++) {
-            for(x = act_x1; x <= act_x2; x++) {
-                location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * finfo.line_length / 2;
-                fbp16[location] = color_p->full;
-                color_p++;
-            }
-
-            color_p += area->x2 - act_x2;
+            location = (act_x1 + vinfo.xoffset) + (y + vinfo.yoffset) * finfo.line_length / 2;
+            memcpy(&fbp16[location], (uint32_t *)color_p, (act_x2 - act_x1 + 1) * 2);
+            color_p += w;
         }
     }
     /*8 bit per pixel*/
     else if(vinfo.bits_per_pixel == 8) {
         uint8_t * fbp8 = (uint8_t *)fbp;
-        int32_t x;
         int32_t y;
         for(y = act_y1; y <= act_y2; y++) {
-            for(x = act_x1; x <= act_x2; x++) {
-                location = (x + vinfo.xoffset) + (y + vinfo.yoffset) * finfo.line_length;
-                fbp8[location] = color_p->full;
-                color_p++;
-            }
-
-            color_p += area->x2 - act_x2;
+            location = (act_x1 + vinfo.xoffset) + (y + vinfo.yoffset) * finfo.line_length;
+            memcpy(&fbp8[location], (uint32_t *)color_p, (act_x2 - act_x1 + 1));
+            color_p += w;
         }
     }
     /*1 bit per pixel*/
