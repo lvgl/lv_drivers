@@ -22,7 +22,7 @@ extern "C" {
 #if USE_UC1610
 
 #include <stdint.h>
-#include "lvgl.h"
+#include "lvgl/lvgl.h"
 
 /*********************
  *      DEFINES
