@@ -23,7 +23,7 @@
 #define UC1610_SET_MODE    1
 
 /* hardware control commands */
-#define UC1610_SYSTEM_RESET					0xE2      /* software reset */
+#define UC1610_SYSTEM_RESET                 0xE2      /* software reset */
 #define UC1610_NOP                          0xE3
 #define UC1610_SET_TEMP_COMP                0x24      /* set temperature compensation, default -0.05%/°C */
 #define UC1610_SET_PANEL_LOADING            0x29      /* set panel loading, default 16~21 nF */
