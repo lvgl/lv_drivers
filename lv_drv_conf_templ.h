@@ -179,6 +179,22 @@
 /*No settings*/
 #endif  /*USE_ST7565*/
 
+/*------------------------------------------
+ *  UC1610 (4 gray 160*[104|128])
+ *  (EA DOGXL160 160x104 tested)
+ *-----------------------------------------*/
+#ifndef USE_UC1610
+#  define USE_UC1610          0
+#endif
+
+#if USE_UC1610
+#  define UC1610_HOR_RES         LV_HOR_RES
+#  define UC1610_VER_RES         LV_VER_RES
+#  define UC1610_INIT_CONTRAST   33   /* init contrast, values in [%] */
+#  define UC1610_INIT_HARD_RST   0    /* 1 : hardware reset at init, 0 : software reset */
+#  define UC1610_TOP_VIEW        0    /* 0 : Bottom View, 1 : Top View */
+#endif  /*USE_UC1610*/
+
 /*-----------------------------------------
  *  Linux frame buffer device (/dev/fbx)
  *-----------------------------------------*/
