@@ -13,9 +13,9 @@
  *      LS044Q7DH01 (320x240 pixels.)
  *
  *  These displays need periodic com inversion, there are two ways :
- *    - software com inversion when writing a frame on screen
- *      memory : define SHARP_MIP_SOFT_COM_INVERSION 1 and
- *      set EXTMODE display pin LOW
+ *    - software com inversion :
+ *      define SHARP_MIP_SOFT_COM_INVERSION 1 and set EXTMODE display pin LOW,
+ *      call sharp_mip_com_inversion() periodically
  *    - hardware com inversion with EXTCOMIN display pin :
  *      define SHARP_MIP_SOFT_COM_INVERSION 0,
  *      set EXTMODE display pin HIGH and handle
