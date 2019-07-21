@@ -127,14 +127,6 @@ void sharp_mip_flush_cb(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_col
   /* Set frame header in VDB */
   buf[0] = SHARP_MIP_HEADER         |
            SHARP_MIP_UPDATE_RAM_FLAG;
-#if SHARP_MIP_SOFT_COM_INVERSION
-  if (com_output_state) {
-    com_output_state = false;
-  } else {
-    buf[0] |= SHARP_MIP_COM_INVERSION_FLAG;
-    com_output_state = true;
-  }
-#endif
 
   /* Write the frame on display memory */
   LV_DRV_DISP_SPI_CS(1);
@@ -163,6 +155,25 @@ void sharp_mip_rounder_cb(lv_disp_drv_t * disp_drv, lv_area_t * area) {
   area->x1 = 0;
   area->x2 = SHARP_MIP_HOR_RES - 1;
 }
+
+#if SHARP_MIP_SOFT_COM_INVERSION
+void sharp_mip_com_inversion(void) {
+  uint8_t inversion_header[2] = {0};
+
+  /* Set inversion header */
+  if (com_output_state) {
+    com_output_state = false;
+  } else {
+    inversion_header[0] |= SHARP_MIP_COM_INVERSION_FLAG;
+    com_output_state = true;
+  }
+
+  /* Write inversion header on display memory */
+  LV_DRV_DISP_SPI_CS(1);
+  LV_DRV_DISP_SPI_WR_ARRAY(inversion_header, 2);
+  LV_DRV_DISP_SPI_CS(0);
+}
+#endif
 
 /**********************
  *   STATIC FUNCTIONS
