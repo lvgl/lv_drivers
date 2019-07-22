@@ -113,7 +113,7 @@ void libinput_init(void)
  * @param data store the libinput data here
  * @return false: because the points are not buffered, so no more data to be read
  */
-bool libinput_read(lv_indev_data_t * data)
+bool libinput_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 {
   struct libinput_event *event;
   struct libinput_event_touch *touch_event = NULL;
