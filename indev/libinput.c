@@ -110,6 +110,7 @@ void libinput_init(void)
 
 /**
  * Get the current position and state of the libinput
+ * @param indev_drv driver object itself
  * @param data store the libinput data here
  * @return false: because the points are not buffered, so no more data to be read
  */
