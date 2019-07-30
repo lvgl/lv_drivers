@@ -37,7 +37,7 @@ static void close_restricted(int fd, void *user_data);
  **********************/
 static int libinput_fd;
 static int libinput_button;
-static const int timeout = 0.0; // do not block
+static const int timeout = 0; // do not block
 static const nfds_t nfds = 1;
 static struct pollfd fds[1];
 static lv_point_t most_recent_touch_point = { .x = 0, .y = 0};
@@ -110,21 +110,21 @@ void libinput_init(void)
 
 /**
  * Get the current position and state of the libinput
+ * @param indev_drv driver object itself
  * @param data store the libinput data here
  * @return false: because the points are not buffered, so no more data to be read
  */
-bool libinput_read(lv_indev_data_t * data)
+bool libinput_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 {
   struct libinput_event *event;
   struct libinput_event_touch *touch_event = NULL;
   int rc = 0;
-  struct pollfd fds[1];
 
   rc = poll(fds, nfds, timeout);
   switch (rc){
-    case 0:
     case -1:
       perror(NULL);
+    case 0:
       goto report_most_recent_state;
     default:
       break;
