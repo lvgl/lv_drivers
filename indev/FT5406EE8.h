@@ -23,7 +23,7 @@ extern "C" {
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "lvgl/lv_hal/lv_hal_indev.h"
+#include "lvgl/lvgl.h"
 
 /*********************
  *      DEFINES
