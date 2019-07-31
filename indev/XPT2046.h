@@ -25,7 +25,7 @@ extern "C" {
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "lvgl/lv_hal/lv_hal_indev.h"
+#include "lvgl/src/lv_hal/lv_hal_indev.h"
 
 /*********************
  *      DEFINES
