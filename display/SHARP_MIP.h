@@ -13,16 +13,23 @@ extern "C" {
 /*********************
  *      INCLUDES
  *********************/
+
+#ifndef LV_DRV_NO_CONF
 #ifdef LV_CONF_INCLUDE_SIMPLE
 #include "lv_drv_conf.h"
 #else
 #include "../../lv_drv_conf.h"
 #endif
+#endif
 
 #if USE_SHARP_MIP
 
-#include <stdint.h>
+#ifdef LV_LVGL_H_INCLUDE_SIMPLE
+#include "lvgl.h"
+#else
 #include "lvgl/lvgl.h"
+#endif
+
 
 /*********************
  *      DEFINES
@@ -36,9 +43,9 @@ extern "C" {
  * GLOBAL PROTOTYPES
  **********************/
 void sharp_mip_init(void);
-void sharp_mip_flush_cb(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p);
-void sharp_mip_rounder_cb(lv_disp_drv_t * disp_drv, lv_area_t * area);
-void sharp_mip_set_px_cb(lv_disp_drv_t * disp_drv, uint8_t * buf, lv_coord_t buf_w, lv_coord_t x, lv_coord_t y, lv_color_t color, lv_opa_t opa);
+void sharp_mip_flush_(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p);
+void sharp_mip_rounder(lv_disp_drv_t * disp_drv, lv_area_t * area);
+void sharp_mip_set_px(lv_disp_drv_t * disp_drv, uint8_t * buf, lv_coord_t buf_w, lv_coord_t x, lv_coord_t y, lv_color_t color, lv_opa_t opa);
 #if SHARP_MIP_SOFT_COM_INVERSION
 void sharp_mip_com_inversion(void)
 #endif
