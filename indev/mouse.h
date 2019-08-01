@@ -23,10 +23,11 @@ extern "C" {
 
 #if USE_MOUSE
 
-#include <stdint.h>
-#include <stdbool.h>
+#ifdef LV_LVGL_H_INCLUDE_SIMPLE
+#include "lvgl.h"
+#else
 #include "lvgl/lvgl.h"
-
+#endif
 
 #ifndef MONITOR_SDL_INCLUDE_PATH
 #define MONITOR_SDL_INCLUDE_PATH <SDL2/SDL.h>

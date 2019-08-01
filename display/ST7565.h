@@ -23,8 +23,11 @@ extern "C" {
 
 #if USE_ST7565
 
-#include <stdint.h>
-#include "lvgl/lv_misc/lv_color.h"
+#ifdef LV_LVGL_H_INCLUDE_SIMPLE
+#include "lvgl.h"
+#else
+#include "lvgl/lvgl.h"
+#endif
 
 /*********************
  *      DEFINES
