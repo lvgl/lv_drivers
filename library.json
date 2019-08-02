@@ -1,5 +1,6 @@
 {
     "name": "lv_drivers",
+    "version": "6.0.2",
     "keywords": "littlevgl, lvgl, driver, display, touchpad",
     "description": "Drivers for LittlevGL graphics library.",
     "repository": {
