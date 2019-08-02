@@ -30,6 +30,14 @@
 #define MONITOR_ZOOM        1
 #endif
 
+#ifndef MONITOR_HOR_RES
+#define MONITOR_HOR_RES        LV_HOR_RES
+#endif
+
+#ifndef MONITOR_VER_RES
+#define MONITOR_VER_RES        LV_VER_RES
+#endif
+
 #if defined(__APPLE__) && defined(TARGET_OS_MAC)
 #  if __APPLE__ && TARGET_OS_MAC
 #define MONITOR_APPLE
