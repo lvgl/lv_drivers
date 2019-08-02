@@ -6,7 +6,7 @@
 /*********************
  *      INCLUDES
  *********************/
-#include "libinput.h"
+#include "libinput_drv.h"
 #if USE_LIBINPUT != 0
 
 #include <stdio.h>
