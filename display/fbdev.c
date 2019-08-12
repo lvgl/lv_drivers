@@ -78,14 +78,9 @@ static int fbfd = 0;
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
-#ifdef USE_BSD_FBDEV
+
 void fbdev_init(void)
 {
-    int y;
-    unsigned addr;
-    struct fbtype fb;
-    unsigned line_length;
-
     // Open the file for reading and writing
     fbfd = open(FBDEV_PATH, O_RDWR);
     if(fbfd == -1) {
@@ -93,6 +88,10 @@ void fbdev_init(void)
         return;
     }
     printf("The framebuffer device was opened successfully.\n");
+
+#ifdef USE_BSD_FBDEV
+    struct fbtype fb;
+    unsigned line_length;
 
     //Get fb type
     if (ioctl(fbfd, FBIOGTYPE, &fb) != 0) {
@@ -101,10 +100,10 @@ void fbdev_init(void)
     }
 
     //Get screen width
-	if (ioctl(fbfd, FBIO_GETLINEWIDTH, &line_length) != 0) {
-		perror("ioctl(FBIO_GETLINEWIDTH)");
-		return;
-	}
+    if (ioctl(fbfd, FBIO_GETLINEWIDTH, &line_length) != 0) {
+        perror("ioctl(FBIO_GETLINEWIDTH)");
+        return;
+    }
 
     vinfo.xres = (unsigned) fb.fb_width;
     vinfo.yres = (unsigned) fb.fb_height;
@@ -112,35 +111,7 @@ void fbdev_init(void)
     vinfo.xoffset = 0;
     vinfo.yoffset = 0;
     finfo.line_length = line_length;
-
-    printf("%dx%d, %dbpp\n", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);
-
-    // Figure out the size of the screen in bytes
-    screensize =  finfo.line_length * vinfo.yres;
-
-    // Map the device to memory
-    fbp = (char *)mmap(0, screensize, PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, 0);
-    if((intptr_t)fbp == -1) {
-        perror("Error: failed to map framebuffer device to memory");
-        return;
-    }
-
-    memset(fbp, 0, screensize);
-
-    printf("The framebuffer device was mapped to memory successfully.\n");
-
-}
-
 #else /* USE_BSD_FBDEV */
-void fbdev_init(void)
-{
-    // Open the file for reading and writing
-    fbfd = open(FBDEV_PATH, O_RDWR);
-    if(fbfd == -1) {
-        perror("Error: cannot open framebuffer device");
-        return;
-    }
-    printf("The framebuffer device was opened successfully.\n");
 
     // Get fixed screen information
     if(ioctl(fbfd, FBIOGET_FSCREENINFO, &finfo) == -1) {
@@ -153,6 +124,7 @@ void fbdev_init(void)
         perror("Error reading variable information");
         return;
     }
+#endif /* USE_BSD_FBDEV */
 
     printf("%dx%d, %dbpp\n", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);
 
@@ -165,10 +137,11 @@ void fbdev_init(void)
         perror("Error: failed to map framebuffer device to memory");
         return;
     }
+    memset(fbp, 0, screensize);
+
     printf("The framebuffer device was mapped to memory successfully.\n");
 
 }
-#endif /* USE_BSD_FBDEV */
 
 void fbdev_exit(void)
 {
