@@ -21,7 +21,7 @@ extern "C" {
 #endif
 #endif
 
-#if USE_FBDEV
+#if USE_FBDEV || USE_BSD_FBDEV
 
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
 #include "lvgl.h"

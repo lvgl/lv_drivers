@@ -226,6 +226,17 @@
 #  define FBDEV_PATH          "/dev/fb0"
 #endif
 
+/*-----------------------------------------
+ *  FreeBSD frame buffer device (/dev/fbx)
+ *.........................................*/
+#ifndef USE_BSD_FBDEV
+#  define USE_BSD_FBDEV		0
+#endif
+
+#if USE_BSD_FBDEV
+# define FBDEV_PATH		"/dev/fb0"
+#endif
+
 /*********************
  *  INPUT DEVICES
  *********************/
