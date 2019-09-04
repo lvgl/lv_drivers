@@ -17,7 +17,7 @@
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 
-#ifdef USE_BSD_FBDEV
+#if USE_BSD_FBDEV
 #include <sys/fcntl.h>
 #include <sys/time.h>
 #include <sys/consio.h>
@@ -60,7 +60,7 @@ struct bsd_fb_fix_info{
 /**********************
  *  STATIC VARIABLES
  **********************/
-#ifdef USE_BSD_FBDEV
+#if USE_BSD_FBDEV
 static struct bsd_fb_var_info vinfo;
 static struct bsd_fb_fix_info finfo;
 #else
@@ -89,7 +89,7 @@ void fbdev_init(void)
     }
     printf("The framebuffer device was opened successfully.\n");
 
-#ifdef USE_BSD_FBDEV
+#if USE_BSD_FBDEV
     struct fbtype fb;
     unsigned line_length;
 
