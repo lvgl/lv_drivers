@@ -129,7 +129,7 @@ void fbdev_init(void)
     printf("%dx%d, %dbpp\n", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);
 
     // Figure out the size of the screen in bytes
-    screensize =  finfo.line_length * vinfo.yres;
+    screensize =  finfo.smem_len; //finfo.line_length * vinfo.yres;    
 
     // Map the device to memory
     fbp = (char *)mmap(0, screensize, PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, 0);
