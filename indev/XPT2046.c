@@ -57,11 +57,10 @@ void xpt2046_init(void)
  * @param data store the read data here
  * @return false: because no ore data to be read
  */
-bool xpt2046_read(lv_indev_data_t * data)
+bool xpt2046_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 {
     static int16_t last_x = 0;
     static int16_t last_y = 0;
-    bool valid = true;
     uint8_t buf;
 
     int16_t x = 0;
@@ -93,20 +92,20 @@ bool xpt2046_read(lv_indev_data_t * data)
 
         last_x = x;
         last_y = y;
+		data->state = LV_INDEV_STATE_PR;
 
         LV_DRV_INDEV_SPI_CS(1);
     } else {
         x = last_x;
         y = last_y;
         avg_last = 0;
-        valid = false;
+		data->state = LV_INDEV_STATE_REL;
     }
 
     data->point.x = x;
     data->point.y = y;
-    data->state = valid == false ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
 
-    return valid;
+    return false;
 }
 
 /**********************
