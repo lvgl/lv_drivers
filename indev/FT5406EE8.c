@@ -78,7 +78,7 @@ void ft5406ee8_init(void)
  * @param data store the read data here
  * @return false: because no ore data to be read
  */
-bool ft5406ee8_read(lv_indev_data_t * data)
+bool ft5406ee8_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 {
     static int16_t x_last;
     static int16_t y_last;

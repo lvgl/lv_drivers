@@ -108,7 +108,7 @@ extern "C" {
 #define TOUCHCAL_LRY 0x032D
 
 void ad_touch_init(void);
-bool ad_touch_read(lv_indev_data_t *data);
+bool ad_touch_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
 int16_t ad_touch_handler(void);
 
 #endif /* USE_AD_TOUCH */
