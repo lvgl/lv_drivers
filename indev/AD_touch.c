@@ -101,7 +101,7 @@ void ad_touch_init(void)
 }
 
 /*Use this in lv_indev_drv*/
-bool ad_touch_read(lv_indev_data_t * data)
+bool ad_touch_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 {
     static int16_t last_x = 0;
     static int16_t last_y = 0;

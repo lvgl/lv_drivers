@@ -41,7 +41,7 @@ extern "C" {
  * GLOBAL PROTOTYPES
  **********************/
 void ft5406ee8_init(void);
-bool ft5406ee8_read(lv_indev_data_t * data);
+bool ft5406ee8_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
 
 /**********************
  *      MACROS
