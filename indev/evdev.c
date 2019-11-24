@@ -189,14 +189,13 @@ bool evdev_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
 #if EVDEV_SCALE
     data->point.x = map(evdev_root_x, 0, EVDEV_SCALE_HOR_RES, 0, lv_disp_get_hor_res(drv->disp));
     data->point.y = map(evdev_root_y, 0, EVDEV_SCALE_VER_RES, 0, lv_disp_get_ver_res(drv->disp));
-#else
+#endif
 #if EVDEV_CALIBRATE
 	data->point.x = map(evdev_root_x, EVDEV_HOR_MIN, EVDEV_HOR_MAX, 0, lv_disp_get_hor_res(drv->disp));
 	data->point.y = map(evdev_root_y, EVDEV_VER_MIN, EVDEV_VER_MAX, 0, lv_disp_get_ver_res(drv->disp));
 #else
     data->point.x = evdev_root_x;
     data->point.y = evdev_root_y;
-#endif
 #endif
 
     data->state = evdev_button;
