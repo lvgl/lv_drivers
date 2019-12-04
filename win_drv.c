@@ -189,7 +189,7 @@ static void msg_handler(void *param)
 
     MSG msg;
     BOOL bRet;
-    while( (bRet = PeekMessage( &msg, NULL, 0, 0, TRUE )) != 0)
+    if( (bRet = PeekMessage( &msg, NULL, 0, 0, TRUE )) != 0)
     {
         if (bRet == -1)
         {
