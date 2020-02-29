@@ -38,12 +38,6 @@
 #define MONITOR_VER_RES        LV_VER_RES
 #endif
 
-#if defined(__APPLE__) && defined(TARGET_OS_MAC)
-#  if __APPLE__ && TARGET_OS_MAC
-#define MONITOR_APPLE
-#  endif
-#endif
-
 #if defined(__EMSCRIPTEN__)
 #  define MONITOR_EMSCRIPTEN
 #endif
@@ -354,11 +348,7 @@ static void window_create(monitor_t * m)
                               SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                               MONITOR_HOR_RES * MONITOR_ZOOM, MONITOR_VER_RES * MONITOR_ZOOM, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
 
-#if MONITOR_VIRTUAL_MACHINE || defined(MONITOR_EMSCRIPTEN)
     m->renderer = SDL_CreateRenderer(m->window, -1, SDL_RENDERER_SOFTWARE);
-#else
-    m->renderer = SDL_CreateRenderer(m->window, -1, 0);
-#endif
     m->texture = SDL_CreateTexture(m->renderer,
                                 SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, MONITOR_HOR_RES, MONITOR_VER_RES);
     SDL_SetTextureBlendMode(m->texture, SDL_BLENDMODE_BLEND);
