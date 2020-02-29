@@ -66,9 +66,17 @@ typedef struct {
 /**********************
  *  STATIC PROTOTYPES
  **********************/
-static int monitor_sdl_refr_thread(void * param);
 static void window_create(monitor_t * m);
 static void window_update(monitor_t * m);
+int quit_filter(void * userdata, SDL_Event * event);
+static void monitor_sdl_clean_up(void);
+static void monitor_sdl_init(void);
+#ifdef MONITOR_EMSCRIPTEN
+void monitor_sdl_refr_core(void); /* called from Emscripten loop */
+#else
+static void monitor_sdl_refr_core(void);
+static void monitor_sdl_refr_thread(lv_task_t * t);
+#endif
 
 /***********************
  *   GLOBAL PROTOTYPES
@@ -86,14 +94,6 @@ monitor_t monitor2;
 static volatile bool sdl_inited = false;
 static volatile bool sdl_quit_qry = false;
 
-int quit_filter(void * userdata, SDL_Event * event);
-static void monitor_sdl_clean_up(void);
-static void monitor_sdl_init(void);
-#ifdef MONITOR_EMSCRIPTEN
-void monitor_sdl_refr_core(void); /* called from Emscripten loop */
-#else
-static void monitor_sdl_refr_core(void);
-#endif
 
 /**********************
  *      MACROS
@@ -108,14 +108,10 @@ static void monitor_sdl_refr_core(void);
  */
 void monitor_init(void)
 {
-    /*OSX needs to initialize SDL here*/
-#if defined(MONITOR_APPLE) || defined(MONITOR_EMSCRIPTEN)
-    monitor_sdl_init();
-#endif
 
 #ifndef MONITOR_EMSCRIPTEN
-    SDL_CreateThread(monitor_sdl_refr_thread, "sdl_refr", NULL);
-    while(sdl_inited == false); /*Wait until 'sdl_refr' initializes the SDL*/
+    monitor_sdl_init();
+    lv_task_create(monitor_sdl_refr_thread, 10, LV_TASK_PRIO_HIGH, NULL);
 #endif
 }
 
@@ -237,24 +233,18 @@ void monitor_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t
  * It initializes SDL, handles drawing and the mouse.
  */
 
-static int monitor_sdl_refr_thread(void * param)
+static void monitor_sdl_refr_thread(lv_task_t * t)
 {
-    (void)param;
+    (void)t;
 
-    /*If not OSX initialize SDL in the Thread*/
-#ifndef MONITOR_APPLE
-    monitor_sdl_init();
-#endif
+    /*Refresh handling*/
+    monitor_sdl_refr_core();
+
     /*Run until quit event not arrives*/
-    while(sdl_quit_qry == false) {
-        /*Refresh handling*/
-        monitor_sdl_refr_core();
+    if(sdl_quit_qry) {
+        monitor_sdl_clean_up();
+        exit(0);
     }
-
-    monitor_sdl_clean_up();
-    exit(0);
-
-    return 0;
 }
 
 int quit_filter(void * userdata, SDL_Event * event)
@@ -269,8 +259,6 @@ int quit_filter(void * userdata, SDL_Event * event)
     else if(event->type == SDL_QUIT) {
         sdl_quit_qry = true;
     }
-
-
 
     return 1;
 }
@@ -316,7 +304,6 @@ void monitor_sdl_refr_core(void)
 static void monitor_sdl_refr_core(void)
 #endif
 {
-
     if(monitor.sdl_refr_qry != false) {
         monitor.sdl_refr_qry = false;
         window_update(&monitor);
@@ -329,7 +316,6 @@ static void monitor_sdl_refr_core(void)
     }
 #endif
 
-#if !defined(MONITOR_APPLE) && !defined(MONITOR_EMSCRIPTEN)
     SDL_Event event;
     while(SDL_PollEvent(&event)) {
 #if USE_MOUSE != 0
@@ -359,10 +345,6 @@ static void monitor_sdl_refr_core(void)
             }
         }
     }
-#endif /*MONITOR_APPLE*/
-
-    /*Sleep some time*/
-    SDL_Delay(SDL_REFR_PERIOD);
 
 }
 
