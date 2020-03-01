@@ -38,10 +38,6 @@
 #define MONITOR_VER_RES        LV_VER_RES
 #endif
 
-#if defined(__EMSCRIPTEN__)
-#  define MONITOR_EMSCRIPTEN
-#endif
-
 /**********************
  *      TYPEDEFS
  **********************/
@@ -65,12 +61,8 @@ static void window_update(monitor_t * m);
 int quit_filter(void * userdata, SDL_Event * event);
 static void monitor_sdl_clean_up(void);
 static void monitor_sdl_init(void);
-#ifdef MONITOR_EMSCRIPTEN
-void monitor_sdl_refr_core(void); /* called from Emscripten loop */
-#else
 static void monitor_sdl_refr_core(void);
 static void monitor_sdl_refr_thread(lv_task_t * t);
-#endif
 
 /***********************
  *   GLOBAL PROTOTYPES
@@ -102,11 +94,8 @@ static volatile bool sdl_quit_qry = false;
  */
 void monitor_init(void)
 {
-
-#ifndef MONITOR_EMSCRIPTEN
     monitor_sdl_init();
     lv_task_create(monitor_sdl_refr_thread, 10, LV_TASK_PRIO_HIGH, NULL);
-#endif
 }
 
 /**
@@ -292,11 +281,7 @@ static void monitor_sdl_init(void)
     sdl_inited = true;
 }
 
-#ifdef MONITOR_EMSCRIPTEN
-void monitor_sdl_refr_core(void)
-#else
 static void monitor_sdl_refr_core(void)
-#endif
 {
     if(monitor.sdl_refr_qry != false) {
         monitor.sdl_refr_qry = false;
