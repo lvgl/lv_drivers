@@ -51,6 +51,7 @@ struct bsd_fb_var_info{
 
 struct bsd_fb_fix_info{
     long int line_length;
+    long int smem_len;
 };
 
 /**********************
@@ -111,6 +112,7 @@ void fbdev_init(void)
     vinfo.xoffset = 0;
     vinfo.yoffset = 0;
     finfo.line_length = line_length;
+    finfo.smem_len = finfo.line_length * vinfo.yres;
 #else /* USE_BSD_FBDEV */
 
     // Get fixed screen information
