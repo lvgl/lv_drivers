@@ -401,11 +401,12 @@ static void window_update(monitor_t * m)
     SDL_UpdateTexture(m->texture, NULL, m->tft_fb_act, MONITOR_HOR_RES * sizeof(uint32_t));
 #endif
     SDL_RenderClear(m->renderer);
-    /*Test: Draw a background to test transparent screens (LV_COLOR_SCREEN_TRANSP)*/
-    //        SDL_SetRenderDrawColor(renderer, 0xff, 0, 0, 0xff);
-    //        SDL_Rect r;
-    //        r.x = 0; r.y = 0; r.w = MONITOR_HOR_RES; r.w = MONITOR_VER_RES;
-    //        SDL_RenderDrawRect(renderer, &r);
+#if LV_COLOR_SCREEN_TRANSP
+    SDL_SetRenderDrawColor(m->renderer, 0xff, 0, 0, 0xff);
+    SDL_Rect r;
+    r.x = 0; r.y = 0; r.w = MONITOR_HOR_RES; r.w = MONITOR_VER_RES;
+    SDL_RenderDrawRect(m->renderer, &r);
+#endif
 
     /*Update the renderer with the texture containing the rendered image*/
     SDL_RenderCopy(m->renderer, m->texture, NULL, NULL);
