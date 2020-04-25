@@ -256,7 +256,9 @@
 #  define XPT2046_X_MAX       3800
 #  define XPT2046_Y_MAX       3800
 #  define XPT2046_AVG         4
-#  define XPT2046_INV         0
+#  define XPT2046_X_INV       0
+#  define XPT2046_Y_INV       0
+#  define XPT2046_XY_SWAP     0
 #endif
 
 /*-----------------
