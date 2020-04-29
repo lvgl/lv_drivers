@@ -200,9 +200,9 @@ static void msg_handler(void *param)
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
+        if(msg.message == WM_QUIT)
+            lv_win_exit_flag = true;
     }
-    if(msg.message == WM_QUIT)
-        lv_win_exit_flag = true;
 }
 
  static bool win_drv_read(lv_indev_t *drv, lv_indev_data_t * data)
