@@ -7,12 +7,16 @@
  *      INCLUDES
  *********************/
 #include "evdev.h"
-#if USE_EVDEV != 0
+#if USE_EVDEV != 0 || USE_BSD_EVDEV
 
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
+#if USE_BSD_EVDEV
+#include <dev/evdev/input.h>
+#else
 #include <linux/input.h>
+#endif
 
 /*********************
  *      DEFINES
@@ -50,13 +54,21 @@ int evdev_key_val;
  */
 void evdev_init(void)
 {
+#if USE_BSD_EVDEV
+    evdev_fd = open(EVDEV_NAME, O_RDWR | O_NOCTTY);
+#else
     evdev_fd = open(EVDEV_NAME, O_RDWR | O_NOCTTY | O_NDELAY);
+#endif
     if(evdev_fd == -1) {
         perror("unable open evdev interface:");
         return;
     }
 
+#if USE_BSD_EVDEV
+    fcntl(evdev_fd, F_SETFL, O_NONBLOCK);
+#else
     fcntl(evdev_fd, F_SETFL, O_ASYNC | O_NONBLOCK);
+#endif
 
     evdev_root_x = 0;
     evdev_root_y = 0;
@@ -74,14 +86,22 @@ bool evdev_set_file(char* dev_name)
      if(evdev_fd != -1) {
         close(evdev_fd);
      }
+#if USE_BSD_EVDEV
+     evdev_fd = open(dev_name, O_RDWR | O_NOCTTY);
+#else
      evdev_fd = open(dev_name, O_RDWR | O_NOCTTY | O_NDELAY);
+#endif
 
      if(evdev_fd == -1) {
         perror("unable open evdev interface:");
         return false;
      }
 
+#if USE_BSD_EVDEV
+     fcntl(evdev_fd, F_SETFL, O_NONBLOCK);
+#else
      fcntl(evdev_fd, F_SETFL, O_ASYNC | O_NONBLOCK);
+#endif
 
      evdev_root_x = 0;
      evdev_root_y = 0;

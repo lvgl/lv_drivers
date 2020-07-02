@@ -108,7 +108,7 @@ void fbdev_init(void)
 
     vinfo.xres = (unsigned) fb.fb_width;
     vinfo.yres = (unsigned) fb.fb_height;
-    vinfo.bits_per_pixel = fb.fb_depth + 8;
+    vinfo.bits_per_pixel = fb.fb_depth;
     vinfo.xoffset = 0;
     vinfo.yoffset = 0;
     finfo.line_length = line_length;
