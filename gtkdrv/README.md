@@ -33,12 +33,12 @@ C/C++ Build > Build variables
 - Configuration: [All Configuration]
 
 - Add
-  - Variable name: gtk+-cflags
-   - Type: String
-   - Value: `pkg-config --cflags gtk+-3.0`
-  - Variable name: gtk+-libs
-   - Type: String
-   - Value: `pkg-config --libs gtk+-3.0`
+  - Variable name: `gtk+-cflags`
+    - Type: `String`
+    - Value: `pkg-config --cflags gtk+-3.0`
+  - Variable name: `gtk+-libs`
+    - Type: `String`
+    - Value: `pkg-config --libs gtk+-3.0`
 
 
 ## Init GDK in LVGL
