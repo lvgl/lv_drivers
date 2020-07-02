@@ -9,36 +9,37 @@ sudo apt-get install libglib2.0-dev
 
 ## Add GTK include paths and libraries
 
-In `Project properties > C/C++ Build > Settings` set the followings:
-`Cross GCC Compiler > Command line pattern`
+In "Project properties > C/C++ Build > Settings" set the followings:
+
+- "Cross GCC Compiler > Command line pattern"
   - Add ` ${gtk+-cflags}` to the end (add a space between the last command and this)
   
-`Cross GCC Compiler > Includes`
- - /usr/include/glib-2.0
- - /usr/include/gtk-3.0
- - /usr/include/pango-1.0
- - /usr/include/cairo
- - /usr/include/gdk-pixbuf-2.0
- - /usr/include/atk-1.0
+- "Cross GCC Compiler > Includes"
+  - /usr/include/glib-2.0
+  - /usr/include/gtk-3.0
+  - /usr/include/pango-1.0
+  - /usr/include/cairo
+  - /usr/include/gdk-pixbuf-2.0
+  - /usr/include/atk-1.0
 		
-`Cross GCC Linker > Command line pattern`
- - Add ` ${gtk+-libs}` to the end (add a space between the last command and this)
+- "Cross GCC Linker > Command line pattern"
+  - Add ` ${gtk+-libs}` to the end (add a space between the last command and this)
  
  
-`Cross GCC Linker > Libraries`
- - Add `pthread`
+- "Cross GCC Linker > Libraries"
+  - Add `pthread`
  
  
-In `C/C++ Build > Build variables`
-- Configuration: [All Configuration]
+- In "C/C++ Build > Build variables"
+  - Configuration: [All Configuration]
 
-- Add
-  - Variable name: `gtk+-cflags`
-    - Type: `String`
-    - Value: `pkg-config --cflags gtk+-3.0`
-  - Variable name: `gtk+-libs`
-    - Type: `String`
-    - Value: `pkg-config --libs gtk+-3.0`
+  - Add
+    - Variable name: `gtk+-cflags`
+      - Type: `String`
+      - Value: `pkg-config --cflags gtk+-3.0`
+    - Variable name: `gtk+-libs`
+      - Type: `String`
+      - Value: `pkg-config --libs gtk+-3.0`
 
 
 ## Init GDK in LVGL
@@ -71,7 +72,7 @@ In `C/C++ Build > Build variables`
   indev_drv_kb.read_cb = lv_keyboard_read_cb;
   lv_indev_drv_register(&indev_drv_kb);
 ```
-4. Configure tick in `lv_conf.h`
+5. Configure tick in `lv_conf.h`
 ```c
 #define LV_TICK_CUSTOM     1
 #if LV_TICK_CUSTOM == 1
