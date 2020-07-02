@@ -9,27 +9,27 @@ sudo apt-get install libglib2.0-dev
 
 ## Add GTK include paths and libraries
 
-C/C++ Build > Settings > Cross GCC Compiler > Command line pattern:
+In `Project properties > C/C++ Build > Settings` set the followings:
+`Cross GCC Compiler > Command line pattern`
   - Add ` ${gtk+-cflags}` to the end (add a space between the last command and this)
   
-C/C++ Build > Settings > Cross GCC Compiler > Includes:
+`Cross GCC Compiler > Includes`
  - /usr/include/glib-2.0
  - /usr/include/gtk-3.0
  - /usr/include/pango-1.0
  - /usr/include/cairo
  - /usr/include/gdk-pixbuf-2.0
  - /usr/include/atk-1.0
-	
-	
-C/C++ Build > Settings > Cross GCC Linker > Command line pattern: 
+		
+`Cross GCC Linker > Command line pattern`
  - Add ` ${gtk+-libs}` to the end (add a space between the last command and this)
  
  
-C/C++ Build > Settings > Cross GCC Linker > Libraries: 
+`Cross GCC Linker > Libraries`
  - Add `pthread`
  
  
-C/C++ Build > Build variables
+In `C/C++ Build > Build variables`
 - Configuration: [All Configuration]
 
 - Add
