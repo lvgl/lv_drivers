@@ -89,6 +89,6 @@ With the help of `Broadway` the UI can be easily shown via a browser.
 
 1. Open Terminal and start *Broadway* with `broadwayd :5`. Leave the terminal running.
 2. Navigate to where eclipse created the binary executable (my_project/Debug) and open a terminal in that folder. 
-In this terminal run ``GDK_BACKEND=broadway BROADWAY_DISPLAY=:5` ./my_executable`` (replace *my_executable* wih name of your executable)
+In this terminal run `GDK_BACKEND=broadway BROADWAY_DISPLAY=:5 ./my_executable` (replace *my_executable* wih name of your executable)
 3. Open a web browser and go to `http://localhost:8085/`
 
