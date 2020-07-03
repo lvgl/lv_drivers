@@ -45,8 +45,9 @@ In "Project properties > C/C++ Build > Settings" set the followings:
 ## Init GDK in LVGL
 
 1. In `main.c` `#incude "lv_drivers/gdkdrv/gdkdrv.h"`
-2. After `lv_init()` call `gdkdrv_init()`; 
-3. Add a display:
+2. Enable the GTK driver in `lv_drv_conf.h` with `USE_GTK 1`
+3. After `lv_init()` call `gdkdrv_init()`; 
+4. Add a display:
 ```c
   static lv_disp_buf_t disp_buf1;
   static lv_color_t buf1_1[LV_HOR_RES_MAX * LV_VER_RES_MAX];
@@ -58,13 +59,13 @@ In "Project properties > C/C++ Build > Settings" set the followings:
   disp_drv.buffer = &disp_buf1;
   disp_drv.flush_cb = gtkdrv_flush_cb;
 ```
-3. Add mouse:
+5. Add mouse:
 ```c
   lv_indev_drv_t indev_drv_mouse;
   lv_indev_drv_init(&indev_drv_mouse);
   indev_drv_mouse.type = LV_INDEV_TYPE_POINTER;
 ```
-4. Akk keyboard:
+6. Akk keyboard:
 ```c
   lv_indev_drv_t indev_drv_kb;
   lv_indev_drv_init(&indev_drv_kb);
@@ -72,7 +73,7 @@ In "Project properties > C/C++ Build > Settings" set the followings:
   indev_drv_kb.read_cb = lv_keyboard_read_cb;
   lv_indev_drv_register(&indev_drv_kb);
 ```
-5. Configure tick in `lv_conf.h`
+7. Configure tick in `lv_conf.h`
 ```c
 #define LV_TICK_CUSTOM     1
 #if LV_TICK_CUSTOM == 1
@@ -80,6 +81,7 @@ In "Project properties > C/C++ Build > Settings" set the followings:
 #define LV_TICK_CUSTOM_SYS_TIME_EXPR (gtkdrv_tick_get())     /*Expression evaluating to current systime in ms*/
 #endif   /*LV_TICK_CUSTOM*/
 ```
+8. Be sure `LV_COLOR_DEPTH` is `32` in `lv_conf.h`
 
 ## Run in a window
 Build and Run to "normally" run the UI in a window  
