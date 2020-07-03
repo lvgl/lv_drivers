@@ -21,13 +21,14 @@ extern "C" {
 #endif
 #endif
 
-#if USE_MONITOR
+#if USE_GTK
 
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
 #include "lvgl.h"
 #else
 #include "lvgl/lvgl.h"
 #endif
+
 
 /*********************
  *      DEFINES
@@ -49,7 +50,7 @@ bool gtkdrv_keyboard_read_cb(lv_indev_drv_t * drv, lv_indev_data_t * data);
  *      MACROS
  **********************/
 
-#endif /* USE_MONITOR */
+#endif /*USE_GTK*/
 
 #ifdef __cplusplus
 } /* extern "C" */
