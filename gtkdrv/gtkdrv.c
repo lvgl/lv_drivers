@@ -6,6 +6,9 @@
 /*********************
  *      INCLUDES
  *********************/
+#include "gtkdrv.h"
+
+#if USE_GTK
 #define _DEFAULT_SOURCE /* needed for usleep() */
 #include <stdlib.h>
 #include <unistd.h>
@@ -14,7 +17,6 @@
 #include <pthread.h>
 #include <time.h>
 #include <sys/time.h>
-#include "gtkdrv.h"
 
 /*********************
  *      DEFINES
@@ -321,5 +323,5 @@ static void quit_handler(void)
     exit(0);
     run_gtk = FALSE;
 }
-
+#endif /*USE_GTK*/
 
