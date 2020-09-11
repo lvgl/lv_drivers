@@ -254,6 +254,18 @@
 # define FBDEV_PATH		"/dev/fb0"
 #endif
 
+/*-----------------------------------------
+ *  DRM/KMS device (/dev/dri/cardX)
+ *-----------------------------------------*/
+#ifndef USE_DRM
+#  define USE_DRM           0
+#endif
+
+#if USE_DRM
+#  define DRM_CARD          "/dev/dri/card0"
+#  define DRM_CONNECTOR_ID  -1	/* -1 for the first connected one */
+#endif
+
 /*********************
  *  INPUT DEVICES
  *********************/
