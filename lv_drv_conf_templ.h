@@ -179,6 +179,17 @@
 /*No settings*/
 #endif  /*USE_ST7565*/
 
+/*------------------------------
+ *  GC9A01 (color, low res.)
+ *-----------------------------*/
+#ifndef USE_GC9A01
+#  define USE_GC9A01          0
+#endif
+
+#if USE_GC9A01
+/*No settings*/
+#endif  /*USE_GC9A01*/
+
 /*------------------------------------------
  *  UC1610 (4 gray 160*[104|128])
  *  (EA DOGXL160 160x104 tested)
