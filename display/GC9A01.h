@@ -54,8 +54,6 @@ extern "C" {
 #define GC9A01_MADCTL_RGB 0x00
 #define GC9A01_DISFNCTRL	0xB6
 
-#define GC9A01_FB_SIZE  (GC9A01_HOR_RES * GC9A01_VER_RES)
-
 /**********************
  *      TYPEDEFS
  **********************/
