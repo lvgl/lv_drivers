@@ -39,21 +39,6 @@ extern "C" {
  *      DEFINES
  *********************/
 
-/* GC9A01 Commands */
-#define GC9A01_INVOFF	0x20
-#define GC9A01_INVON	0x21
-#define GC9A01_DISPON	0x29
-#define GC9A01_CASET	0x2A
-#define GC9A01_RASET	0x2B
-#define GC9A01_RAMWR	0x2C
-#define GC9A01_COLMOD	0x3A
-#define GC9A01_MADCTL	0x36
-#define GC9A01_MADCTL_MY  0x80
-#define GC9A01_MADCTL_MX  0x40
-#define GC9A01_MADCTL_MV  0x20
-#define GC9A01_MADCTL_RGB 0x00
-#define GC9A01_DISFNCTRL	0xB6
-
 /**********************
  *      TYPEDEFS
  **********************/

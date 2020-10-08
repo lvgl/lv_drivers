@@ -20,8 +20,28 @@
 /*********************
  *      DEFINES
  *********************/
+#define GC9A01_BAUD      		2000000    /*< 2,5 MHz (400 ns)*/
+
 #define GC9A01_CMD_MODE     0
 #define GC9A01_DATA_MODE    1
+
+#define GC9A01_HOR_RES  		240
+#define GC9A01_VER_RES  		240
+
+/* GC9A01 Commands that we know of.  Limited documentation */
+#define GC9A01_INVOFF	0x20
+#define GC9A01_INVON	0x21
+#define GC9A01_DISPON	0x29
+#define GC9A01_CASET	0x2A
+#define GC9A01_RASET	0x2B
+#define GC9A01_RAMWR	0x2C
+#define GC9A01_COLMOD	0x3A
+#define GC9A01_MADCTL	0x36
+#define GC9A01_MADCTL_MY  0x80
+#define GC9A01_MADCTL_MX  0x40
+#define GC9A01_MADCTL_MV  0x20
+#define GC9A01_MADCTL_RGB 0x00
+#define GC9A01_DISFNCTRL	0xB6
 
 /**********************
  *      TYPEDEFS
