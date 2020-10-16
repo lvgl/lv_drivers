@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/mman.h>
+#include <inttypes.h>
 
 #include <xf86drm.h>
 #include <xf86drmMode.h>
@@ -68,7 +69,7 @@ struct drm_dev {
 	struct drm_buffer *cur_bufs[2]; /* double buffering handling */
 } drm_dev;
 
-uint32_t get_plane_property_id(const char *name)
+static uint32_t get_plane_property_id(const char *name)
 {
 	uint32_t i;
 
@@ -83,7 +84,7 @@ uint32_t get_plane_property_id(const char *name)
 	return 0;
 }
 
-uint32_t get_crtc_property_id(const char *name)
+static uint32_t get_crtc_property_id(const char *name)
 {
 	uint32_t i;
 
@@ -98,7 +99,7 @@ uint32_t get_crtc_property_id(const char *name)
 	return 0;
 }
 
-uint32_t get_conn_property_id(const char *name)
+static uint32_t get_conn_property_id(const char *name)
 {
 	uint32_t i;
 
@@ -194,7 +195,7 @@ static int drm_add_plane_property(const char *name, uint64_t value)
 
 	ret = drmModeAtomicAddProperty(drm_dev.req, drm_dev.plane_id, get_plane_property_id(name), value);
 	if (ret < 0) {
-		err("drmModeAtomicAddProperty (%s:%lu) failed: %d", name, value, ret);
+		err("drmModeAtomicAddProperty (%s:%" PRIu64 ") failed: %d", name, value, ret);
 		return ret;
 	}
 
@@ -213,7 +214,7 @@ static int drm_add_crtc_property(const char *name, uint64_t value)
 
 	ret = drmModeAtomicAddProperty(drm_dev.req, drm_dev.crtc_id, get_crtc_property_id(name), value);
 	if (ret < 0) {
-		err("drmModeAtomicAddProperty (%s:%lu) failed: %d", name, value, ret);
+		err("drmModeAtomicAddProperty (%s:%" PRIu64 ") failed: %d", name, value, ret);
 		return ret;
 	}
 
@@ -232,7 +233,7 @@ static int drm_add_conn_property(const char *name, uint64_t value)
 
 	ret = drmModeAtomicAddProperty(drm_dev.req, drm_dev.conn_id, get_conn_property_id(name), value);
 	if (ret < 0) {
-		err("drmModeAtomicAddProperty (%s:%lu) failed: %d", name, value, ret);
+		err("drmModeAtomicAddProperty (%s:%" PRIu64 ") failed: %d", name, value, ret);
 		return ret;
 	}
 
@@ -340,7 +341,7 @@ static int drm_find_connector(void)
 	drmModeConnector *conn = NULL;
 	drmModeEncoder *enc = NULL;
 	drmModeRes *res;
-	int i, j;
+	int i;
 
 	if ((res = drmModeGetResources(drm_dev.fd)) == NULL) {
 		err("drmModeGetResources() failed");
@@ -604,7 +605,7 @@ static int drm_allocate_dumb(struct drm_buffer *buf)
 {
 	struct drm_mode_create_dumb creq;
 	struct drm_mode_map_dumb mreq;
-	int handles[4] = {0}, pitches[4] = {0}, offsets[4] = {0};
+	uint32_t handles[4] = {0}, pitches[4] = {0}, offsets[4] = {0};
 	int ret;
 
 	/* create dumb buffer */
@@ -714,12 +715,12 @@ void drm_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color
 	dbg("x %d:%d y %d:%d w %d h %d", area->x1, area->x2, area->y1, area->y2, w, h);
 
 	/* Partial update */
-	if (w != drm_dev.width || h != drm_dev.height && drm_dev.cur_bufs[0])
+	if ((w != drm_dev.width || h != drm_dev.height) && drm_dev.cur_bufs[0])
 		memcpy(fbuf->map, drm_dev.cur_bufs[0]->map, fbuf->size);
 
 	for (y = 0, i = area->y1 ; i <= area->y2 ; ++i, ++y) {
-                memcpy(fbuf->map + (area->x1 * (LV_COLOR_SIZE/8)) + (fbuf->pitch * i),
-                       (void *)color_p + (w * (LV_COLOR_SIZE/8) * y),
+                memcpy((uint8_t *)fbuf->map + (area->x1 * (LV_COLOR_SIZE/8)) + (fbuf->pitch * i),
+                       (uint8_t *)color_p + (w * (LV_COLOR_SIZE/8) * y),
 		       w * (LV_COLOR_SIZE/8));
 	}
 
