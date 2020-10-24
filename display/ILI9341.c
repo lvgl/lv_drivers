@@ -19,7 +19,6 @@
 
 #include <stdio.h>
 #include <stdbool.h>
-#include "lvgl/src/lv_hal/lv_hal_disp.h"
 #include LV_DRV_DISP_INCLUDE
 #include LV_DRV_DELAY_INCLUDE
 
