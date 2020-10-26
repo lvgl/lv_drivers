@@ -62,7 +62,7 @@ int quit_filter(void * userdata, SDL_Event * event);
 static void monitor_sdl_clean_up(void);
 static void monitor_sdl_init(void);
 static void monitor_sdl_refr_core(void);
-static void monitor_sdl_refr_thread(lv_task_t * t);
+static void monitor_sdl_refr(lv_task_t * t);
 
 /***********************
  *   GLOBAL PROTOTYPES
@@ -95,7 +95,7 @@ static volatile bool sdl_quit_qry = false;
 void monitor_init(void)
 {
     monitor_sdl_init();
-    lv_task_create(monitor_sdl_refr_thread, 10, LV_TASK_PRIO_HIGH, NULL);
+//    lv_task_create(monitor_sdl_refr_thread, 10, LV_TASK_PRIO_HIGH, NULL);
 }
 
 /**
@@ -146,6 +146,12 @@ void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t 
 #endif
 
     monitor.sdl_refr_qry = true;
+
+    /* TYPICALLY YOU DO NOT NEED THIS
+     * If it was the last part to refresh update the texture of the window.*/
+    if(lv_disp_flush_is_last(disp_drv)) {
+        monitor_sdl_refr(NULL);
+    }
 
     /*IMPORTANT! It must be called to tell the system the flush is ready*/
     lv_disp_flush_ready(disp_drv);
@@ -201,6 +207,12 @@ void monitor_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t
 
     monitor2.sdl_refr_qry = true;
 
+    /* TYPICALLY YOU DO NOT NEED THIS
+     * If it was the last part to refresh update the texture of the window.*/
+    if(lv_disp_flush_is_last(disp_drv)) {
+        monitor_sdl_refr(NULL);
+    }
+
     /*IMPORTANT! It must be called to tell the system the flush is ready*/
     lv_disp_flush_ready(disp_drv);
 #endif
@@ -216,7 +228,7 @@ void monitor_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t
  * It initializes SDL, handles drawing and the mouse.
  */
 
-static void monitor_sdl_refr_thread(lv_task_t * t)
+static void monitor_sdl_refr(lv_task_t * t)
 {
     (void)t;
 
@@ -285,6 +297,7 @@ static void monitor_sdl_refr_core(void)
 {
     if(monitor.sdl_refr_qry != false) {
         monitor.sdl_refr_qry = false;
+        printf("refr\n");
         window_update(&monitor);
     }
 
