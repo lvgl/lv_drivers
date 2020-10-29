@@ -61,7 +61,7 @@ static void window_update(monitor_t * m);
 int quit_filter(void * userdata, SDL_Event * event);
 static void monitor_sdl_clean_up(void);
 static void monitor_sdl_init(void);
-static void monitor_sdl_refr_core(void);
+static void sdl_event_handler(lv_task_t * t);
 static void monitor_sdl_refr(lv_task_t * t);
 
 /***********************
@@ -95,7 +95,7 @@ static volatile bool sdl_quit_qry = false;
 void monitor_init(void)
 {
     monitor_sdl_init();
-//    lv_task_create(monitor_sdl_refr_thread, 10, LV_TASK_PRIO_HIGH, NULL);
+    lv_task_create(sdl_event_handler, 10, LV_TASK_PRIO_HIGH, NULL);
 }
 
 /**
@@ -223,6 +223,54 @@ void monitor_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t
  *   STATIC FUNCTIONS
  **********************/
 
+
+/**
+ * SDL main thread. All SDL related task have to be handled here!
+ * It initializes SDL, handles drawing and the mouse.
+ */
+
+static void sdl_event_handler(lv_task_t * t)
+{
+    (void)t;
+
+    /*Refresh handling*/
+    SDL_Event event;
+    while(SDL_PollEvent(&event)) {
+#if USE_MOUSE != 0
+        mouse_handler(&event);
+#endif
+
+#if USE_MOUSEWHEEL != 0
+        mousewheel_handler(&event);
+#endif
+
+#if USE_KEYBOARD
+        keyboard_handler(&event);
+#endif
+        if((&event)->type == SDL_WINDOWEVENT) {
+            switch((&event)->window.event) {
+#if SDL_VERSION_ATLEAST(2, 0, 5)
+                case SDL_WINDOWEVENT_TAKE_FOCUS:
+#endif
+                case SDL_WINDOWEVENT_EXPOSED:
+                    window_update(&monitor);
+#if MONITOR_DUAL
+                    window_update(&monitor2);
+#endif
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    /*Run until quit event not arrives*/
+    if(sdl_quit_qry) {
+        monitor_sdl_clean_up();
+        exit(0);
+    }
+}
+
 /**
  * SDL main thread. All SDL related task have to be handled here!
  * It initializes SDL, handles drawing and the mouse.
@@ -233,13 +281,17 @@ static void monitor_sdl_refr(lv_task_t * t)
     (void)t;
 
     /*Refresh handling*/
-    monitor_sdl_refr_core();
-
-    /*Run until quit event not arrives*/
-    if(sdl_quit_qry) {
-        monitor_sdl_clean_up();
-        exit(0);
+    if(monitor.sdl_refr_qry != false) {
+        monitor.sdl_refr_qry = false;
+        window_update(&monitor);
     }
+
+#if MONITOR_DUAL
+    if(monitor2.sdl_refr_qry != false) {
+        monitor2.sdl_refr_qry = false;
+        window_update(&monitor2);
+    }
+#endif
 }
 
 int quit_filter(void * userdata, SDL_Event * event)
@@ -293,52 +345,6 @@ static void monitor_sdl_init(void)
     sdl_inited = true;
 }
 
-static void monitor_sdl_refr_core(void)
-{
-    if(monitor.sdl_refr_qry != false) {
-        monitor.sdl_refr_qry = false;
-        printf("refr\n");
-        window_update(&monitor);
-    }
-
-#if MONITOR_DUAL
-    if(monitor2.sdl_refr_qry != false) {
-        monitor2.sdl_refr_qry = false;
-        window_update(&monitor2);
-    }
-#endif
-
-    SDL_Event event;
-    while(SDL_PollEvent(&event)) {
-#if USE_MOUSE != 0
-        mouse_handler(&event);
-#endif
-
-#if USE_MOUSEWHEEL != 0
-        mousewheel_handler(&event);
-#endif
-
-#if USE_KEYBOARD
-        keyboard_handler(&event);
-#endif
-        if((&event)->type == SDL_WINDOWEVENT) {
-            switch((&event)->window.event) {
-#if SDL_VERSION_ATLEAST(2, 0, 5)
-                case SDL_WINDOWEVENT_TAKE_FOCUS:
-#endif
-                case SDL_WINDOWEVENT_EXPOSED:
-                    window_update(&monitor);
-#if MONITOR_DUAL
-                    window_update(&monitor2);
-#endif
-                    break;
-                default:
-                    break;
-            }
-        }
-    }
-
-}
 
 static void window_create(monitor_t * m)
 {
