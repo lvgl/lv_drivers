@@ -338,8 +338,8 @@ static void monitor_sdl_init(void)
     window_create(&monitor2);
     int x, y;
     SDL_GetWindowPosition(monitor2.window, &x, &y);
-    SDL_SetWindowPosition(monitor.window, x + MONITOR_HOR_RES / 2 + 10, y);
-    SDL_SetWindowPosition(monitor2.window, x - MONITOR_HOR_RES / 2 - 10, y);
+    SDL_SetWindowPosition(monitor.window, x + (MONITOR_HOR_RES * MONITOR_ZOOM) / 2 + 10, y);
+    SDL_SetWindowPosition(monitor2.window, x - (MONITOR_HOR_RES * MONITOR_ZOOM) / 2 - 10, y);
 #endif
 
     sdl_inited = true;
