@@ -120,12 +120,7 @@ void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t 
 
 #if MONITOR_DOUBLE_BUFFERED
     monitor.tft_fb_act = (uint32_t *)color_p;
-
-    monitor.sdl_refr_qry = true;
-
-    /*IMPORTANT! It must be called to tell the system the flush is ready*/
-    lv_disp_flush_ready(disp_drv);
-#else
+#else /*MONITOR_DOUBLE_BUFFERED*/
 
     int32_t y;
 #if LV_COLOR_DEPTH != 24 && LV_COLOR_DEPTH != 32    /*32 is valid but support 24 for backward compatibility too*/
@@ -144,6 +139,7 @@ void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t 
         color_p += w;
     }
 #endif
+#endif /*MONITOR_DOUBLE_BUFFERED*/
 
     monitor.sdl_refr_qry = true;
 
@@ -155,7 +151,7 @@ void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t 
 
     /*IMPORTANT! It must be called to tell the system the flush is ready*/
     lv_disp_flush_ready(disp_drv);
-#endif
+
 }
 
 
