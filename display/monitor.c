@@ -113,7 +113,6 @@ void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t 
 
     /*Return if the area is out the screen*/
     if(area->x2 < 0 || area->y2 < 0 || area->x1 > hres - 1 || area->y1 > vres - 1) {
-        printf("REJECT\n");
         lv_disp_flush_ready(disp_drv);
         return;
     }
