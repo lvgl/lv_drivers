@@ -106,26 +106,20 @@ void monitor_init(void)
  */
 void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
-    lv_coord_t hres = disp_drv->rotated == 0 ? disp_drv->hor_res : disp_drv->ver_res;
-    lv_coord_t vres = disp_drv->rotated == 0 ? disp_drv->ver_res : disp_drv->hor_res;
+    lv_coord_t hres = disp_drv->hor_res;
+    lv_coord_t vres = disp_drv->ver_res;
 
 //    printf("x1:%d,y1:%d,x2:%d,y2:%d\n", area->x1, area->y1, area->x2, area->y2);
 
     /*Return if the area is out the screen*/
     if(area->x2 < 0 || area->y2 < 0 || area->x1 > hres - 1 || area->y1 > vres - 1) {
-
         lv_disp_flush_ready(disp_drv);
         return;
     }
 
 #if MONITOR_DOUBLE_BUFFERED
     monitor.tft_fb_act = (uint32_t *)color_p;
-
-    monitor.sdl_refr_qry = true;
-
-    /*IMPORTANT! It must be called to tell the system the flush is ready*/
-    lv_disp_flush_ready(disp_drv);
-#else
+#else /*MONITOR_DOUBLE_BUFFERED*/
 
     int32_t y;
 #if LV_COLOR_DEPTH != 24 && LV_COLOR_DEPTH != 32    /*32 is valid but support 24 for backward compatibility too*/
@@ -144,6 +138,7 @@ void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t 
         color_p += w;
     }
 #endif
+#endif /*MONITOR_DOUBLE_BUFFERED*/
 
     monitor.sdl_refr_qry = true;
 
@@ -155,7 +150,7 @@ void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t 
 
     /*IMPORTANT! It must be called to tell the system the flush is ready*/
     lv_disp_flush_ready(disp_drv);
-#endif
+
 }
 
 
@@ -169,8 +164,8 @@ void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t 
  */
 void monitor_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
-    lv_coord_t hres = disp_drv->rotated == 0 ? disp_drv->hor_res : disp_drv->ver_res;
-    lv_coord_t vres = disp_drv->rotated == 0 ? disp_drv->ver_res : disp_drv->hor_res;
+    lv_coord_t hres = disp_drv->hor_res;
+    lv_coord_t vres = disp_drv->ver_res;
 
     /*Return if the area is out the screen*/
     if(area->x2 < 0 || area->y2 < 0 || area->x1 > hres - 1 || area->y1 > vres - 1) {
@@ -338,8 +333,8 @@ static void monitor_sdl_init(void)
     window_create(&monitor2);
     int x, y;
     SDL_GetWindowPosition(monitor2.window, &x, &y);
-    SDL_SetWindowPosition(monitor.window, x + MONITOR_HOR_RES / 2 + 10, y);
-    SDL_SetWindowPosition(monitor2.window, x - MONITOR_HOR_RES / 2 - 10, y);
+    SDL_SetWindowPosition(monitor.window, x + (MONITOR_HOR_RES * MONITOR_ZOOM) / 2 + 10, y);
+    SDL_SetWindowPosition(monitor2.window, x - (MONITOR_HOR_RES * MONITOR_ZOOM) / 2 - 10, y);
 #endif
 
     sdl_inited = true;
