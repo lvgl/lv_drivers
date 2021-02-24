@@ -49,7 +49,7 @@ typedef struct {
 #if MONITOR_DOUBLE_BUFFERED
     uint32_t * tft_fb_act;
 #else
-    uint32_t tft_fb[LV_HOR_RES_MAX * LV_VER_RES_MAX];
+    uint32_t tft_fb[MONITOR_HOR_RES * MONITOR_VER_RES];
 #endif
 }monitor_t;
 
