@@ -9,6 +9,8 @@
 
 #include "win32drv.h"
 
+#if USE_WIN32DRV
+
 #include <windowsx.h>
 #include <VersionHelpers.h>
 
@@ -581,3 +583,5 @@ static void lv_win32_message_handler(
         }
     }
 }
+
+#endif /*USE_WIN32DRV*/

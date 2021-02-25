@@ -10,6 +10,16 @@
  *      INCLUDES
  *********************/
 
+#ifndef LV_DRV_NO_CONF
+#ifdef LV_CONF_INCLUDE_SIMPLE
+#include "lv_drv_conf.h"
+#else
+#include "../lv_drv_conf.h"
+#endif
+#endif
+
+#if USE_WIN32DRV
+
 #include <Windows.h>
 
 #if _MSC_VER >= 1200
@@ -56,5 +66,7 @@ EXTERN_C bool lv_win32_init(
 /**********************
  *      MACROS
  **********************/
+
+#endif /*USE_WIN32DRV*/
 
 #endif /*LV_WIN32DRV_H*/
