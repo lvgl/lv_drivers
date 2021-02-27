@@ -116,6 +116,13 @@
 #  define WINDOW_VER_RES      320
 #endif
 
+/*----------------------------
+ *  Native Windows (win32drv)
+ *---------------------------*/
+#ifndef USE_WIN32DRV
+#  define USE_WIN32DRV       0
+#endif
+
 /*----------------------------------------
  *  GTK drivers (monitor, mouse, keyboard
  *---------------------------------------*/
