@@ -94,7 +94,7 @@
 #  define MONITOR_ZOOM        1
 
 /* Used to test true double buffering with only address changing.
- * Set LV_VDB_SIZE = (LV_HOR_RES * LV_VER_RES) and  LV_VDB_DOUBLE = 1 and LV_COLOR_DEPTH = 32" */
+ * Use 2 draw buffers, bith with MONITOR_HOR_RES x MONITOR_VER_RES size*/
 #  define MONITOR_DOUBLE_BUFFERED 0
 
 /*Eclipse: <SDL2/SDL.h>    Visual Studio: <SDL.h>*/
