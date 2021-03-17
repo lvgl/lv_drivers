@@ -130,6 +130,19 @@
 #  define USE_GTK       0
 #endif
 
+/*----------------------------------------
+ *  Wayland drivers (monitor, mouse, keyboard, touchscreen)
+ *---------------------------------------*/
+#ifndef USE_WAYLAND
+#  define USE_WAYLAND       0
+#endif
+
+#if USE_WAYLAND
+#  define WAYLAND_HOR_RES      480
+#  define WAYLAND_VER_RES      320
+#  define WAYLAND_SURF_TITLE   "LVGL"
+#endif
+
 /*----------------
  *    SSD1963
  *--------------*/
