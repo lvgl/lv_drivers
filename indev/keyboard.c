@@ -123,6 +123,12 @@ static uint32_t keycode_to_ascii(uint32_t sdl_key)
         case '\r':
             return LV_KEY_ENTER;
 
+        case SDLK_PAGEDOWN:
+            return LV_KEY_NEXT;
+
+        case SDLK_PAGEUP:
+            return LV_KEY_PREV;
+
         default:
             return sdl_key;
     }
