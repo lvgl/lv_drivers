@@ -49,7 +49,7 @@ typedef struct {
 #if MONITOR_DOUBLE_BUFFERED
     uint32_t * tft_fb_act;
 #else
-    uint32_t tft_fb[MONITOR_HOR_RES * MONITOR_VER_RES];
+    uint32_t * tft_fb;
 #endif
 }monitor_t;
 
@@ -356,6 +356,7 @@ static void window_create(monitor_t * m)
 #if MONITOR_DOUBLE_BUFFERED
     SDL_UpdateTexture(m->texture, NULL, m->tft_fb_act, MONITOR_HOR_RES * sizeof(uint32_t));
 #else
+    m->tft_fb = (uint32_t *)malloc(sizeof(uint32_t) * MONITOR_HOR_RES * MONITOR_VER_RES);
     memset(m->tft_fb, 0x44, MONITOR_HOR_RES * MONITOR_VER_RES * sizeof(uint32_t));
 #endif
 
