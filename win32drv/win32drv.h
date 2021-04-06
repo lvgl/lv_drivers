@@ -61,7 +61,8 @@ EXTERN_C bool lv_win32_init(
     int show_window_mode,
     lv_coord_t hor_res,
     lv_coord_t ver_res,
-    HICON icon_handle);
+    HICON icon_handle,
+    double monitor_zoom_factor);
 
 /**********************
  *      MACROS
