@@ -27,6 +27,10 @@
 #define WINDOW_STYLE \
     (WS_OVERLAPPEDWINDOW & ~(WS_SIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME))
 
+#ifndef WIN32DRV_MONITOR_ZOOM
+#define WIN32DRV_MONITOR_ZOOM 1
+#endif
+
 /**********************
  *      TYPEDEFS
  **********************/
@@ -167,9 +171,9 @@ EXTERN_C bool lv_win32_init(
     RECT NewWindowSize;
 
     NewWindowSize.left = 0;
-    NewWindowSize.right = hor_res - 1;
+    NewWindowSize.right = hor_res * WIN32DRV_MONITOR_ZOOM - 1;
     NewWindowSize.top = 0;
-    NewWindowSize.bottom = ver_res - 1;
+    NewWindowSize.bottom = ver_res * WIN32DRV_MONITOR_ZOOM - 1;
 
     AdjustWindowRectEx(
         &NewWindowSize,
@@ -371,15 +375,17 @@ static void lv_win32_display_driver_flush_callback(
     HDC hWindowDC = GetDC(g_window_handle);
     if (hWindowDC)
     {
-        BitBlt(
+        StretchBlt(
             hWindowDC,
+            0,
+            0,
+            disp_drv->hor_res * WIN32DRV_MONITOR_ZOOM,
+            disp_drv->ver_res * WIN32DRV_MONITOR_ZOOM,
+            g_buffer_dc_handle,
             0,
             0,
             disp_drv->hor_res,
             disp_drv->ver_res,
-            g_buffer_dc_handle,
-            0,
-            0,
             SRCCOPY);
 
         ReleaseDC(g_window_handle, hWindowDC);
@@ -406,8 +412,8 @@ static bool lv_win32_mouse_driver_read_callback(
 
     data->state = (lv_indev_state_t)(
         g_mouse_pressed ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL);
-    data->point.x = GET_X_LPARAM(g_mouse_value);
-    data->point.y = GET_Y_LPARAM(g_mouse_value);
+    data->point.x = GET_X_LPARAM(g_mouse_value) / WIN32DRV_MONITOR_ZOOM;
+    data->point.y = GET_Y_LPARAM(g_mouse_value) / WIN32DRV_MONITOR_ZOOM;
     return false;
 }
 
