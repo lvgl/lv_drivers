@@ -27,6 +27,10 @@
 #define WINDOW_STYLE \
     (WS_OVERLAPPEDWINDOW & ~(WS_SIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME))
 
+#ifndef WIN32DRV_MONITOR_ZOOM
+#define WIN32DRV_MONITOR_ZOOM 1
+#endif
+
 /**********************
  *      TYPEDEFS
  **********************/
@@ -126,8 +130,6 @@ static int16_t volatile g_mousewheel_value = 0;
 static bool volatile g_keyboard_pressed = false;
 static WPARAM volatile g_keyboard_value = 0;
 
-static double volatile g_monitor_zoom_factor = 0.0;
-
 /**********************
  *      MACROS
  **********************/
@@ -141,8 +143,7 @@ EXTERN_C bool lv_win32_init(
     int show_window_mode,
     lv_coord_t hor_res,
     lv_coord_t ver_res,
-    HICON icon_handle,
-    double monitor_zoom_factor)
+    HICON icon_handle)
 {
     WNDCLASSEXW WindowClass;
 
@@ -167,14 +168,12 @@ EXTERN_C bool lv_win32_init(
 
     g_instance_handle = instance_handle;
 
-    g_monitor_zoom_factor = monitor_zoom_factor;
-
     RECT NewWindowSize;
 
     NewWindowSize.left = 0;
-    NewWindowSize.right = hor_res * g_monitor_zoom_factor - 1;
+    NewWindowSize.right = hor_res * WIN32DRV_MONITOR_ZOOM - 1;
     NewWindowSize.top = 0;
-    NewWindowSize.bottom = ver_res * g_monitor_zoom_factor - 1;
+    NewWindowSize.bottom = ver_res * WIN32DRV_MONITOR_ZOOM - 1;
 
     AdjustWindowRectEx(
         &NewWindowSize,
@@ -380,8 +379,8 @@ static void lv_win32_display_driver_flush_callback(
             hWindowDC,
             0,
             0,
-            disp_drv->hor_res * g_monitor_zoom_factor,
-            disp_drv->ver_res * g_monitor_zoom_factor,
+            disp_drv->hor_res * WIN32DRV_MONITOR_ZOOM,
+            disp_drv->ver_res * WIN32DRV_MONITOR_ZOOM,
             g_buffer_dc_handle,
             0,
             0,
@@ -413,8 +412,8 @@ static bool lv_win32_mouse_driver_read_callback(
 
     data->state = (lv_indev_state_t)(
         g_mouse_pressed ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL);
-    data->point.x = GET_X_LPARAM(g_mouse_value) / g_monitor_zoom_factor;
-    data->point.y = GET_Y_LPARAM(g_mouse_value) / g_monitor_zoom_factor;
+    data->point.x = GET_X_LPARAM(g_mouse_value) / WIN32DRV_MONITOR_ZOOM;
+    data->point.y = GET_Y_LPARAM(g_mouse_value) / WIN32DRV_MONITOR_ZOOM;
     return false;
 }
 
