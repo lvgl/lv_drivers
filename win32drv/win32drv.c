@@ -176,9 +176,9 @@ EXTERN_C bool lv_win32_init(
     RECT NewWindowSize;
 
     NewWindowSize.left = 0;
-    NewWindowSize.right = hor_res * WIN32DRV_MONITOR_ZOOM - 1;
+    NewWindowSize.right = hor_res * WIN32DRV_MONITOR_ZOOM;
     NewWindowSize.top = 0;
-    NewWindowSize.bottom = ver_res * WIN32DRV_MONITOR_ZOOM - 1;
+    NewWindowSize.bottom = ver_res * WIN32DRV_MONITOR_ZOOM;
 
     AdjustWindowRectEx(
         &NewWindowSize,
@@ -605,8 +605,8 @@ static LRESULT CALLBACK lv_win32_window_message_callback(
             NULL,
             SuggestedRect->left,
             SuggestedRect->top,
-            SuggestedRect->right + (WindowWidth - 1 - ClientRect.right),
-            SuggestedRect->bottom + (WindowHeight - 1 - ClientRect.bottom),
+            SuggestedRect->right + (WindowWidth - ClientRect.right),
+            SuggestedRect->bottom + (WindowHeight - ClientRect.bottom),
             SWP_NOZORDER | SWP_NOACTIVATE);
 
         break;
