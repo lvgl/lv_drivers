@@ -59,6 +59,24 @@ bool keyboard_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
     return false;
 }
 
+static uint8_t last_state = LV_INDEV_STATE_RELEASED;
+
+extern void monitor_prtscr_post(void);
+void keyboard_process(void)
+{
+	if(state == LV_INDEV_STATE_RELEASED && last_state == LV_INDEV_STATE_PRESSED)
+	{
+		//key released
+		switch(last_key)
+		{
+			case SDLK_PRINTSCREEN:
+				monitor_prtscr_post();
+				break;
+			default:break;
+		}
+	}
+	last_state = state;
+}
 /**
  * It is called periodically from the SDL thread to check a key is pressed/released
  * @param event describes the event
@@ -76,8 +94,8 @@ void keyboard_handler(SDL_Event * event)
             break;
         default:
             break;
-
     }
+    keyboard_process();
 }
 
 /**********************

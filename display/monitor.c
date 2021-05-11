@@ -13,6 +13,7 @@
 #  define MONITOR_SDL_INCLUDE_PATH <SDL2/SDL.h>
 #endif
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
@@ -64,6 +65,8 @@ static void monitor_sdl_init(void);
 static void sdl_event_handler(lv_timer_t * t);
 static void monitor_sdl_refr(lv_timer_t * t);
 
+static void monitor_print_scr(char *filepath);
+static int prtsc_thread(void *data);
 /***********************
  *   GLOBAL PROTOTYPES
  ***********************/
@@ -88,6 +91,10 @@ static volatile bool sdl_quit_qry = false;
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
+static SDL_sem *prtsc_sem;
+static char prtsc_fn[128];
+static uint32_t fn_idx = 1;
+static int prtsc_thread(void *data);
 
 /**
  * Initialize the monitor
@@ -96,6 +103,9 @@ void monitor_init(void)
 {
     monitor_sdl_init();
     lv_timer_create(sdl_event_handler, 10, NULL);
+	prtsc_sem = SDL_CreateSemaphore (0);
+//	if (prtsc_sem)
+	SDL_CreateThread(prtsc_thread, "prtscr", NULL);
 }
 
 /**
@@ -106,8 +116,8 @@ void monitor_init(void)
  */
 void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
-    lv_coord_t hres = disp_drv->hor_res;
-    lv_coord_t vres = disp_drv->ver_res;
+    lv_coord_t hres = MONITOR_HOR_RES;
+    lv_coord_t vres = MONITOR_VER_RES;
 
 //    printf("x1:%d,y1:%d,x2:%d,y2:%d\n", area->x1, area->y1, area->x2, area->y2);
 
@@ -129,7 +139,6 @@ void monitor_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t 
             monitor.tft_fb[y * disp_drv->hor_res + x] = lv_color_to32(*color_p);
             color_p++;
         }
-
     }
 #else
     uint32_t w = lv_area_get_width(area);
@@ -213,6 +222,13 @@ void monitor_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t
 #endif
 }
 #endif
+/**
+ * Screen shot task sem poster
+ */
+void monitor_prtscr_post(void)
+{
+	SDL_SemPost (prtsc_sem);
+}
 
 /**********************
  *   STATIC FUNCTIONS
@@ -356,12 +372,11 @@ static void window_create(monitor_t * m)
 #if MONITOR_DOUBLE_BUFFERED
     SDL_UpdateTexture(m->texture, NULL, m->tft_fb_act, MONITOR_HOR_RES * sizeof(uint32_t));
 #else
-    m->tft_fb = (uint32_t *)malloc(sizeof(uint32_t) * MONITOR_HOR_RES * MONITOR_VER_RES);
+	m->tft_fb = (uint32_t *)malloc(sizeof(uint32_t) * MONITOR_HOR_RES * MONITOR_VER_RES);
     memset(m->tft_fb, 0x44, MONITOR_HOR_RES * MONITOR_VER_RES * sizeof(uint32_t));
 #endif
 
     m->sdl_refr_qry = true;
-
 }
 
 static void window_update(monitor_t * m)
@@ -383,6 +398,71 @@ static void window_update(monitor_t * m)
     /*Update the renderer with the texture containing the rendered image*/
     SDL_RenderCopy(m->renderer, m->texture, NULL, NULL);
     SDL_RenderPresent(m->renderer);
+}
+
+/**
+ * Take a screen shot into a BMP file
+ * @param filepath pointer to file path
+ */
+static void monitor_print_scr(char *filepath)
+{
+	SDL_Surface *saveSurface = NULL;
+	SDL_Surface *infoSurface = NULL;
+
+	unsigned int *pixels = (uint32_t *)malloc(sizeof(uint32_t) * LV_HOR_RES * LV_VER_RES);
+
+	infoSurface = SDL_GetWindowSurface (monitor.window);
+	if (infoSurface == NULL)
+	{
+	}
+	else
+	{
+		if (SDL_RenderReadPixels (monitor.renderer, &infoSurface->clip_rect, infoSurface->format->format, pixels,
+		                          infoSurface->w * infoSurface->format->BytesPerPixel) != 0)
+		{
+			//failed
+			return;
+		}
+		else
+		{
+			saveSurface = SDL_CreateRGBSurfaceFrom (pixels, infoSurface->w, infoSurface->h,
+			                                        infoSurface->format->BitsPerPixel,
+			                                        infoSurface->w * infoSurface->format->BytesPerPixel,
+			                                        infoSurface->format->Rmask, infoSurface->format->Gmask,
+			                                        infoSurface->format->Bmask, infoSurface->format->Amask);
+			if (saveSurface == NULL)
+			{
+				return;
+			}
+			SDL_SaveBMP(saveSurface, filepath);
+			SDL_FreeSurface (saveSurface);
+			saveSurface = NULL;
+		}
+		SDL_FreeSurface (infoSurface);
+		infoSurface = NULL;
+	}
+}
+
+/**
+ * A task to print screen of LVGL
+ * @param data unused
+ * @return never return
+ */
+static int prtsc_thread(void *data)
+{
+	(void) data;
+
+	while (1)
+	{
+		SDL_SemWait (prtsc_sem);
+		memset((char*)prtsc_fn, 0x00, 128);
+		sprintf (prtsc_fn, "SnapShot-%04d.bmp", fn_idx);
+		monitor_print_scr (prtsc_fn);
+		fn_idx++;
+		SDL_Delay (10); /*Sleep for 10 millisecond*/
+	}
+
+	return 0;
 }
 
 #endif /*USE_MONITOR*/
