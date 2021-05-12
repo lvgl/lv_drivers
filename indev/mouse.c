@@ -53,7 +53,7 @@ void mouse_init(void)
  * @param data store the mouse data here
  * @return false: because the points are not buffered, so no more data to be read
  */
-bool mouse_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
+void mouse_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 {
     (void) indev_drv;      /*Unused*/
 
@@ -61,8 +61,6 @@ bool mouse_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
     data->point.x = last_x;
     data->point.y = last_y;
     data->state = left_button_down ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
-
-    return false;
 }
 
 /**
