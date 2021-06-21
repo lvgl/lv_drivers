@@ -1,10 +1,10 @@
 /**
- * @file gtkdrv
+ * @file wayland
  *
  */
 
-#ifndef GTKDRV_H
-#define GTKDRV_H
+#ifndef WAYLAND_H
+#define WAYLAND_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,7 +21,7 @@ extern "C" {
 #endif
 #endif
 
-#if USE_GTK
+#if USE_WAYLAND
 
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
 #include "lvgl.h"
@@ -41,19 +41,22 @@ extern "C" {
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
-void gtkdrv_init(void);
-uint32_t gtkdrv_tick_get(void);
-void gtkdrv_flush_cb(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p);
-void gtkdrv_mouse_read_cb(lv_indev_drv_t * drv, lv_indev_data_t * data);
-void gtkdrv_keyboard_read_cb(lv_indev_drv_t * drv, lv_indev_data_t * data);
+void wayland_init(void);
+void wayland_deinit(void);
+void wayland_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p);
+void wayland_pointer_read(lv_indev_drv_t * drv, lv_indev_data_t * data);
+void wayland_pointeraxis_read(lv_indev_drv_t * drv, lv_indev_data_t * data);
+void wayland_keyboard_read(lv_indev_drv_t * drv, lv_indev_data_t * data);
+void wayland_touch_read(lv_indev_drv_t * drv, lv_indev_data_t * data);
+
 /**********************
  *      MACROS
  **********************/
 
-#endif /*USE_GTK*/
+#endif /* USE_WAYLAND */
 
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
 
-#endif /* GTKDRV_H */
+#endif /* WAYLAND_H */

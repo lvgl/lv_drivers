@@ -1,6 +1,6 @@
 /**
  * @file lv_drv_conf.h
- * Configuration file for v7.10.1
+ * Configuration file for v8.1.0-dev
  */
 
 /*
@@ -87,14 +87,14 @@
 #endif
 
 #if USE_MONITOR
-#  define MONITOR_HOR_RES     LV_HOR_RES
-#  define MONITOR_VER_RES     LV_VER_RES
+#  define MONITOR_HOR_RES     480
+#  define MONITOR_VER_RES     320
 
 /* Scale window by this factor (useful when simulating small screens) */
 #  define MONITOR_ZOOM        1
 
 /* Used to test true double buffering with only address changing.
- * Set LV_VDB_SIZE = (LV_HOR_RES * LV_VER_RES) and  LV_VDB_DOUBLE = 1 and LV_COLOR_DEPTH = 32" */
+ * Use 2 draw buffers, bith with MONITOR_HOR_RES x MONITOR_VER_RES size*/
 #  define MONITOR_DOUBLE_BUFFERED 0
 
 /*Eclipse: <SDL2/SDL.h>    Visual Studio: <SDL.h>*/
@@ -133,6 +133,19 @@
  *---------------------------------------*/
 #ifndef USE_GTK
 #  define USE_GTK       0
+#endif
+
+/*----------------------------------------
+ *  Wayland drivers (monitor, mouse, keyboard, touchscreen)
+ *---------------------------------------*/
+#ifndef USE_WAYLAND
+#  define USE_WAYLAND       0
+#endif
+
+#if USE_WAYLAND
+#  define WAYLAND_HOR_RES      480
+#  define WAYLAND_VER_RES      320
+#  define WAYLAND_SURF_TITLE   "LVGL"
 #endif
 
 /*----------------
