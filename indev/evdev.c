@@ -225,10 +225,10 @@ bool evdev_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
       data->point.x = 0;
     if(data->point.y < 0)
       data->point.y = 0;
-    if(data->point.x >= drv->disp->driver.hor_res)
-      data->point.x = drv->disp->driver.hor_res - 1;
-    if(data->point.y >= drv->disp->driver.ver_res)
-      data->point.y = drv->disp->driver.ver_res - 1;
+    if(data->point.x >= drv->disp->driver->hor_res)
+      data->point.x = drv->disp->driver->hor_res - 1;
+    if(data->point.y >= drv->disp->driver->ver_res)
+      data->point.y = drv->disp->driver->ver_res - 1;
 
     return false;
 }
