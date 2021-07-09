@@ -212,8 +212,8 @@ bool evdev_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
     /*Store the collected data*/
 
 #if EVDEV_CALIBRATE
-    data->point.x = map(evdev_root_x, EVDEV_HOR_MIN, EVDEV_HOR_MAX, 0, drv->disp->driver.hor_res);
-    data->point.y = map(evdev_root_y, EVDEV_VER_MIN, EVDEV_VER_MAX, 0, drv->disp->driver.ver_res);
+    data->point.x = map(evdev_root_x, EVDEV_HOR_MIN, EVDEV_HOR_MAX, 0, drv->disp->driver->hor_res);
+    data->point.y = map(evdev_root_y, EVDEV_VER_MIN, EVDEV_VER_MAX, 0, drv->disp->driver->ver_res);
 #else
     data->point.x = evdev_root_x;
     data->point.y = evdev_root_y;
