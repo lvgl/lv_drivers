@@ -125,15 +125,15 @@ static void lv_win32_display_driver_rounder_callback(
     lv_disp_drv_t* disp_drv,
     lv_area_t* area);
 
-static void lv_win32_mouse_driver_read_callback(
+static void lv_win32_pointer_driver_read_callback(
     lv_indev_drv_t* indev_drv,
     lv_indev_data_t* data);
 
-static void lv_win32_keyboard_driver_read_callback(
+static void lv_win32_keypad_driver_read_callback(
     lv_indev_drv_t* indev_drv,
     lv_indev_data_t* data);
 
-static void lv_win32_mousewheel_driver_read_callback(
+static void lv_win32_encoder_driver_read_callback(
     lv_indev_drv_t* indev_drv,
     lv_indev_data_t* data);
 
@@ -152,6 +152,10 @@ static void lv_win32_message_handler(
 
 EXTERN_C bool lv_win32_quit_signal = false;
 
+EXTERN_C lv_indev_t* lv_win32_pointer_device_object = NULL;
+EXTERN_C lv_indev_t* lv_win32_keypad_device_object = NULL;
+EXTERN_C lv_indev_t* lv_win32_encoder_device_object = NULL;
+
 /**********************
  *  STATIC VARIABLES
  **********************/
@@ -164,7 +168,6 @@ static UINT32* g_pixel_buffer = NULL;
 static SIZE_T g_pixel_buffer_size = 0;
 
 static lv_disp_t* g_display = NULL;
-static lv_group_t* g_default_group = NULL;
 
 static bool volatile g_mouse_pressed = false;
 static LPARAM volatile g_mouse_value = 0;
@@ -182,6 +185,17 @@ static WPARAM volatile g_keyboard_value = 0;
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
+
+EXTERN_C void lv_win32_add_all_input_devices_to_group(
+    lv_group_t* group)
+{
+    if (group)
+    {
+        lv_indev_set_group(lv_win32_pointer_device_object, group);
+        lv_indev_set_group(lv_win32_keypad_device_object, group);
+        lv_indev_set_group(lv_win32_encoder_device_object, group);
+    }
+}
 
 EXTERN_C bool lv_win32_init(
     HINSTANCE instance_handle,
@@ -265,42 +279,39 @@ EXTERN_C bool lv_win32_init(
     DeleteDC(g_buffer_dc_handle);
     g_buffer_dc_handle = hNewBufferDC;
 
-    static lv_disp_draw_buf_t disp_buf;
+    static lv_disp_draw_buf_t display_buffer;
     lv_disp_draw_buf_init(
-        &disp_buf,
+        &display_buffer,
         (lv_color_t*)malloc(hor_res * ver_res * sizeof(lv_color_t)),
         NULL,
         hor_res * ver_res);
 
-    static lv_disp_drv_t disp_drv;
-    lv_disp_drv_init(&disp_drv);
-    disp_drv.hor_res = hor_res;
-    disp_drv.ver_res = ver_res;
-    disp_drv.flush_cb = lv_win32_display_driver_flush_callback;
-    disp_drv.draw_buf = &disp_buf;
-    disp_drv.rounder_cb = lv_win32_display_driver_rounder_callback;
-    g_display = lv_disp_drv_register(&disp_drv);
+    static lv_disp_drv_t display_driver;
+    lv_disp_drv_init(&display_driver);
+    display_driver.hor_res = hor_res;
+    display_driver.ver_res = ver_res;
+    display_driver.flush_cb = lv_win32_display_driver_flush_callback;
+    display_driver.draw_buf = &display_buffer;
+    display_driver.rounder_cb = lv_win32_display_driver_rounder_callback;
+    g_display = lv_disp_drv_register(&display_driver);
 
-    g_default_group = lv_group_create();
-    lv_group_set_default(g_default_group);
+    static lv_indev_drv_t pointer_driver;
+    lv_indev_drv_init(&pointer_driver);
+    pointer_driver.type = LV_INDEV_TYPE_POINTER;
+    pointer_driver.read_cb = lv_win32_pointer_driver_read_callback;
+    lv_win32_pointer_device_object = lv_indev_drv_register(&pointer_driver);
 
-    static lv_indev_drv_t indev_drv;
-    lv_indev_drv_init(&indev_drv);
-    indev_drv.type = LV_INDEV_TYPE_POINTER;
-    indev_drv.read_cb = lv_win32_mouse_driver_read_callback;
-    lv_indev_set_group(lv_indev_drv_register(&indev_drv), g_default_group);
+    static lv_indev_drv_t keypad_driver;
+    lv_indev_drv_init(&keypad_driver);
+    keypad_driver.type = LV_INDEV_TYPE_KEYPAD;
+    keypad_driver.read_cb = lv_win32_keypad_driver_read_callback;
+    lv_win32_keypad_device_object = lv_indev_drv_register(&keypad_driver);
 
-    static lv_indev_drv_t kb_drv;
-    lv_indev_drv_init(&kb_drv);
-    kb_drv.type = LV_INDEV_TYPE_KEYPAD;
-    kb_drv.read_cb = lv_win32_keyboard_driver_read_callback;
-    lv_indev_set_group(lv_indev_drv_register(&kb_drv), g_default_group);
-
-    static lv_indev_drv_t enc_drv;
-    lv_indev_drv_init(&enc_drv);
-    enc_drv.type = LV_INDEV_TYPE_ENCODER;
-    enc_drv.read_cb = lv_win32_mousewheel_driver_read_callback;
-    lv_indev_set_group(lv_indev_drv_register(&enc_drv), g_default_group);
+    static lv_indev_drv_t encoder_driver;
+    lv_indev_drv_init(&encoder_driver);
+    encoder_driver.type = LV_INDEV_TYPE_ENCODER;
+    encoder_driver.read_cb = lv_win32_encoder_driver_read_callback;
+    lv_win32_encoder_device_object = lv_indev_drv_register(&encoder_driver);
 
     ShowWindow(g_window_handle, show_window_mode);
     UpdateWindow(g_window_handle);
@@ -521,7 +532,7 @@ static void lv_win32_display_driver_rounder_callback(
     area->y2 = disp_drv->ver_res - 1;
 }
 
-static void lv_win32_mouse_driver_read_callback(
+static void lv_win32_pointer_driver_read_callback(
     lv_indev_drv_t* indev_drv,
     lv_indev_data_t* data)
 {
@@ -533,7 +544,7 @@ static void lv_win32_mouse_driver_read_callback(
     data->point.y = GET_Y_LPARAM(g_mouse_value) / WIN32DRV_MONITOR_ZOOM;
 }
 
-static void lv_win32_keyboard_driver_read_callback(
+static void lv_win32_keypad_driver_read_callback(
     lv_indev_drv_t* indev_drv,
     lv_indev_data_t* data)
 {
@@ -594,7 +605,7 @@ static void lv_win32_keyboard_driver_read_callback(
     }
 }
 
-static void lv_win32_mousewheel_driver_read_callback(
+static void lv_win32_encoder_driver_read_callback(
     lv_indev_drv_t* indev_drv,
     lv_indev_data_t* data)
 {
