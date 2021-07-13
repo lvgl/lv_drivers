@@ -189,12 +189,31 @@ static WPARAM volatile g_keyboard_value = 0;
 EXTERN_C void lv_win32_add_all_input_devices_to_group(
     lv_group_t* group)
 {
-    if (group)
+    if (!group)
     {
-        lv_indev_set_group(lv_win32_pointer_device_object, group);
-        lv_indev_set_group(lv_win32_keypad_device_object, group);
-        lv_indev_set_group(lv_win32_encoder_device_object, group);
+        LV_LOG_WARN(
+            "The group object is NULL. Get the default group object instead.");
+
+        group = lv_group_get_default();
+        if (!group)
+        {
+            LV_LOG_WARN(
+                "The default group object is NULL. Create a new group object "
+                "and set it to default instead.");
+
+            group = lv_group_create();
+            if (group)
+            {
+                lv_group_set_default(group);
+            }
+        }
     }
+
+    LV_ASSERT_MSG(group, "Cannot obtain an available group object.");
+
+    lv_indev_set_group(lv_win32_pointer_device_object, group);
+    lv_indev_set_group(lv_win32_keypad_device_object, group);
+    lv_indev_set_group(lv_win32_encoder_device_object, group);
 }
 
 EXTERN_C bool lv_win32_init(
