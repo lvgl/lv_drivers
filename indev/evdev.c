@@ -115,7 +115,7 @@ bool evdev_set_file(char* dev_name)
  * @param data store the evdev data here
  * @return false: because the points are not buffered, so no more data to be read
  */
-bool evdev_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
+void evdev_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
 {
     struct input_event in;
 
@@ -196,7 +196,7 @@ bool evdev_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
 		}
 		evdev_key_val = data->key;
 		evdev_button = data->state;
-		return false;
+		return ;
 	    }
         }
     }
@@ -205,10 +205,10 @@ bool evdev_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
         /* No data retrieved */
         data->key = evdev_key_val;
 	data->state = evdev_button;
-	return false;
+	return ;
     }
     if(drv->type != LV_INDEV_TYPE_POINTER)
-        return false;
+        return ;
     /*Store the collected data*/
 
 #if EVDEV_CALIBRATE
@@ -230,7 +230,7 @@ bool evdev_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
     if(data->point.y >= drv->disp->driver->ver_res)
       data->point.y = drv->disp->driver->ver_res - 1;
 
-    return false;
+    return ;
 }
 
 /**********************
