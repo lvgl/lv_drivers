@@ -522,6 +522,10 @@ static void lv_win32_display_driver_flush_callback(
     HDC hWindowDC = GetDC(g_window_handle);
     if (hWindowDC)
     {
+        int PreviousMode = SetStretchBltMode(
+            hWindowDC,
+            HALFTONE);
+
         StretchBlt(
             hWindowDC,
             0,
@@ -534,6 +538,10 @@ static void lv_win32_display_driver_flush_callback(
             disp_drv->hor_res,
             disp_drv->ver_res,
             SRCCOPY);
+
+        SetStretchBltMode(
+            hWindowDC,
+            PreviousMode);
 
         ReleaseDC(g_window_handle, hWindowDC);
     }
