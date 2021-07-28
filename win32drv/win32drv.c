@@ -662,6 +662,23 @@ static void lv_win32_pointer_driver_read_callback(
         GET_Y_LPARAM(g_mouse_value),
         USER_DEFAULT_SCREEN_DPI,
         WIN32DRV_MONITOR_ZOOM * g_dpi_value);
+
+    if (data->point.x < 0)
+    {
+        data->point.x = 0;
+    }
+    if (data->point.x > g_display->driver->hor_res - 1)
+    {
+        data->point.x = g_display->driver->hor_res - 1;
+    }
+    if (data->point.y < 0)
+    {
+        data->point.y = 0;
+    }
+    if (data->point.y > g_display->driver->ver_res - 1)
+    {
+        data->point.y = g_display->driver->ver_res - 1;
+    }
 }
 
 static void lv_win32_keypad_driver_read_callback(
