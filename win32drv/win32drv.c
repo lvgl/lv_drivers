@@ -13,6 +13,7 @@
 
 #include <windowsx.h>
 #include <VersionHelpers.h>
+#include <ShellScalingApi.h>
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -116,6 +117,14 @@ static BOOL lv_win32_get_touch_input_info(
 static BOOL lv_win32_close_touch_input_handle(
     HTOUCHINPUT hTouchInput);
 
+/**
+ * @brief Returns the dots per inch (dpi) value for the associated window.
+ * @param WindowHandle The window you want to get information about.
+ * @return The DPI for the window.
+*/
+static UINT lv_win32_get_dpi_for_window(
+    _In_ HWND WindowHandle);
+
 static void lv_win32_display_driver_flush_callback(
     lv_disp_drv_t* disp_drv,
     const lv_area_t* area,
@@ -177,6 +186,8 @@ static int16_t volatile g_mousewheel_value = 0;
 
 static bool volatile g_keyboard_pressed = false;
 static WPARAM volatile g_keyboard_value = 0;
+
+static int volatile g_dpi_value = USER_DEFAULT_SCREEN_DPI;
 
 /**********************
  *      MACROS
@@ -246,23 +257,6 @@ EXTERN_C bool lv_win32_init(
 
     g_instance_handle = instance_handle;
 
-    RECT NewWindowSize;
-
-    NewWindowSize.left = 0;
-    NewWindowSize.right = hor_res * WIN32DRV_MONITOR_ZOOM;
-    NewWindowSize.top = 0;
-    NewWindowSize.bottom = ver_res * WIN32DRV_MONITOR_ZOOM;
-
-    AdjustWindowRectEx(
-        &NewWindowSize,
-        WINDOW_STYLE,
-        FALSE,
-        WINDOW_EX_STYLE);
-    OffsetRect(
-        &NewWindowSize,
-        -NewWindowSize.left,
-        -NewWindowSize.top);
-
     g_window_handle = CreateWindowExW(
         WINDOW_EX_STYLE,
         WindowClass.lpszClassName,
@@ -270,8 +264,8 @@ EXTERN_C bool lv_win32_init(
         WINDOW_STYLE,
         CW_USEDEFAULT,
         0,
-        NewWindowSize.right,
-        NewWindowSize.bottom,
+        CW_USEDEFAULT,
+        0,
         NULL,
         NULL,
         instance_handle,
@@ -281,6 +275,40 @@ EXTERN_C bool lv_win32_init(
     {
         return false;
     }
+
+    g_dpi_value = lv_win32_get_dpi_for_window(g_window_handle);
+
+    RECT WindowSize;
+
+    WindowSize.left = 0;
+    WindowSize.right = MulDiv(
+        hor_res * WIN32DRV_MONITOR_ZOOM,
+        g_dpi_value,
+        USER_DEFAULT_SCREEN_DPI);
+    WindowSize.top = 0;
+    WindowSize.bottom = MulDiv(
+        ver_res * WIN32DRV_MONITOR_ZOOM,
+        g_dpi_value,
+        USER_DEFAULT_SCREEN_DPI);
+
+    AdjustWindowRectEx(
+        &WindowSize,
+        WINDOW_STYLE,
+        FALSE,
+        WINDOW_EX_STYLE);
+    OffsetRect(
+        &WindowSize,
+        -WindowSize.left,
+        -WindowSize.top);
+
+    SetWindowPos(
+        g_window_handle,
+        NULL,
+        0,
+        0,
+        WindowSize.right,
+        WindowSize.bottom,
+        SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOMOVE);
 
     lv_win32_register_touch_window(g_window_handle, 0);
 
@@ -362,24 +390,98 @@ static HDC lv_win32_create_frame_buffer(
 
         if (hFrameBufferDC)
         {
+#if LV_COLOR_DEPTH == 32
             BITMAPINFO BitmapInfo = { 0 };
+#elif LV_COLOR_DEPTH == 16
+            typedef struct _BITMAPINFO_16BPP {
+                BITMAPINFOHEADER bmiHeader;
+                DWORD bmiColorMask[3];
+            } BITMAPINFO_16BPP, *PBITMAPINFO_16BPP;
+
+            BITMAPINFO_16BPP BitmapInfo = { 0 };
+#elif LV_COLOR_DEPTH == 8
+            typedef struct _BITMAPINFO_8BPP {
+                BITMAPINFOHEADER bmiHeader;
+                RGBQUAD bmiColors[256];
+            } BITMAPINFO_8BPP, *PBITMAPINFO_8BPP;
+
+            BITMAPINFO_8BPP BitmapInfo = { 0 };
+#elif LV_COLOR_DEPTH == 1
+            typedef struct _BITMAPINFO_1BPP {
+                BITMAPINFOHEADER bmiHeader;
+                RGBQUAD bmiColors[2];
+            } BITMAPINFO_1BPP, *PBITMAPINFO_1BPP;
+
+            BITMAPINFO_1BPP BitmapInfo = { 0 };
+#else
+            BITMAPINFO BitmapInfo = { 0 };
+#endif
+            
             BitmapInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
             BitmapInfo.bmiHeader.biWidth = Width;
             BitmapInfo.bmiHeader.biHeight = -Height;
             BitmapInfo.bmiHeader.biPlanes = 1;
+#if LV_COLOR_DEPTH == 32
             BitmapInfo.bmiHeader.biBitCount = 32;
             BitmapInfo.bmiHeader.biCompression = BI_RGB;
+#elif LV_COLOR_DEPTH == 16
+            BitmapInfo.bmiHeader.biBitCount = 16;
+            BitmapInfo.bmiHeader.biCompression = BI_BITFIELDS;
+            BitmapInfo.bmiColorMask[0] = 0xF800;
+            BitmapInfo.bmiColorMask[1] = 0x07E0;
+            BitmapInfo.bmiColorMask[2] = 0x001F;
+#elif LV_COLOR_DEPTH == 8
+            BitmapInfo.bmiHeader.biBitCount = 8;
+            BitmapInfo.bmiHeader.biCompression = BI_RGB;
+            for (size_t i = 0; i < 256; ++i)
+            {
+                lv_color8_t color;
+                color.full = i;
+
+                BitmapInfo.bmiColors[i].rgbRed = LV_COLOR_GET_R(color) * 36;
+                BitmapInfo.bmiColors[i].rgbGreen = LV_COLOR_GET_G(color) * 36;
+                BitmapInfo.bmiColors[i].rgbBlue = LV_COLOR_GET_B(color) * 85;
+                BitmapInfo.bmiColors[i].rgbReserved = 0xFF;
+            }
+#elif LV_COLOR_DEPTH == 1
+            BitmapInfo.bmiHeader.biBitCount = 8;
+            BitmapInfo.bmiHeader.biCompression = BI_RGB;
+            BitmapInfo.bmiHeader.biClrUsed = 2;
+            BitmapInfo.bmiHeader.biClrImportant = 2;
+            BitmapInfo.bmiColors[0].rgbRed = 0x00;
+            BitmapInfo.bmiColors[0].rgbGreen = 0x00;
+            BitmapInfo.bmiColors[0].rgbBlue = 0x00;
+            BitmapInfo.bmiColors[0].rgbReserved = 0xFF;
+            BitmapInfo.bmiColors[1].rgbRed = 0xFF;
+            BitmapInfo.bmiColors[1].rgbGreen = 0xFF;
+            BitmapInfo.bmiColors[1].rgbBlue = 0xFF;
+            BitmapInfo.bmiColors[1].rgbReserved = 0xFF;
+#else
+            BitmapInfo.bmiHeader.biBitCount = 32;
+            BitmapInfo.bmiHeader.biCompression = BI_RGB;
+#endif
 
             HBITMAP hBitmap = CreateDIBSection(
                 hFrameBufferDC,
-                &BitmapInfo,
+                (PBITMAPINFO)(&BitmapInfo),
                 DIB_RGB_COLORS,
                 (void**)PixelBuffer,
                 NULL,
                 0);
             if (hBitmap)
             {
+#if LV_COLOR_DEPTH == 32
                 *PixelBufferSize = Width * Height * sizeof(UINT32);
+#elif LV_COLOR_DEPTH == 16
+                *PixelBufferSize = Width * Height * sizeof(UINT16);
+#elif LV_COLOR_DEPTH == 8
+                *PixelBufferSize = Width * Height * sizeof(UINT8);
+#elif LV_COLOR_DEPTH == 1
+                *PixelBufferSize = Width * Height * sizeof(UINT8);
+#else
+                *PixelBufferSize = Width * Height * sizeof(UINT32);
+#endif
+             
                 DeleteObject(SelectObject(hFrameBufferDC, hBitmap));
                 DeleteObject(hBitmap);
             }
@@ -500,12 +602,67 @@ static BOOL lv_win32_close_touch_input_handle(
     return pFunction(hTouchInput);
 }
 
+static UINT lv_win32_get_dpi_for_window(
+    _In_ HWND WindowHandle)
+{
+    UINT Result = (UINT)(-1);
+
+    HMODULE ModuleHandle = LoadLibraryW(L"SHCore.dll");
+    if (ModuleHandle)
+    {
+        typedef HRESULT(WINAPI* FunctionType)(
+            HMONITOR, MONITOR_DPI_TYPE, UINT*, UINT*);
+
+        FunctionType pFunction = (FunctionType)(
+            GetProcAddress(ModuleHandle, "GetDpiForMonitor"));
+        if (pFunction)
+        {
+            HMONITOR MonitorHandle = MonitorFromWindow(
+                WindowHandle,
+                MONITOR_DEFAULTTONEAREST);
+
+            UINT dpiX = 0;
+            UINT dpiY = 0;
+            if (SUCCEEDED(pFunction(
+                MonitorHandle,
+                MDT_EFFECTIVE_DPI,
+                &dpiX,
+                &dpiY)))
+            {
+                Result = dpiX;
+            }
+        }
+
+        FreeLibrary(ModuleHandle);
+    }
+
+    if (Result == (UINT)(-1))
+    {
+        HDC hWindowDC = GetDC(WindowHandle);
+        if (hWindowDC)
+        {
+            Result = GetDeviceCaps(hWindowDC, LOGPIXELSX);
+            ReleaseDC(WindowHandle, hWindowDC);
+        }
+    }
+
+    if (Result == (UINT)(-1))
+    {
+        Result = USER_DEFAULT_SCREEN_DPI;
+    }
+
+    return Result;
+}
+
 static void lv_win32_display_driver_flush_callback(
     lv_disp_drv_t* disp_drv,
     const lv_area_t* area,
     lv_color_t* color_p)
 {
-#if LV_COLOR_DEPTH == 32
+#if (LV_COLOR_DEPTH == 32) || \
+    (LV_COLOR_DEPTH == 16) || \
+    (LV_COLOR_DEPTH == 8) || \
+    (LV_COLOR_DEPTH == 1)
     UNREFERENCED_PARAMETER(area);
     memcpy(g_pixel_buffer, color_p, g_pixel_buffer_size);
 #else
@@ -522,18 +679,32 @@ static void lv_win32_display_driver_flush_callback(
     HDC hWindowDC = GetDC(g_window_handle);
     if (hWindowDC)
     {
+        int PreviousMode = SetStretchBltMode(
+            hWindowDC,
+            HALFTONE);
+
         StretchBlt(
             hWindowDC,
             0,
             0,
-            disp_drv->hor_res * WIN32DRV_MONITOR_ZOOM,
-            disp_drv->ver_res * WIN32DRV_MONITOR_ZOOM,
+            MulDiv(
+                disp_drv->hor_res * WIN32DRV_MONITOR_ZOOM,
+                g_dpi_value,
+                USER_DEFAULT_SCREEN_DPI),
+            MulDiv(
+                disp_drv->ver_res * WIN32DRV_MONITOR_ZOOM,
+                g_dpi_value,
+                USER_DEFAULT_SCREEN_DPI),
             g_buffer_dc_handle,
             0,
             0,
             disp_drv->hor_res,
             disp_drv->ver_res,
             SRCCOPY);
+
+        SetStretchBltMode(
+            hWindowDC,
+            PreviousMode);
 
         ReleaseDC(g_window_handle, hWindowDC);
     }
@@ -559,8 +730,32 @@ static void lv_win32_pointer_driver_read_callback(
 
     data->state = (lv_indev_state_t)(
         g_mouse_pressed ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL);
-    data->point.x = GET_X_LPARAM(g_mouse_value) / WIN32DRV_MONITOR_ZOOM;
-    data->point.y = GET_Y_LPARAM(g_mouse_value) / WIN32DRV_MONITOR_ZOOM;
+
+    data->point.x = MulDiv(
+        GET_X_LPARAM(g_mouse_value),
+        USER_DEFAULT_SCREEN_DPI,
+        WIN32DRV_MONITOR_ZOOM * g_dpi_value);
+    data->point.y = MulDiv(
+        GET_Y_LPARAM(g_mouse_value),
+        USER_DEFAULT_SCREEN_DPI,
+        WIN32DRV_MONITOR_ZOOM * g_dpi_value);
+
+    if (data->point.x < 0)
+    {
+        data->point.x = 0;
+    }
+    if (data->point.x > g_display->driver->hor_res - 1)
+    {
+        data->point.x = g_display->driver->hor_res - 1;
+    }
+    if (data->point.y < 0)
+    {
+        data->point.y = 0;
+    }
+    if (data->point.y > g_display->driver->ver_res - 1)
+    {
+        data->point.y = g_display->driver->ver_res - 1;
+    }
 }
 
 static void lv_win32_keypad_driver_read_callback(
@@ -717,6 +912,8 @@ static LRESULT CALLBACK lv_win32_window_message_callback(
     }
     case WM_DPICHANGED:
     {
+        g_dpi_value = HIWORD(wParam);
+
         LPRECT SuggestedRect = (LPRECT)lParam;
 
         SetWindowPos(
@@ -731,8 +928,14 @@ static LRESULT CALLBACK lv_win32_window_message_callback(
         RECT ClientRect;
         GetClientRect(hWnd, &ClientRect);
 
-        int WindowWidth = g_display->driver->hor_res;
-        int WindowHeight = g_display->driver->ver_res;
+        int WindowWidth = MulDiv(
+            g_display->driver->hor_res * WIN32DRV_MONITOR_ZOOM,
+            g_dpi_value,
+            USER_DEFAULT_SCREEN_DPI);
+        int WindowHeight = MulDiv(
+            g_display->driver->ver_res * WIN32DRV_MONITOR_ZOOM,
+            g_dpi_value,
+            USER_DEFAULT_SCREEN_DPI);
 
         SetWindowPos(
             hWnd,
