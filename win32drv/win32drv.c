@@ -660,11 +660,23 @@ static void lv_win32_display_driver_flush_callback(
     lv_color_t* color_p)
 {
 #if (LV_COLOR_DEPTH == 32) || \
-    (LV_COLOR_DEPTH == 16) || \
+    (LV_COLOR_DEPTH == 16 && LV_COLOR_16_SWAP == 0) || \
     (LV_COLOR_DEPTH == 8) || \
     (LV_COLOR_DEPTH == 1)
     UNREFERENCED_PARAMETER(area);
     memcpy(g_pixel_buffer, color_p, g_pixel_buffer_size);
+#elif (LV_COLOR_DEPTH == 16 && LV_COLOR_16_SWAP != 0)
+    SIZE_T count = g_pixel_buffer_size / sizeof(UINT16);
+    PUINT16 source = (PUINT16)color_p;
+    PUINT16 destination = (PUINT16)g_pixel_buffer;
+    for (SIZE_T i = 0; i < count; ++i)
+    {
+        UINT16 current = *source;
+        *destination = (LOBYTE(current) << 8) | HIBYTE(current);
+
+        ++source;
+        ++destination;
+    }
 #else
     for (int y = area->y1; y <= area->y2; ++y)
     {
