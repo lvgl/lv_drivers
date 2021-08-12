@@ -76,6 +76,10 @@ static int fbfd = 0;
  *      MACROS
  **********************/
 
+#if USE_BSD_FBDEV
+#define FBIOBLANK FBIO_BLANK
+#endif /* USE_BSD_FBDEV */
+
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
