@@ -12,6 +12,9 @@
 /*********************
  *      DEFINES
  *********************/
+#ifndef KEYBOARD_BUFFER_SIZE
+#define KEYBOARD_BUFFER_SIZE SDL_TEXTINPUTEVENT_TEXT_SIZE
+#endif
 
 /**********************
  *      TYPEDEFS
@@ -25,7 +28,7 @@ static uint32_t keycode_to_ctrl_key(SDL_Keycode sdl_key);
 /**********************
  *  STATIC VARIABLES
  **********************/
-static char buf[SDL_TEXTINPUTEVENT_TEXT_SIZE];
+static char buf[KEYBOARD_BUFFER_SIZE];
 
 /**********************
  *      MACROS
@@ -82,15 +85,21 @@ void keyboard_handler(SDL_Event * event)
         case SDL_KEYDOWN:                       /*Button press*/
             {
                 const uint32_t ctrl_key = keycode_to_ctrl_key(event->key.keysym.sym);
-                if (ctrl_key != '\0') {
-                    const size_t len = strlen(buf);
+                if (ctrl_key == '\0')
+                    return;
+                const size_t len = strlen(buf);
+                if (len < KEYBOARD_BUFFER_SIZE - 1) {
                     buf[len] = ctrl_key;
                     buf[len + 1] = '\0';
                 }
                 break;
             }
         case SDL_TEXTINPUT:                     /*Text input*/
-            strcat(buf, event->text.text);
+            {
+                const size_t len = strlen(buf) + strlen(event->text.text);
+                if (len < KEYBOARD_BUFFER_SIZE - 1)
+                    strcat(buf, event->text.text);
+            }
             break;
         default:
             break;
