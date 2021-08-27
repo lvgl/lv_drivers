@@ -147,6 +147,7 @@ static uint32_t keycode_to_ctrl_key(SDL_Keycode sdl_key)
         case '\r':
             return LV_KEY_ENTER;
 
+        case SDLK_TAB:
         case SDLK_PAGEDOWN:
             return LV_KEY_NEXT;
 
