@@ -372,15 +372,19 @@
 #endif
 
 /*-------------------------------------------------
- * Touchscreen as libinput interface (for Linux based systems)
+ * Touchscreen or keyboard as libinput interface (for Linux based systems)
  *------------------------------------------------*/
 #ifndef USE_LIBINPUT
 #  define USE_LIBINPUT           0
 #endif
 
-#if USE_LIBINPUT
+#ifndef USE_BSD_LIBINPUT
+#  define USE_BSD_LIBINPUT       0
+#endif
+
+#if USE_LIBINPUT || USE_BSD_LIBINPUT
 #  define LIBINPUT_NAME   "/dev/input/event0"        /*You can use the "evtest" Linux tool to get the list of devices and test them*/
-#endif  /*USE_LIBINPUT*/
+#endif  /*USE_LIBINPUT || USE_BSD_LIBINPUT*/
 
 /*-------------------------------------------------
  * Mouse or touchpad as evdev interface (for Linux based systems)
