@@ -21,7 +21,7 @@ extern "C" {
 #endif
 #endif
 
-#if USE_LIBINPUT
+#if USE_LIBINPUT || USE_BSD_LIBINPUT
 
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
 #include "lvgl.h"
@@ -56,16 +56,15 @@ bool libinput_set_file(char* dev_name);
  * Get the current position and state of the libinput
  * @param indev_drv driver object itself
  * @param data store the libinput data here
- * @return false: because the points are not buffered, so no more data to be read
  */
-bool libinput_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
+void libinput_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
 
 
 /**********************
  *      MACROS
  **********************/
 
-#endif /* USE_LIBINPUT */
+#endif /* USE_LIBINPUT || USE_BSD_LIBINPUT */
 
 #ifdef __cplusplus
 } /* extern "C" */
