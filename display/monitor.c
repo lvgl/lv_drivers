@@ -376,7 +376,7 @@ static void window_update(monitor_t * m)
 #if LV_COLOR_SCREEN_TRANSP
     SDL_SetRenderDrawColor(m->renderer, 0xff, 0, 0, 0xff);
     SDL_Rect r;
-    r.x = 0; r.y = 0; r.w = MONITOR_HOR_RES; r.w = MONITOR_VER_RES;
+    r.x = 0; r.y = 0; r.w = MONITOR_HOR_RES; r.h = MONITOR_VER_RES;
     SDL_RenderDrawRect(m->renderer, &r);
 #endif
 
