@@ -169,6 +169,7 @@ report_most_recent_state:
  */
 static void read_pointer(struct libinput_event *event) {
   struct libinput_event_touch *touch_event = NULL;
+  struct libinput_event_pointer *pointer_event = NULL;
   enum libinput_event_type type = libinput_event_get_type(event);
   switch (type) {
     case LIBINPUT_EVENT_TOUCH_MOTION:
@@ -180,6 +181,20 @@ static void read_pointer(struct libinput_event *event) {
       break;
     case LIBINPUT_EVENT_TOUCH_UP:
       libinput_button = LV_INDEV_STATE_REL;
+      break;
+    case LIBINPUT_EVENT_POINTER_MOTION:
+      pointer_event = libinput_event_get_pointer_event(event);
+      most_recent_touch_point.x += libinput_event_pointer_get_dx(pointer_event);
+      most_recent_touch_point.y += libinput_event_pointer_get_dy(pointer_event);
+      most_recent_touch_point.x = most_recent_touch_point.x < 0 ? 0 : most_recent_touch_point.x;
+      most_recent_touch_point.x = most_recent_touch_point.x > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : most_recent_touch_point.x;
+      most_recent_touch_point.y = most_recent_touch_point.y < 0 ? 0 : most_recent_touch_point.y;
+      most_recent_touch_point.y = most_recent_touch_point.y > LV_VER_RES - 1 ? LV_VER_RES - 1 : most_recent_touch_point.y;
+      break;
+    case LIBINPUT_EVENT_POINTER_BUTTON:
+      pointer_event = libinput_event_get_pointer_event(event);
+      enum libinput_button_state button_state = libinput_event_pointer_get_button_state(pointer_event); 
+      libinput_button = button_state == LIBINPUT_BUTTON_STATE_RELEASED ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
       break;
     default:
       break;
