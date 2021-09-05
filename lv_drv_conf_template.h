@@ -383,7 +383,10 @@
 #endif
 
 #if USE_LIBINPUT || USE_BSD_LIBINPUT
+/*If only a single device of the same type is connected, you can also auto detect it, e.g.:
+ *#define LIBINPUT_NAME   libinput_find_dev(LIBINPUT_CAPABILITY_TOUCH, false)*/
 #  define LIBINPUT_NAME   "/dev/input/event0"        /*You can use the "evtest" Linux tool to get the list of devices and test them*/
+
 #endif  /*USE_LIBINPUT || USE_BSD_LIBINPUT*/
 
 /*-------------------------------------------------
