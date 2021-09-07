@@ -23,6 +23,8 @@ extern "C" {
 
 #if USE_MOUSEWHEEL
 
+#warning "Deprecated, use the SDL driver instead. See lv_drivers/sdl/sdl.c"
+
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
 #include "lvgl.h"
 #else

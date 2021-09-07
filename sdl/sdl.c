@@ -9,20 +9,41 @@
 #include "sdl.h"
 #if USE_MONITOR || USE_SDL
 
-#ifndef MONITOR_SDL_INCLUDE_PATH
-#  define MONITOR_SDL_INCLUDE_PATH <SDL2/SDL.h>
+#if USE_MONITOR
+# warning "MONITOR is deprecated, use SDL instead. See lv_drivers/sdl/sdl.c"
 #endif
+
+#if USE_KEYBOARD
+# warning "KEYBOARD is deprecated, use SDL instead. See lv_drivers/sdl/sdl.c"
+#endif
+
+#if USE_MOUSE
+# warning "MOUSE is deprecated, use SDL instead. See lv_drivers/sdl/sdl.c"
+#endif
+
+#if USE_MOUSEWHEEL
+# warning "MOUSEWHEEL is deprecated, use SDL instead that. See lv_drivers/sdl/sdl.c"
+#endif
+
+#if USE_MONITOR && USE_SDL
+# error "Cannot enable both MONITOR and SDL at the same time. "
+#endif
+
+#if USE_MONITOR
+# define SDL_HOR_RES            MONITOR_HOR_RES
+# define SDL_VER_RES            MONITOR_VER_RES
+# define SDL_ZOOM               MONITOR_ZOOM
+# define SDL_DOUBLE_BUFFERED    MONITOR_DOUBLE_BUFFERED
+# define SDL_INCLUDE_PATH       MONITOR_SDL_INCLUDE_PATH
+# define SDL_VIRTUAL_MACHINE    MONITOR_VIRTUAL_MACHINE
+# define SDL_DUAL_DISPLAY       MONITOR_DUAL
+#endif
+
 
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
-#ifdef SDL_INCLUDE_PATH
-# include SDL_INCLUDE_PATH
-#else
-#include MONITOR_SDL_INCLUDE_PATH
-# endif
-#include "../indev/keyboard.h"
-#include "../indev/mousewheel.h"
+#include SDL_INCLUDE_PATH
 
 /*********************
  *      DEFINES
@@ -41,7 +62,7 @@ typedef struct {
     SDL_Renderer * renderer;
     SDL_Texture * texture;
     volatile bool sdl_refr_qry;
-#if MONITOR_DOUBLE_BUFFERED
+#if SDL_DOUBLE_BUFFERED
     uint32_t * tft_fb_act;
 #else
     uint32_t * tft_fb;
@@ -72,7 +93,7 @@ static int tick_thread(void *data);
  **********************/
 monitor_t monitor;
 
-#if MONITOR_DUAL
+#if SDL_DUAL_DISPLAY
 monitor_t monitor2;
 #endif
 
@@ -104,12 +125,12 @@ void sdl_init(void)
     SDL_SetEventFilter(quit_filter, NULL);
 
     window_create(&monitor);
-#if MONITOR_DUAL
+#if SDL_DUAL_DISPLAY
     window_create(&monitor2);
     int x, y;
     SDL_GetWindowPosition(monitor2.window, &x, &y);
-    SDL_SetWindowPosition(monitor.window, x + (MONITOR_HOR_RES * MONITOR_ZOOM) / 2 + 10, y);
-    SDL_SetWindowPosition(monitor2.window, x - (MONITOR_HOR_RES * MONITOR_ZOOM) / 2 - 10, y);
+    SDL_SetWindowPosition(monitor.window, x + (SDL_HOR_RES * SDL_ZOOM) / 2 + 10, y);
+    SDL_SetWindowPosition(monitor2.window, x - (SDL_HOR_RES * SDL_ZOOM) / 2 - 10, y);
 #endif
 
     sdl_inited = true;
@@ -143,9 +164,9 @@ void sdl_display_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
         return;
     }
 
-#if MONITOR_DOUBLE_BUFFERED
+#if SDL_DOUBLE_BUFFERED
     monitor.tft_fb_act = (uint32_t *)color_p;
-#else /*MONITOR_DOUBLE_BUFFERED*/
+#else /*SDL_DOUBLE_BUFFERED*/
 
     int32_t y;
 #if LV_COLOR_DEPTH != 24 && LV_COLOR_DEPTH != 32    /*32 is valid but support 24 for backward compatibility too*/
@@ -160,11 +181,11 @@ void sdl_display_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
 #else
     uint32_t w = lv_area_get_width(area);
     for(y = area->y1; y <= area->y2 && y < disp_drv->ver_res; y++) {
-        memcpy(&monitor.tft_fb[y * MONITOR_HOR_RES + area->x1], color_p, w * sizeof(lv_color_t));
+        memcpy(&monitor.tft_fb[y * SDL_HOR_RES + area->x1], color_p, w * sizeof(lv_color_t));
         color_p += w;
     }
 #endif
-#endif /*MONITOR_DOUBLE_BUFFERED*/
+#endif /*SDL_DOUBLE_BUFFERED*/
 
     monitor.sdl_refr_qry = true;
 
@@ -180,7 +201,7 @@ void sdl_display_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
 }
 
 
-#if MONITOR_DUAL
+#if SDL_DUAL_DISPLAY
 
 /**
  * Flush a buffer to the marked area
@@ -199,7 +220,7 @@ void sdl_display_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_col
         return;
     }
 
-#if MONITOR_DOUBLE_BUFFERED
+#if SDL_DOUBLE_BUFFERED
     monitor2.tft_fb_act = (uint32_t *)color_p;
 
     monitor2.sdl_refr_qry = true;
@@ -317,17 +338,10 @@ static void sdl_event_handler(lv_timer_t * t)
     /*Refresh handling*/
     SDL_Event event;
     while(SDL_PollEvent(&event)) {
-#if USE_MOUSE != 0
         mouse_handler(&event);
-#endif
-
-#if USE_MOUSEWHEEL != 0
         mousewheel_handler(&event);
-#endif
-
-#if USE_KEYBOARD
         keyboard_handler(&event);
-#endif
+
         if((&event)->type == SDL_WINDOWEVENT) {
             switch((&event)->window.event) {
 #if SDL_VERSION_ATLEAST(2, 0, 5)
@@ -335,7 +349,7 @@ static void sdl_event_handler(lv_timer_t * t)
 #endif
                 case SDL_WINDOWEVENT_EXPOSED:
                     window_update(&monitor);
-#if MONITOR_DUAL
+#if SDL_DUAL_DISPLAY
                     window_update(&monitor2);
 #endif
                     break;
@@ -367,7 +381,7 @@ static void monitor_sdl_refr(lv_timer_t * t)
         window_update(&monitor);
     }
 
-#if MONITOR_DUAL
+#if SDL_DUAL_DISPLAY
     if(monitor2.sdl_refr_qry != false) {
         monitor2.sdl_refr_qry = false;
         window_update(&monitor2);
@@ -397,7 +411,7 @@ static void monitor_sdl_clean_up(void)
     SDL_DestroyRenderer(monitor.renderer);
     SDL_DestroyWindow(monitor.window);
 
-#if MONITOR_DUAL
+#if SDL_DUAL_DISPLAY
     SDL_DestroyTexture(monitor2.texture);
     SDL_DestroyRenderer(monitor2.renderer);
     SDL_DestroyWindow(monitor2.window);
@@ -411,19 +425,19 @@ static void window_create(monitor_t * m)
 {
     m->window = SDL_CreateWindow("TFT Simulator",
                               SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                              MONITOR_HOR_RES * MONITOR_ZOOM, MONITOR_VER_RES * MONITOR_ZOOM, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
+                              SDL_HOR_RES * SDL_ZOOM, SDL_VER_RES * SDL_ZOOM, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
 
     m->renderer = SDL_CreateRenderer(m->window, -1, SDL_RENDERER_SOFTWARE);
     m->texture = SDL_CreateTexture(m->renderer,
-                                SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, MONITOR_HOR_RES, MONITOR_VER_RES);
+                                SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, SDL_HOR_RES, SDL_VER_RES);
     SDL_SetTextureBlendMode(m->texture, SDL_BLENDMODE_BLEND);
 
     /*Initialize the frame buffer to gray (77 is an empirical value) */
-#if MONITOR_DOUBLE_BUFFERED
-    SDL_UpdateTexture(m->texture, NULL, m->tft_fb_act, MONITOR_HOR_RES * sizeof(uint32_t));
+#if SDL_DOUBLE_BUFFERED
+    SDL_UpdateTexture(m->texture, NULL, m->tft_fb_act, SDL_HOR_RES * sizeof(uint32_t));
 #else
-    m->tft_fb = (uint32_t *)malloc(sizeof(uint32_t) * MONITOR_HOR_RES * MONITOR_VER_RES);
-    memset(m->tft_fb, 0x44, MONITOR_HOR_RES * MONITOR_VER_RES * sizeof(uint32_t));
+    m->tft_fb = (uint32_t *)malloc(sizeof(uint32_t) * SDL_HOR_RES * SDL_VER_RES);
+    memset(m->tft_fb, 0x44, SDL_HOR_RES * SDL_VER_RES * sizeof(uint32_t));
 #endif
 
     m->sdl_refr_qry = true;
@@ -432,17 +446,17 @@ static void window_create(monitor_t * m)
 
 static void window_update(monitor_t * m)
 {
-#if MONITOR_DOUBLE_BUFFERED == 0
-    SDL_UpdateTexture(m->texture, NULL, m->tft_fb, MONITOR_HOR_RES * sizeof(uint32_t));
+#if SDL_DOUBLE_BUFFERED == 0
+    SDL_UpdateTexture(m->texture, NULL, m->tft_fb, SDL_HOR_RES * sizeof(uint32_t));
 #else
     if(m->tft_fb_act == NULL) return;
-    SDL_UpdateTexture(m->texture, NULL, m->tft_fb_act, MONITOR_HOR_RES * sizeof(uint32_t));
+    SDL_UpdateTexture(m->texture, NULL, m->tft_fb_act, SDL_HOR_RES * sizeof(uint32_t));
 #endif
     SDL_RenderClear(m->renderer);
 #if LV_COLOR_SCREEN_TRANSP
     SDL_SetRenderDrawColor(m->renderer, 0xff, 0, 0, 0xff);
     SDL_Rect r;
-    r.x = 0; r.y = 0; r.w = MONITOR_HOR_RES; r.h = MONITOR_VER_RES;
+    r.x = 0; r.y = 0; r.w = SDL_HOR_RES; r.h = SDL_VER_RES;
     SDL_RenderDrawRect(m->renderer, &r);
 #endif
 
@@ -461,28 +475,28 @@ static void mouse_handler(SDL_Event * event)
         case SDL_MOUSEBUTTONDOWN:
             if(event->button.button == SDL_BUTTON_LEFT) {
                 left_button_down = true;
-                last_x = event->motion.x / MONITOR_ZOOM;
-                last_y = event->motion.y / MONITOR_ZOOM;
+                last_x = event->motion.x / SDL_ZOOM;
+                last_y = event->motion.y / SDL_ZOOM;
             }
             break;
         case SDL_MOUSEMOTION:
-            last_x = event->motion.x / MONITOR_ZOOM;
-            last_y = event->motion.y / MONITOR_ZOOM;
+            last_x = event->motion.x / SDL_ZOOM;
+            last_y = event->motion.y / SDL_ZOOM;
             break;
 
         case SDL_FINGERUP:
             left_button_down = false;
-            last_x = LV_HOR_RES * event->tfinger.x / MONITOR_ZOOM;
-            last_y = LV_VER_RES * event->tfinger.y / MONITOR_ZOOM;
+            last_x = LV_HOR_RES * event->tfinger.x / SDL_ZOOM;
+            last_y = LV_VER_RES * event->tfinger.y / SDL_ZOOM;
             break;
         case SDL_FINGERDOWN:
             left_button_down = true;
-            last_x = LV_HOR_RES * event->tfinger.x / MONITOR_ZOOM;
-            last_y = LV_VER_RES * event->tfinger.y / MONITOR_ZOOM;
+            last_x = LV_HOR_RES * event->tfinger.x / SDL_ZOOM;
+            last_y = LV_VER_RES * event->tfinger.y / SDL_ZOOM;
             break;
         case SDL_FINGERMOTION:
-            last_x = LV_HOR_RES * event->tfinger.x / MONITOR_ZOOM;
-            last_y = LV_VER_RES * event->tfinger.y / MONITOR_ZOOM;
+            last_x = LV_HOR_RES * event->tfinger.x / SDL_ZOOM;
+            last_y = LV_VER_RES * event->tfinger.y / SDL_ZOOM;
             break;
     }
 

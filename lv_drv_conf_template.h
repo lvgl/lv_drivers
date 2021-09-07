@@ -80,8 +80,37 @@
  *********************/
 
 /*-------------------
+ *  SDL
+ *-------------------*/
+
+/* SDL based drivers for display, mouse, mousewheel and keyboard*/
+#ifndef USE_SDL
+# define USE_SDL 0
+#endif
+
+#if USE_SDL
+#  define SDL_HOR_RES     480
+#  define SDL_VER_RES     320
+
+/* Scale window by this factor (useful when simulating small screens) */
+#  define SDL_ZOOM        1
+
+/* Used to test true double buffering with only address changing.
+ * Use 2 draw buffers, bith with SDL_HOR_RES x SDL_VER_RES size*/
+#  define SDL_DOUBLE_BUFFERED 0
+
+/*Eclipse: <SDL2/SDL.h>    Visual Studio: <SDL.h>*/
+#  define SDL_INCLUDE_PATH    <SDL2/SDL.h>
+
+/*Open two windows to test multi display support*/
+#  define SDL_DUAL_DISPLAY            0
+#endif
+
+/*-------------------
  *  Monitor of PC
  *-------------------*/
+
+/*DEPRECATED: Use the SDL driver instead. */
 #ifndef USE_MONITOR
 #  define USE_MONITOR         0
 #endif
@@ -352,6 +381,7 @@
 /*---------------------------------------
  * Mouse or touchpad on PC (using SDL)
  *-------------------------------------*/
+/*DEPRECATED: Use the SDL driver instead. */
 #ifndef USE_MOUSE
 #  define USE_MOUSE           0
 #endif
@@ -363,6 +393,7 @@
 /*-------------------------------------------
  * Mousewheel as encoder on PC (using SDL)
  *------------------------------------------*/
+/*DEPRECATED: Use the SDL driver instead. */
 #ifndef USE_MOUSEWHEEL
 #  define USE_MOUSEWHEEL      0
 #endif
@@ -414,6 +445,7 @@
 /*-------------------------------
  *   Keyboard of a PC (using SDL)
  *------------------------------*/
+/*DEPRECATED: Use the SDL driver instead. */
 #ifndef USE_KEYBOARD
 #  define USE_KEYBOARD        0
 #endif

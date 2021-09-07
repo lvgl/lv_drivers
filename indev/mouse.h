@@ -23,6 +23,8 @@ extern "C" {
 
 #if USE_MOUSE
 
+#warning "Deprecated, use the SDL driver instead. See lv_drivers/sdl/sdl.c"
+
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
 #include "lvgl.h"
 #else
@@ -43,6 +45,7 @@ extern "C" {
  * GLOBAL PROTOTYPES
  **********************/
 
+
 /**
  * Initialize the mouse
  */
@@ -52,7 +55,6 @@ static inline void mouse_init(void)
 }
 
 /**
- * DEPRACETED: use sdl_mouse_read instead
  * Get the current position and state of the mouse
  * @param indev_drv pointer to the related input device driver
  * @param data store the mouse data here
