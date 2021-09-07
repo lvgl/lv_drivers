@@ -29,11 +29,7 @@ extern "C" {
 #include "lvgl/lvgl.h"
 #endif
 
-#ifndef MONITOR_SDL_INCLUDE_PATH
-#define MONITOR_SDL_INCLUDE_PATH <SDL2/SDL.h>
-#endif
-
-#include MONITOR_SDL_INCLUDE_PATH
+#include "../sdl/sdl.h"
 
 /*********************
  *      DEFINES
@@ -50,19 +46,21 @@ extern "C" {
 /**
  * Initialize the mouse
  */
-void mouse_init(void);
+static inline void mouse_init(void)
+{
+    /*Nothing to do*/
+}
 
 /**
+ * DEPRACETED: use sdl_mouse_read instead
  * Get the current position and state of the mouse
  * @param indev_drv pointer to the related input device driver
  * @param data store the mouse data here
  */
-void mouse_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
-
-/**
- * It will be called from the main SDL thread
- */
-void mouse_handler(SDL_Event *event);
+void mouse_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
+{
+    sdl_mouse_read(indev_drv, data);
+}
 
 /**********************
  *      MACROS

@@ -29,11 +29,7 @@ extern "C" {
 #include "lvgl/lvgl.h"
 #endif
 
-#ifndef MONITOR_SDL_INCLUDE_PATH
-#define MONITOR_SDL_INCLUDE_PATH <SDL2/SDL.h>
-#endif
-
-#include MONITOR_SDL_INCLUDE_PATH
+#include "../sdl/sdl.h"
 
 /*********************
  *      DEFINES
@@ -49,20 +45,21 @@ extern "C" {
 /**
  * Initialize the keyboard
  */
-void keyboard_init(void);
+static inline void keyboard_init(void)
+{
+    /*Nothing to do*/
+}
 
 /**
  * Get the last pressed or released character from the PC's keyboard
  * @param indev_drv pointer to the related input device driver
  * @param data store the read data here
  */
-void keyboard_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
+static inline void keyboard_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
+{
+    sdl_keyboard_read(indev_drv, data);
+}
 
-/**
- * It is called periodically from the SDL thread to check a key is pressed/released
- * @param event describes the event
- */
-void keyboard_handler(SDL_Event *event);
 
 /**********************
  *      MACROS

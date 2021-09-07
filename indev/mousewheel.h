@@ -29,11 +29,7 @@ extern "C" {
 #include "lvgl/lvgl.h"
 #endif
 
-#ifndef MONITOR_SDL_INCLUDE_PATH
-#define MONITOR_SDL_INCLUDE_PATH <SDL2/SDL.h>
-#endif
-
-#include MONITOR_SDL_INCLUDE_PATH
+#include "../sdl/sdl.h"
 
 /*********************
  *      DEFINES
@@ -50,20 +46,20 @@ extern "C" {
 /**
  * Initialize the encoder
  */
-void mousewheel_init(void);
+static inline void mousewheel_init(void)
+{
+    /*Nothing to do*/
+}
 
 /**
  * Get encoder (i.e. mouse wheel) ticks difference and pressed state
  * @param indev_drv pointer to the related input device driver
  * @param data store the read data here
  */
-void mousewheel_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
-
-/**
- * It is called periodically from the SDL thread to check a key is pressed/released
- * @param event describes the event
- */
-void mousewheel_handler(SDL_Event *event);
+static inline void mousewheel_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
+{
+    sdl_mousewheel_read(indev_drv, data);
+}
 
 /**********************
  *      MACROS
