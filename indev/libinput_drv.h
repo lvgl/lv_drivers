@@ -36,11 +36,35 @@ extern "C" {
 /**********************
  *      TYPEDEFS
  **********************/
+typedef enum {
+  LIBINPUT_CAPABILITY_NONE     = 0,
+  LIBINPUT_CAPABILITY_KEYBOARD = 1U << 0,
+  LIBINPUT_CAPABILITY_POINTER  = 1U << 1,
+  LIBINPUT_CAPABILITY_TOUCH    = 1U << 2
+} libinput_capability;
 
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
 
+/**
+ * find connected input device with specific capabilities
+ * @param capabilities required device capabilities
+ * @param force_rescan erase the device cache (if any) and rescan the file system for available devices
+ * @return device node path (e.g. /dev/input/event0) for the first matching device or NULL if no device was found.
+ *         The pointer is safe to use until the next forceful device search.
+ */
+char *libinput_find_dev(libinput_capability capabilities, bool force_rescan);
+/**
+ * find connected input devices with specific capabilities
+ * @param capabilities required device capabilities
+ * @param devices pre-allocated array to store the found device node paths (e.g. /dev/input/event0). The pointers are
+ *                safe to use until the next forceful device search.
+ * @param count maximum number of devices to find (the devices array should be at least this long)
+ * @param force_rescan erase the device cache (if any) and rescan the file system for available devices
+ * @return number of devices that were found
+ */
+size_t libinput_find_devs(libinput_capability capabilities, char **found, size_t count, bool force_rescan);
 /**
  * Initialize the libinput
  */
