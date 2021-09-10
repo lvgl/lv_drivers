@@ -88,7 +88,12 @@
 # define USE_SDL 0
 #endif
 
-#if USE_SDL
+/* Hardware accelerated SDL driver */
+#ifndef USE_SDL_GPU
+# define USE_SDL_GPU 0
+#endif
+
+#if USE_SDL || USE_SDL_GPU
 #  define SDL_HOR_RES     480
 #  define SDL_VER_RES     320
 
