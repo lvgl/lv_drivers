@@ -46,8 +46,18 @@ extern "C" {
  */
 void sdl_init(void);
 
+/**
+ * IMPORTANT: Initialize draw buffer with one `SDL_Texture`.
+ * Use this instead of `lv_disp_draw_buf_init` because `buf1` isn't a real
+ * pixels buffer.
+ */
 void sdl_gpu_disp_draw_buf_init(lv_disp_draw_buf_t *draw_buf);
 
+/**
+ * IMPORTANT: Initialize display driver with `SDL_Renderer` instance.
+ * Use this instead of `lv_gpu_disp_drv_init` because `user_data` needs to
+ * be pointing to the renderer.
+ */
 void sdl_gpu_disp_drv_init(lv_disp_drv_t *driver);
 
 /**
