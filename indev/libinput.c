@@ -25,6 +25,10 @@
 #include <linux/input.h>
 #endif
 
+#if USE_XKB
+#include "xkb.h"
+#endif /* USE_XKB */
+
 /*********************
  *      DEFINES
  *********************/
@@ -170,6 +174,10 @@ void libinput_init(void)
   fds[0].fd = libinput_fd;
   fds[0].events = POLLIN;
   fds[0].revents = 0;
+
+#if USE_XKB
+  xkb_init();
+#endif
 }
 
 /**
@@ -381,8 +389,10 @@ static void read_keypad(struct libinput_event *event) {
     case LIBINPUT_EVENT_KEYBOARD_KEY:
       keyboard_event = libinput_event_get_keyboard_event(event);
       enum libinput_key_state key_state = libinput_event_keyboard_get_key_state(keyboard_event);
-      libinput_button = (key_state == LIBINPUT_KEY_STATE_RELEASED) ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
       uint32_t code = libinput_event_keyboard_get_key(keyboard_event);
+#if USE_XKB
+      libinput_key_val = xkb_process_key(code, key_state == LIBINPUT_KEY_STATE_PRESSED);
+#else
       switch(code) {
         case KEY_BACKSPACE:
           libinput_key_val = LV_KEY_BACKSPACE;
@@ -408,9 +418,17 @@ static void read_keypad(struct libinput_event *event) {
         case KEY_DOWN:
           libinput_key_val = LV_KEY_DOWN;
           break;
+        case KEY_TAB:
+          libinput_key_val = LV_KEY_NEXT;
+          break;
         default:
           libinput_key_val = 0;
           break;
+      }
+#endif /* USE_XKB */
+      if (libinput_key_val != 0) {
+        /* Only record button state when actual output is produced to prevent widgets from refreshing */
+        libinput_button = (key_state == LIBINPUT_KEY_STATE_RELEASED) ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
       }
       break;
     default:

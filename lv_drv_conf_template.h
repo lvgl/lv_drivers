@@ -445,6 +445,23 @@
 #  endif  /*EVDEV_CALIBRATE*/
 #endif  /*USE_EVDEV*/
 
+/*-------------------------------------------------
+ * Full keyboard support for evdev and libinput interface
+ *------------------------------------------------*/
+#if USE_LIBINPUT || USE_BSD_LIBINPUT || USE_EVDEV || USE_BSD_EVDEV
+#  ifndef USE_XKB
+#    define USE_XKB           0
+#  endif
+
+#  if USE_XKB
+#    define XKB_KEY_MAP       { .rules = NULL, \
+                                .model = "pc101", \
+                                .layout = "us", \
+                                .variant = NULL, \
+                                .options = NULL } /*"setxkbmap -query" can help find the right values for your keyboard*/
+#  endif  /*USE_XKB*/
+#endif  /*USE_LIBINPUT || USE_BSD_LIBINPUT || USE_EVDEV || USE_BSD_EVDEV*/
+
 /*-------------------------------
  *   Keyboard of a PC (using SDL)
  *------------------------------*/
