@@ -40,7 +40,8 @@ typedef enum {
   LIBINPUT_CAPABILITY_NONE     = 0,
   LIBINPUT_CAPABILITY_KEYBOARD = 1U << 0,
   LIBINPUT_CAPABILITY_POINTER  = 1U << 1,
-  LIBINPUT_CAPABILITY_TOUCH    = 1U << 2
+  LIBINPUT_CAPABILITY_TOUCH    = 1U << 2,
+  LIBINPUT_CAPABILITY_POWER    = 1U << 3
 } libinput_capability;
 
 /**********************

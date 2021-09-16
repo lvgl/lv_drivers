@@ -279,6 +279,9 @@ static bool rescan_devices(void) {
     if (libinput_device_has_capability(device, LIBINPUT_DEVICE_CAP_TOUCH)) {
       capabilities |= LIBINPUT_CAPABILITY_TOUCH;
     }
+    if (libinput_device_has_capability(device, LIBINPUT_DEVICE_CAP_KEYBOARD) && libinput_device_keyboard_has_key(device, KEY_POWER)) {
+      capabilities |= LIBINPUT_CAPABILITY_POWER;
+    }
 
     libinput_path_remove_device(device);
 
@@ -420,6 +423,9 @@ static void read_keypad(struct libinput_event *event) {
           break;
         case KEY_TAB:
           libinput_key_val = LV_KEY_NEXT;
+          break;
+        case KEY_POWER:
+          libinput_key_val = LV_KEY_POWER;
           break;
         default:
           libinput_key_val = 0;

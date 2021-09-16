@@ -160,6 +160,10 @@ uint32_t xkb_process_key(uint32_t scancode, bool down) {
     case XKB_KEY_ISO_Left_Tab: /* Sent on SHIFT + TAB */
       result = LV_KEY_PREV;
       break;
+    case XKB_KEY_XF86PowerDown:
+    case XKB_KEY_XF86PowerOff:
+      result = LV_KEY_POWER;
+      break;
     default:
       break;
   }
