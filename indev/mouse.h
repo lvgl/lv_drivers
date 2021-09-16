@@ -31,7 +31,11 @@ extern "C" {
 #include "lvgl/lvgl.h"
 #endif
 
+#if USE_SDL_GPU
+#include "../sdl/sdl_gpu.h"
+#else
 #include "../sdl/sdl.h"
+#endif
 
 /*********************
  *      DEFINES

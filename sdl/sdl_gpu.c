@@ -1,20 +1,16 @@
 /**
- * @file sdl.h
+ * @file sdl_gpu.c
  *
  */
 
 /*********************
  *      INCLUDES
  *********************/
-#include "sdl.h"
-#if USE_MONITOR || USE_SDL
+#include "sdl_gpu.h"
+#if USE_SDL_GPU
 
-#if LV_USE_GPU_SDL
-# error "LV_USE_GPU_SDL must not be enabled"
-#endif
-
-#if USE_MONITOR
-# warning "MONITOR is deprecated, use SDL instead. See lv_drivers/sdl/sdl.c"
+#if LV_USE_GPU_SDL == 0
+# error "LV_USE_GPU_SDL must be enabled"
 #endif
 
 #if USE_KEYBOARD
@@ -29,20 +25,9 @@
 # warning "MOUSEWHEEL is deprecated, use SDL instead that. See lv_drivers/sdl/sdl.c"
 #endif
 
-#if USE_MONITOR && USE_SDL
+#if USE_MONITOR
 # error "Cannot enable both MONITOR and SDL at the same time. "
 #endif
-
-#if USE_MONITOR
-# define SDL_HOR_RES            MONITOR_HOR_RES
-# define SDL_VER_RES            MONITOR_VER_RES
-# define SDL_ZOOM               MONITOR_ZOOM
-# define SDL_DOUBLE_BUFFERED    MONITOR_DOUBLE_BUFFERED
-# define SDL_INCLUDE_PATH       MONITOR_SDL_INCLUDE_PATH
-# define SDL_VIRTUAL_MACHINE    MONITOR_VIRTUAL_MACHINE
-# define SDL_DUAL_DISPLAY       MONITOR_DUAL
-#endif
-
 
 #include <stdlib.h>
 #include <stdbool.h>
@@ -66,11 +51,6 @@ typedef struct {
     SDL_Renderer * renderer;
     SDL_Texture * texture;
     volatile bool sdl_refr_qry;
-#if SDL_DOUBLE_BUFFERED
-    uint32_t * tft_fb_act;
-#else
-    uint32_t * tft_fb;
-#endif
 }monitor_t;
 
 /**********************
@@ -149,6 +129,17 @@ void sdl_init(void)
     lv_timer_create(sdl_event_handler, 10, NULL);
 }
 
+void sdl_gpu_disp_draw_buf_init(lv_disp_draw_buf_t *draw_buf)
+{
+    lv_disp_draw_buf_init(draw_buf, monitor.texture, NULL, SDL_HOR_RES * SDL_VER_RES);
+}
+
+void sdl_gpu_disp_drv_init(lv_disp_drv_t *driver)
+{
+    lv_disp_drv_init(driver);
+    driver->user_data = monitor.renderer;
+}
+
 /**
  * Flush a buffer to the marked area
  * @param drv pointer to driver where this function belongs
@@ -167,29 +158,6 @@ void sdl_display_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
         lv_disp_flush_ready(disp_drv);
         return;
     }
-
-#if SDL_DOUBLE_BUFFERED
-    monitor.tft_fb_act = (uint32_t *)color_p;
-#else /*SDL_DOUBLE_BUFFERED*/
-
-    int32_t y;
-#if LV_COLOR_DEPTH != 24 && LV_COLOR_DEPTH != 32    /*32 is valid but support 24 for backward compatibility too*/
-    int32_t x;
-    for(y = area->y1; y <= area->y2 && y < disp_drv->ver_res; y++) {
-        for(x = area->x1; x <= area->x2; x++) {
-            monitor.tft_fb[y * disp_drv->hor_res + x] = lv_color_to32(*color_p);
-            color_p++;
-        }
-
-    }
-#else
-    uint32_t w = lv_area_get_width(area);
-    for(y = area->y1; y <= area->y2 && y < disp_drv->ver_res; y++) {
-        memcpy(&monitor.tft_fb[y * SDL_HOR_RES + area->x1], color_p, w * sizeof(lv_color_t));
-        color_p += w;
-    }
-#endif
-#endif /*SDL_DOUBLE_BUFFERED*/
 
     monitor.sdl_refr_qry = true;
 
@@ -224,33 +192,6 @@ void sdl_display_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_col
         return;
     }
 
-#if SDL_DOUBLE_BUFFERED
-    monitor2.tft_fb_act = (uint32_t *)color_p;
-
-    monitor2.sdl_refr_qry = true;
-
-    /*IMPORTANT! It must be called to tell the system the flush is ready*/
-    lv_disp_flush_ready(disp_drv);
-#else
-
-    int32_t y;
-#if LV_COLOR_DEPTH != 24 && LV_COLOR_DEPTH != 32    /*32 is valid but support 24 for backward compatibility too*/
-    int32_t x;
-    for(y = area->y1; y <= area->y2 && y < disp_drv->ver_res; y++) {
-        for(x = area->x1; x <= area->x2; x++) {
-            monitor2.tft_fb[y * disp_drv->hor_res + x] = lv_color_to32(*color_p);
-            color_p++;
-        }
-
-    }
-#else
-    uint32_t w = lv_area_get_width(area);
-    for(y = area->y1; y <= area->y2 && y < disp_drv->ver_res; y++) {
-        memcpy(&monitor2.tft_fb[y * disp_drv->hor_res + area->x1], color_p, w * sizeof(lv_color_t));
-        color_p += w;
-    }
-#endif
-
     monitor2.sdl_refr_qry = true;
 
     /* TYPICALLY YOU DO NOT NEED THIS
@@ -261,10 +202,27 @@ void sdl_display_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_col
 
     /*IMPORTANT! It must be called to tell the system the flush is ready*/
     lv_disp_flush_ready(disp_drv);
-#endif
 }
 #endif
 
+void sdl_display_resize(lv_disp_t *disp, int width, int height)
+{
+    lv_disp_drv_t *driver = disp->driver;
+    SDL_Renderer *renderer = driver->user_data;
+    if (driver->draw_buf->buf1) {
+        SDL_DestroyTexture(driver->draw_buf->buf1);
+    }
+    SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, width,
+                                             height);
+    lv_disp_draw_buf_init(driver->draw_buf, texture, NULL, width * height);
+    driver->hor_res = (lv_coord_t) width;
+    driver->ver_res = (lv_coord_t) height;
+    SDL_RendererInfo renderer_info;
+    SDL_GetRendererInfo(renderer, &renderer_info);
+    SDL_assert(renderer_info.flags & SDL_RENDERER_TARGETTEXTURE);
+    SDL_SetRenderTarget(renderer, texture);
+    lv_disp_drv_update(disp, driver);
+}
 
 /**
  * Get the current position and state of the mouse
@@ -323,7 +281,6 @@ void sdl_keyboard_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
         data->continue_reading = true;
     }
 }
-
 
 /**********************
  *   STATIC FUNCTIONS
@@ -431,18 +388,12 @@ static void window_create(monitor_t * m)
                               SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                               SDL_HOR_RES * SDL_ZOOM, SDL_VER_RES * SDL_ZOOM, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
 
-    m->renderer = SDL_CreateRenderer(m->window, -1, SDL_RENDERER_SOFTWARE);
+    m->renderer = SDL_CreateRenderer(m->window, -1, SDL_RENDERER_ACCELERATED);
     m->texture = SDL_CreateTexture(m->renderer,
-                                SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, SDL_HOR_RES, SDL_VER_RES);
+                                SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, SDL_HOR_RES, SDL_VER_RES);
     SDL_SetTextureBlendMode(m->texture, SDL_BLENDMODE_BLEND);
-
-    /*Initialize the frame buffer to gray (77 is an empirical value) */
-#if SDL_DOUBLE_BUFFERED
-    SDL_UpdateTexture(m->texture, NULL, m->tft_fb_act, SDL_HOR_RES * sizeof(uint32_t));
-#else
-    m->tft_fb = (uint32_t *)malloc(sizeof(uint32_t) * SDL_HOR_RES * SDL_VER_RES);
-    memset(m->tft_fb, 0x44, SDL_HOR_RES * SDL_VER_RES * sizeof(uint32_t));
-#endif
+    /* For first frame */
+    SDL_SetRenderTarget(m->renderer, m->texture);
 
     m->sdl_refr_qry = true;
 
@@ -450,12 +401,7 @@ static void window_create(monitor_t * m)
 
 static void window_update(monitor_t * m)
 {
-#if SDL_DOUBLE_BUFFERED == 0
-    SDL_UpdateTexture(m->texture, NULL, m->tft_fb, SDL_HOR_RES * sizeof(uint32_t));
-#else
-    if(m->tft_fb_act == NULL) return;
-    SDL_UpdateTexture(m->texture, NULL, m->tft_fb_act, SDL_HOR_RES * sizeof(uint32_t));
-#endif
+    SDL_SetRenderTarget(m->renderer, NULL);
     SDL_RenderClear(m->renderer);
 #if LV_COLOR_SCREEN_TRANSP
     SDL_SetRenderDrawColor(m->renderer, 0xff, 0, 0, 0xff);
@@ -465,8 +411,11 @@ static void window_update(monitor_t * m)
 #endif
 
     /*Update the renderer with the texture containing the rendered image*/
+    SDL_SetTextureBlendMode(m->texture, SDL_BLENDMODE_BLEND);
+    SDL_RenderSetClipRect(m->renderer, NULL);
     SDL_RenderCopy(m->renderer, m->texture, NULL, NULL);
     SDL_RenderPresent(m->renderer);
+    SDL_SetRenderTarget(m->renderer, m->texture);
 }
 
 static void mouse_handler(SDL_Event * event)
@@ -642,4 +591,4 @@ static int tick_thread(void *data)
 }
 
 
-#endif /*USE_MONITOR || USE_SDL*/
+#endif /*USE_SDL_GPU*/
