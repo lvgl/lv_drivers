@@ -80,8 +80,37 @@
  *********************/
 
 /*-------------------
+ *  SDL
+ *-------------------*/
+
+/* SDL based drivers for display, mouse, mousewheel and keyboard*/
+#ifndef USE_SDL
+# define USE_SDL 0
+#endif
+
+#if USE_SDL
+#  define SDL_HOR_RES     480
+#  define SDL_VER_RES     320
+
+/* Scale window by this factor (useful when simulating small screens) */
+#  define SDL_ZOOM        1
+
+/* Used to test true double buffering with only address changing.
+ * Use 2 draw buffers, bith with SDL_HOR_RES x SDL_VER_RES size*/
+#  define SDL_DOUBLE_BUFFERED 0
+
+/*Eclipse: <SDL2/SDL.h>    Visual Studio: <SDL.h>*/
+#  define SDL_INCLUDE_PATH    <SDL2/SDL.h>
+
+/*Open two windows to test multi display support*/
+#  define SDL_DUAL_DISPLAY            0
+#endif
+
+/*-------------------
  *  Monitor of PC
  *-------------------*/
+
+/*DEPRECATED: Use the SDL driver instead. */
 #ifndef USE_MONITOR
 #  define USE_MONITOR         0
 #endif
@@ -352,6 +381,7 @@
 /*---------------------------------------
  * Mouse or touchpad on PC (using SDL)
  *-------------------------------------*/
+/*DEPRECATED: Use the SDL driver instead. */
 #ifndef USE_MOUSE
 #  define USE_MOUSE           0
 #endif
@@ -363,6 +393,7 @@
 /*-------------------------------------------
  * Mousewheel as encoder on PC (using SDL)
  *------------------------------------------*/
+/*DEPRECATED: Use the SDL driver instead. */
 #ifndef USE_MOUSEWHEEL
 #  define USE_MOUSEWHEEL      0
 #endif
@@ -383,7 +414,10 @@
 #endif
 
 #if USE_LIBINPUT || USE_BSD_LIBINPUT
+/*If only a single device of the same type is connected, you can also auto detect it, e.g.:
+ *#define LIBINPUT_NAME   libinput_find_dev(LIBINPUT_CAPABILITY_TOUCH, false)*/
 #  define LIBINPUT_NAME   "/dev/input/event0"        /*You can use the "evtest" Linux tool to get the list of devices and test them*/
+
 #endif  /*USE_LIBINPUT || USE_BSD_LIBINPUT*/
 
 /*-------------------------------------------------
@@ -411,9 +445,27 @@
 #  endif  /*EVDEV_CALIBRATE*/
 #endif  /*USE_EVDEV*/
 
+/*-------------------------------------------------
+ * Full keyboard support for evdev and libinput interface
+ *------------------------------------------------*/
+#if USE_LIBINPUT || USE_BSD_LIBINPUT || USE_EVDEV || USE_BSD_EVDEV
+#  ifndef USE_XKB
+#    define USE_XKB           0
+#  endif
+
+#  if USE_XKB
+#    define XKB_KEY_MAP       { .rules = NULL, \
+                                .model = "pc101", \
+                                .layout = "us", \
+                                .variant = NULL, \
+                                .options = NULL } /*"setxkbmap -query" can help find the right values for your keyboard*/
+#  endif  /*USE_XKB*/
+#endif  /*USE_LIBINPUT || USE_BSD_LIBINPUT || USE_EVDEV || USE_BSD_EVDEV*/
+
 /*-------------------------------
  *   Keyboard of a PC (using SDL)
  *------------------------------*/
+/*DEPRECATED: Use the SDL driver instead. */
 #ifndef USE_KEYBOARD
 #  define USE_KEYBOARD        0
 #endif
