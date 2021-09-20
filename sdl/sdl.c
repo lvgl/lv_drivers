@@ -41,6 +41,11 @@
 # define SDL_INCLUDE_PATH       MONITOR_SDL_INCLUDE_PATH
 # define SDL_VIRTUAL_MACHINE    MONITOR_VIRTUAL_MACHINE
 # define SDL_DUAL_DISPLAY       MONITOR_DUAL
+
+#ifndef SDL_FULLSCREEN
+#define SDL_FULLSCREEN        0
+#endif
+
 #endif
 
 
@@ -427,9 +432,15 @@ static void monitor_sdl_clean_up(void)
 
 static void window_create(monitor_t * m)
 {
+
+    int flag = 0;
+#if SDL_FULLSCREEN
+    flag |= SDL_WINDOW_FULLSCREEN;
+#endif
+
     m->window = SDL_CreateWindow("TFT Simulator",
                               SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                              SDL_HOR_RES * SDL_ZOOM, SDL_VER_RES * SDL_ZOOM, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
+                              SDL_HOR_RES * SDL_ZOOM, SDL_VER_RES * SDL_ZOOM, flag);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
 
     m->renderer = SDL_CreateRenderer(m->window, -1, SDL_RENDERER_SOFTWARE);
     m->texture = SDL_CreateTexture(m->renderer,
