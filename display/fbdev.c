@@ -254,6 +254,11 @@ void fbdev_get_sizes(uint32_t *width, uint32_t *height) {
         *height = vinfo.yres;
 }
 
+void fbdev_set_offset(uint32_t xoffset, uint32_t yoffset) {
+    vinfo.xoffset = xoffset;
+    vinfo.yoffset = yoffset;
+}
+
 /**********************
  *   STATIC FUNCTIONS
  **********************/
