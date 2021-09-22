@@ -61,8 +61,8 @@ In "Project properties > C/C++ Build > Settings" set the followings:
 2. Enable the Wayland driver in `lv_drv_conf.h` with `USE_WAYLAND 1`
 3. `LV_COLOR_DEPTH` should be set either to `32` or `16` in `lv_conf.h`;
    support for `8` and `1` depends on target platform.
-4. After `lv_init()` call `wayland_init()`
-5. Before `lv_deinit()` call `wayland_deinit()`
+4. After `lv_init()` call `lv_wayland_init()`
+5. Before `lv_deinit()` call `lv_wayland_deinit()`
 6. Add a display:
 ```c
   static lv_disp_draw_buf_t draw_buf;
@@ -75,7 +75,7 @@ In "Project properties > C/C++ Build > Settings" set the followings:
   disp_drv.draw_buf = &draw_buf;
   disp_drv.hor_res = WAYLAND_HOR_RES;
   disp_drv.ver_res = WAYLAND_VER_RES;
-  disp_drv.flush_cb = wayland_flush;
+  disp_drv.flush_cb = lv_wayland_flush;
   lv_disp_t * disp = lv_disp_drv_register(&disp_drv);
 ```
 7. Add keyboard:
@@ -83,7 +83,7 @@ In "Project properties > C/C++ Build > Settings" set the followings:
   lv_indev_drv_t indev_drv_kb;
   lv_indev_drv_init(&indev_drv_kb);
   indev_drv_kb.type = LV_INDEV_TYPE_KEYPAD;
-  indev_drv_kb.read_cb = wayland_keyboard_read;
+  indev_drv_kb.read_cb = lv_wayland_keyboard_read;
   lv_indev_drv_register(&indev_drv_kb);
 ```
 8. Add touchscreen:
@@ -91,7 +91,7 @@ In "Project properties > C/C++ Build > Settings" set the followings:
   lv_indev_drv_t indev_drv_touch;
   lv_indev_drv_init(&indev_drv_touch);
   indev_drv_touch.type = LV_INDEV_TYPE_POINTER;
-  indev_drv_touch.read_cb = wayland_touch_read;
+  indev_drv_touch.read_cb = lv_wayland_touch_read;
   lv_indev_drv_register(&indev_drv_touch);
 ```
 9. Add mouse:
@@ -99,7 +99,7 @@ In "Project properties > C/C++ Build > Settings" set the followings:
   lv_indev_drv_t indev_drv_mouse;
   lv_indev_drv_init(&indev_drv_mouse);
   indev_drv_mouse.type = LV_INDEV_TYPE_POINTER;
-  indev_drv_mouse.read_cb = wayland_pointer_read;
+  indev_drv_mouse.read_cb = lv_wayland_pointer_read;
   lv_indev_drv_register(&indev_drv_mouse);
 ```
 10. Add mouse wheel as encoder:
@@ -107,6 +107,6 @@ In "Project properties > C/C++ Build > Settings" set the followings:
   lv_indev_drv_t indev_drv_mousewheel;
   lv_indev_drv_init(&indev_drv_mousewheel);
   indev_drv_mousewheel.type = LV_INDEV_TYPE_ENCODER;
-  indev_drv_mousewheel.read_cb = wayland_pointeraxis_read;
+  indev_drv_mousewheel.read_cb = lv_wayland_pointeraxis_read;
   lv_indev_drv_register(&indev_drv_mousewheel);
 ```

@@ -98,7 +98,7 @@ struct application {
 /**********************
  *  STATIC PROTOTYPES
  **********************/
-static void * wayland_dispatch_handler(void *data);
+static void * dispatch_handler(void *data);
 static void handle_global(void *data, struct wl_registry *registry, uint32_t name,
                           const char *interface, uint32_t version);
 static void handle_global_remove(void *data, struct wl_registry *registry, uint32_t name);
@@ -209,7 +209,7 @@ static struct application application;
 /**
  * Initialize Wayland driver
  */
-void wayland_init(void)
+void lv_wayland_init(void)
 {
     struct wl_shm_pool *pool;
 
@@ -326,13 +326,13 @@ void wayland_init(void)
     wl_shell_surface_set_title(application.shell_surface, WAYLAND_SURF_TITLE);
 
     pthread_mutex_init(&application.mutex, NULL);
-    pthread_create(&application.thread, NULL, wayland_dispatch_handler, &application);
+    pthread_create(&application.thread, NULL, dispatch_handler, &application);
 }
 
 /**
  * De-initialize Wayland driver
  */
-void wayland_deinit(void)
+void lv_wayland_deinit(void)
 {
     pthread_cancel(application.thread);
 
@@ -367,7 +367,7 @@ void wayland_deinit(void)
  * @param area an area where to copy `color_p`
  * @param color_p an array of pixel to copy to the `area` part of the screen
  */
-void wayland_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
+void lv_wayland_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
     lv_coord_t hres = (disp_drv->rotated == 0) ? (disp_drv->hor_res) : (disp_drv->ver_res);
     lv_coord_t vres = (disp_drv->rotated == 0) ? (disp_drv->ver_res) : (disp_drv->hor_res);
@@ -417,7 +417,7 @@ void wayland_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t 
  * @param drv pointer to driver where this function belongs
  * @param data where to store input data
  */
-void wayland_pointer_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
+void lv_wayland_pointer_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
 {
     (void) drv; /* Unused */
 
@@ -435,7 +435,7 @@ void wayland_pointer_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
  * @param drv pointer to driver where this function belongs
  * @param data where to store input data
  */
-void wayland_pointeraxis_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
+void lv_wayland_pointeraxis_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
 {
     (void) drv; /* Unused */
 
@@ -454,7 +454,7 @@ void wayland_pointeraxis_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
  * @param drv pointer to driver where this function belongs
  * @param data where to store input data
  */
-void wayland_keyboard_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
+void lv_wayland_keyboard_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
 {
     (void) drv; /* Unused */
 
@@ -471,7 +471,7 @@ void wayland_keyboard_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
  * @param drv pointer to driver where this function belongs
  * @param data where to store input data
  */
-void wayland_touch_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
+void lv_wayland_touch_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
 {
     (void) drv; /* Unused */
 
@@ -487,7 +487,7 @@ void wayland_touch_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
 /**********************
  *   STATIC FUNCTIONS
  **********************/
-static void * wayland_dispatch_handler(void *data)
+static void * dispatch_handler(void *data)
 {
     struct application *app = data;
 
