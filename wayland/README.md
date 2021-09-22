@@ -33,10 +33,6 @@ In "Project properties > C/C++ Build > Settings" set the followings:
   - Add ` ${wayland-libs}` and ` ${xkbcommon-libs}`  to the end (add a space between the last command and this)
 
 
-- "Cross GCC Linker > Libraries"
-  - Add `pthread`
-
-
 - In "C/C++ Build > Build variables"
   - Configuration: [All Configuration]
 
@@ -62,8 +58,9 @@ In "Project properties > C/C++ Build > Settings" set the followings:
 3. `LV_COLOR_DEPTH` should be set either to `32` or `16` in `lv_conf.h`;
    support for `8` and `1` depends on target platform.
 4. After `lv_init()` call `lv_wayland_init()`
-5. Before `lv_deinit()` call `lv_wayland_deinit()`
-6. Add a display:
+5. Periodically call `lv_wayland_tick()` - ideally after `lv_timer_handler()`
+6. After `lv_deinit()` call `lv_wayland_deinit()`
+7. Add a display:
 ```c
   static lv_disp_draw_buf_t draw_buf;
   static lv_color_t buf1[WAYLAND_HOR_RES * WAYLAND_VER_RES];
@@ -78,7 +75,7 @@ In "Project properties > C/C++ Build > Settings" set the followings:
   disp_drv.flush_cb = lv_wayland_flush;
   lv_disp_t * disp = lv_disp_drv_register(&disp_drv);
 ```
-7. Add keyboard:
+8. Add keyboard:
 ```c
   lv_indev_drv_t indev_drv_kb;
   lv_indev_drv_init(&indev_drv_kb);
@@ -86,7 +83,7 @@ In "Project properties > C/C++ Build > Settings" set the followings:
   indev_drv_kb.read_cb = lv_wayland_keyboard_read;
   lv_indev_drv_register(&indev_drv_kb);
 ```
-8. Add touchscreen:
+9. Add touchscreen:
 ```c
   lv_indev_drv_t indev_drv_touch;
   lv_indev_drv_init(&indev_drv_touch);
@@ -94,7 +91,7 @@ In "Project properties > C/C++ Build > Settings" set the followings:
   indev_drv_touch.read_cb = lv_wayland_touch_read;
   lv_indev_drv_register(&indev_drv_touch);
 ```
-9. Add mouse:
+10. Add mouse:
 ```c
   lv_indev_drv_t indev_drv_mouse;
   lv_indev_drv_init(&indev_drv_mouse);
@@ -102,7 +99,7 @@ In "Project properties > C/C++ Build > Settings" set the followings:
   indev_drv_mouse.read_cb = lv_wayland_pointer_read;
   lv_indev_drv_register(&indev_drv_mouse);
 ```
-10. Add mouse wheel as encoder:
+11. Add mouse wheel as encoder:
 ```c
   lv_indev_drv_t indev_drv_mousewheel;
   lv_indev_drv_init(&indev_drv_mousewheel);

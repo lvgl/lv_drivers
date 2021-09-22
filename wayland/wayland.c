@@ -17,9 +17,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <assert.h>
 #include <errno.h>
-#include <pthread.h>
 
 #include <sys/mman.h>
 
@@ -59,8 +57,6 @@ struct input {
 };
 
 struct seat {
-    struct application *application;
-    struct wl_seat *wl_seat;
     struct wl_touch *wl_touch;
     struct wl_pointer *wl_pointer;
     struct wl_keyboard *wl_keyboard;
@@ -76,29 +72,45 @@ struct application {
     struct wl_registry *registry;
     struct wl_compositor *compositor;
     struct wl_shm *shm;
+    struct wl_shell *shell;
+    struct wl_seat *wl_seat;
+    const char *xdg_runtime_dir;
+
+    uint32_t format;
+
+    struct xkb_context *xkb_context;
+
+    struct seat seat;
+
+    struct window *touch_window;
+    struct window *pointer_window;
+    struct window *keyboard_window;
+
+    lv_ll_t  window_ll;
+
+    bool shall_flush_display;
+};
+
+struct window {
+    struct application *application;
+
+    struct wl_shm *shm;
     struct wl_buffer *buffer;
     struct wl_surface *surface;
 
-    struct wl_shell *shell;
     struct wl_shell_surface *shell_surface;
 
     int width;
     int height;
-    uint32_t format;
     void *data;
 
-    struct xkb_context *xkb_context;
-    struct seat seat;
     struct input input;
-
-    pthread_t thread;
-    pthread_mutex_t mutex;
 };
 
 /**********************
  *  STATIC PROTOTYPES
  **********************/
-static void * dispatch_handler(void *data);
+static struct window * create_window(struct application *app, int width, int height);
 static void handle_global(void *data, struct wl_registry *registry, uint32_t name,
                           const char *interface, uint32_t version);
 static void handle_global_remove(void *data, struct wl_registry *registry, uint32_t name);
@@ -211,32 +223,19 @@ static struct application application;
  */
 void lv_wayland_init(void)
 {
-    struct wl_shm_pool *pool;
-
-    int stride;
-    int size;
-
-    static const char template[] = "/lvgl-wayland-XXXXXX";
-    const char *path;
-    char *name;
-    int fd;
-    int ret;
-
     // Create XKB context
     application.xkb_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-    assert(application.xkb_context);
+    LV_ASSERT_MSG(application.xkb_context, "failed to create XKB context");
     if (application.xkb_context == NULL) {
-        LV_LOG_ERROR("failed to create XKB context\n");
         return;
     }
 
     // Connect to Wayland display
     application.display = wl_display_connect(NULL);
-    assert(application.display);
-
-    // Create compositor surface
-    application.width = WAYLAND_HOR_RES;
-    application.height = WAYLAND_VER_RES;
+    LV_ASSERT_MSG(application.display, "failed to connect to Wayland server");
+    if (application.display == NULL) {
+        return;
+    }
 
     /* Add registry listener and wait for registry reception */
     application.format = 0xFFFFFFFF;
@@ -245,88 +244,15 @@ void lv_wayland_init(void)
     wl_display_dispatch(application.display);
     wl_display_roundtrip(application.display);
 
-    assert(application.format != 0xFFFFFFFF);
+    LV_ASSERT_MSG((application.format != 0xFFFFFFFF), "WL_SHM_FORMAT not available");
     if (application.format == 0xFFFFFFFF) {
-        LV_LOG_ERROR("WL_SHM_FORMAT not available\n");
         return;
     }
 
-    // Create buffer
-    stride = application.width * ((LV_COLOR_DEPTH + 7) / 8);
-    size = stride * application.height;
+    application.xdg_runtime_dir = getenv("XDG_RUNTIME_DIR");
+    LV_ASSERT_MSG(application.xdg_runtime_dir, "cannot get XDG_RUNTIME_DIR");
 
-    path = getenv("XDG_RUNTIME_DIR");
-    if (!path) {
-        LV_LOG_ERROR("cannot get XDG_RUNTIME_DIR: %s\n", strerror(errno));
-        return;
-    }
-
-    name = malloc(strlen(path) + sizeof(template));
-    if (!name) {
-        LV_LOG_ERROR("cannot malloc name: %s\n", strerror(errno));
-        return;
-    }
-
-    strcpy(name, path);
-    strcat(name, template);
-
-    fd = mkstemp(name);
-    if (fd >= 0) {
-        long flags = fcntl(fd, F_GETFD);
-        if ((flags == -1) || (fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1)) {
-            LV_LOG_ERROR("cannot set FD_CLOEXEC\n");
-            close(fd);
-            fd = -1;
-        }
-        unlink(name);
-    }
-
-    free(name);
-
-    if (fd < 0) {
-        LV_LOG_ERROR("cannot create tmpfile: %s\n", strerror(errno));
-        return;
-    }
-
-    do {
-        ret = ftruncate(fd, size);
-    } while ((ret < 0) && (errno == EINTR));
-    if (ret < 0) {
-        LV_LOG_ERROR("ftruncate failed: %s\n", strerror(errno));
-        close(fd);
-        return;
-    }
-
-    application.data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    if (application.data == MAP_FAILED) {
-        LV_LOG_ERROR("mmap failed: %s\n", strerror(errno));
-        close(fd);
-        return;
-    }
-
-    pool = wl_shm_create_pool(application.shm, fd, size);
-    application.buffer = wl_shm_pool_create_buffer(pool, 0,
-                                                   application.width, application.height,
-                                                   stride,
-                                                   application.format);
-    wl_shm_pool_destroy(pool);
-
-    close(fd);
-
-    // Create compositor surface
-    application.surface = wl_compositor_create_surface(application.compositor);
-    wl_surface_set_user_data(application.surface, &application);
-
-    // Create shell surface
-    application.shell_surface = wl_shell_get_shell_surface(application.shell, application.surface);
-    assert(application.shell_surface);
-
-    wl_shell_surface_add_listener(application.shell_surface, &shell_surface_listener, &application);
-    wl_shell_surface_set_toplevel(application.shell_surface);
-    wl_shell_surface_set_title(application.shell_surface, WAYLAND_SURF_TITLE);
-
-    pthread_mutex_init(&application.mutex, NULL);
-    pthread_create(&application.thread, NULL, dispatch_handler, &application);
+    _lv_ll_init(&application.window_ll, sizeof(struct window));
 }
 
 /**
@@ -334,11 +260,12 @@ void lv_wayland_init(void)
  */
 void lv_wayland_deinit(void)
 {
-    pthread_cancel(application.thread);
+    struct window *window;
 
-    pthread_join(application.thread, NULL);
-
-    pthread_mutex_destroy(&application.mutex);
+    _LV_LL_READ(&application.window_ll, window) {
+        wl_shell_surface_destroy(window->shell_surface);
+        wl_surface_destroy(window->surface);
+    }
 
     if (application.shm) {
         wl_shm_destroy(application.shm);
@@ -348,8 +275,8 @@ void lv_wayland_deinit(void)
         wl_shell_destroy(application.shell);
     }
 
-    if (application.seat.wl_seat) {
-        wl_seat_destroy(application.seat.wl_seat);
+    if (application.wl_seat) {
+        wl_seat_destroy(application.wl_seat);
     }
 
     if (application.compositor) {
@@ -359,6 +286,8 @@ void lv_wayland_deinit(void)
     wl_registry_destroy(application.registry);
     wl_display_flush(application.display);
     wl_display_disconnect(application.display);
+
+    _lv_ll_clear(&application.window_ll);
 }
 
 /**
@@ -369,8 +298,19 @@ void lv_wayland_deinit(void)
  */
 void lv_wayland_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
+    struct window *window = disp_drv->user_data;
     lv_coord_t hres = (disp_drv->rotated == 0) ? (disp_drv->hor_res) : (disp_drv->ver_res);
     lv_coord_t vres = (disp_drv->rotated == 0) ? (disp_drv->ver_res) : (disp_drv->hor_res);
+
+    /* If private data is not set, it means window has not been created yet */
+    if (!window) {
+        window = create_window(&application, hres, vres);
+        if (!window) {
+            LV_LOG_ERROR("failed to create wayland window\n");
+            return;
+        }
+        disp_drv->user_data = window;
+    }
 
     /* Return if the area is out the screen */
     if ((area->x2 < 0) || (area->y2 < 0) || (area->x1 > hres - 1) || (area->y1 > vres - 1)) {
@@ -384,16 +324,16 @@ void lv_wayland_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color
         for (x = area->x1; x <= area->x2 && x < disp_drv->hor_res; x++) {
             int offset = (y * disp_drv->hor_res) + x;
 #if (LV_COLOR_DEPTH == 32)
-            uint32_t * const buf = (uint32_t *)application.data + offset;
+            uint32_t * const buf = (uint32_t *)window->data + offset;
             *buf = color_p->full;
 #elif (LV_COLOR_DEPTH == 16)
-            uint16_t * const buf = (uint16_t *)application.data + offset;
+            uint16_t * const buf = (uint16_t *)window->data + offset;
             *buf = color_p->full;
 #elif (LV_COLOR_DEPTH == 8)
-            uint8_t * const buf = (uint8_t *)application.data + offset;
+            uint8_t * const buf = (uint8_t *)window->data + offset;
             *buf = color_p->full;
 #elif (LV_COLOR_DEPTH == 1)
-            uint8_t * const buf = (uint8_t *)application.data + offset;
+            uint8_t * const buf = (uint8_t *)window->data + offset;
             *buf = ((0x07 * color_p->ch.red)   << 5) |
                    ((0x07 * color_p->ch.green) << 2) |
                    ((0x03 * color_p->ch.blue)  << 0);
@@ -402,14 +342,34 @@ void lv_wayland_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color
         }
     }
 
-    wl_surface_attach(application.surface, application.buffer, 0, 0);
-    wl_surface_damage(application.surface, area->x1, area->y1,
+    wl_surface_attach(window->surface, window->buffer, 0, 0);
+    wl_surface_damage(window->surface, area->x1, area->y1,
                       (area->x2 - area->x1 + 1), (area->y2 - area->y1 + 1));
-    wl_surface_commit(application.surface);
+    wl_surface_commit(window->surface);
 
-    wl_display_flush(application.display);
+    window->application->shall_flush_display = true;
 
     lv_disp_flush_ready(disp_drv);
+}
+
+/**
+ * Dispath Wayland events and flush changes to server
+ */
+void lv_wayland_cycle(void)
+{
+    while (wl_display_prepare_read(application.display) != 0)
+    {
+        wl_display_dispatch_pending(application.display);
+    }
+
+    if (application.shall_flush_display)
+    {
+        wl_display_flush(application.display);
+        application.shall_flush_display = false;
+    }
+
+    wl_display_read_events(application.display);
+    wl_display_dispatch_pending(application.display);
 }
 
 /**
@@ -419,15 +379,13 @@ void lv_wayland_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color
  */
 void lv_wayland_pointer_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
 {
-    (void) drv; /* Unused */
+    struct window *window = drv->disp->driver->user_data;
+    if (!window)
+        return;
 
-    pthread_mutex_lock(&application.mutex);
-
-    data->point.x = application.input.mouse.x;
-    data->point.y = application.input.mouse.y;
-    data->state = application.input.mouse.left_button;
-
-    pthread_mutex_unlock(&application.mutex);
+    data->point.x = window->input.mouse.x;
+    data->point.y = window->input.mouse.y;
+    data->state = window->input.mouse.left_button;
 }
 
 /**
@@ -437,16 +395,14 @@ void lv_wayland_pointer_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
  */
 void lv_wayland_pointeraxis_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
 {
-    (void) drv; /* Unused */
+    struct window *window = drv->disp->driver->user_data;
+    if (!window)
+        return;
 
-    pthread_mutex_lock(&application.mutex);
+    data->state = window->input.mouse.wheel_button;
+    data->enc_diff = window->input.mouse.wheel_diff;
 
-    data->state = application.input.mouse.wheel_button;
-    data->enc_diff = application.input.mouse.wheel_diff;
-
-    application.input.mouse.wheel_diff = 0;
-
-    pthread_mutex_unlock(&application.mutex);
+    window->input.mouse.wheel_diff = 0;
 }
 
 /**
@@ -456,14 +412,12 @@ void lv_wayland_pointeraxis_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
  */
 void lv_wayland_keyboard_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
 {
-    (void) drv; /* Unused */
+    struct window *window = drv->disp->driver->user_data;
+    if (!window)
+        return;
 
-    pthread_mutex_lock(&application.mutex);
-
-    data->key = application.input.keyboard.key;
-    data->state = application.input.keyboard.state;
-
-    pthread_mutex_unlock(&application.mutex);
+    data->key = window->input.keyboard.key;
+    data->state = window->input.keyboard.state;
 }
 
 /**
@@ -473,29 +427,111 @@ void lv_wayland_keyboard_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
  */
 void lv_wayland_touch_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
 {
-    (void) drv; /* Unused */
+    struct window *window = drv->disp->driver->user_data;
+    if (!window)
+        return;
 
-    pthread_mutex_lock(&application.mutex);
-
-    data->point.x = application.input.touch.x;
-    data->point.y = application.input.touch.y;
-    data->state = application.input.touch.state;
-
-    pthread_mutex_unlock(&application.mutex);
+    data->point.x = window->input.touch.x;
+    data->point.y = window->input.touch.y;
+    data->state = window->input.touch.state;
 }
 
 /**********************
  *   STATIC FUNCTIONS
  **********************/
-static void * dispatch_handler(void *data)
+static struct window * create_window(struct application *app, int width, int height)
 {
-    struct application *app = data;
+    static const char template[] = "/lvgl-wayland-XXXXXX";
+    struct window *window;
+    struct wl_shm_pool *shm_pool;
+    int stride;
+    int size;
+    char *name;
+    int ret;
+    int fd;
 
-    while (wl_display_dispatch(app->display) >= 0) {
-        // Do nothing
+    window = _lv_ll_ins_tail(&app->window_ll);
+    LV_ASSERT_MALLOC(window);
+    if (!window)
+        return NULL;
+
+    window->width = width;
+    window->height = height;
+    window->application = app;
+
+    stride = width * ((LV_COLOR_DEPTH + 7) / 8);
+    size = stride * height;
+
+    name = lv_mem_alloc(strlen(app->xdg_runtime_dir) + sizeof(template));
+    if (!name) {
+        LV_LOG_ERROR("cannot allocate memory for name: %s\n", strerror(errno));
+        goto err_free_window;
     }
 
-    return (void *)0;
+    strcpy(name, app->xdg_runtime_dir);
+    strcat(name, template);
+
+    fd = mkstemp(name);
+
+    lv_mem_free(name);
+
+    if (fd < 0) {
+        LV_LOG_ERROR("cannot create tmpfile: %s\n", strerror(errno));
+        goto err_free_window;
+    }
+
+    do {
+        ret = ftruncate(fd, size);
+    } while ((ret < 0) && (errno == EINTR));
+    if (ret < 0) {
+        LV_LOG_ERROR("ftruncate failed: %s\n", strerror(errno));
+        goto err_close_fd;
+    }
+
+    window->data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (window->data == MAP_FAILED) {
+        LV_LOG_ERROR("mmap failed: %s\n", strerror(errno));
+        goto err_close_fd;
+    }
+
+    shm_pool = wl_shm_create_pool(app->shm, fd, size);
+    window->buffer = wl_shm_pool_create_buffer(shm_pool, 0, width, height,
+                                               stride, app->format);
+
+    close(fd);
+
+    // Create compositor surface
+    window->surface = wl_compositor_create_surface(app->compositor);
+    LV_ASSERT_MSG(window->surface, "cannot create surface");
+    if (!window->surface) {
+        goto err_close_fd;
+    }
+
+    wl_surface_set_user_data(window->surface, window);
+
+    // Create shell surface
+    window->shell_surface = wl_shell_get_shell_surface(app->shell, window->surface);
+    LV_ASSERT_MSG(window->shell_surface, "cannot create shell surface");
+    if (!window->surface) {
+        goto err_destroy_surface;
+    }
+
+
+    wl_shell_surface_add_listener(window->shell_surface, &shell_surface_listener, &window);
+    wl_shell_surface_set_toplevel(window->shell_surface);
+
+    return window;
+
+err_destroy_surface:
+    wl_surface_destroy(window->surface);
+
+err_close_fd:
+    close(fd);
+
+err_free_window:
+    _lv_ll_remove(&app->window_ll, window);
+    lv_mem_free(window);
+    return NULL;
 }
 
 static void handle_global(void *data, struct wl_registry *registry,
@@ -511,9 +547,8 @@ static void handle_global(void *data, struct wl_registry *registry,
         app->shm = wl_registry_bind(registry, name, &wl_shm_interface, 1);
         wl_shm_add_listener(app->shm, &shm_listener, app);
     } else if (strcmp(interface, "wl_seat") == 0) {
-        app->seat.application = app;
-        app->seat.wl_seat = wl_registry_bind(app->registry, name, &wl_seat_interface, 1);
-        wl_seat_add_listener(app->seat.wl_seat, &seat_listener, &app->seat);
+        app->wl_seat = wl_registry_bind(app->registry, name, &wl_seat_interface, 1);
+        wl_seat_add_listener(app->wl_seat, &seat_listener, app);
     }
 }
 
@@ -570,11 +605,12 @@ static void shell_handle_popup_done(void *data, struct wl_shell_surface *shell_s
 
 static void seat_handle_capabilities(void *data, struct wl_seat *wl_seat, enum wl_seat_capability caps)
 {
-    struct seat *seat = data;
+    struct application *application = data;
+    struct seat *seat = &application->seat;
 
     if ((caps & WL_SEAT_CAPABILITY_POINTER) && !seat->wl_pointer) {
         seat->wl_pointer = wl_seat_get_pointer(wl_seat);
-        wl_pointer_add_listener(seat->wl_pointer, &pointer_listener, seat->application);
+        wl_pointer_add_listener(seat->wl_pointer, &pointer_listener, application);
     } else if (!(caps & WL_SEAT_CAPABILITY_POINTER) && seat->wl_pointer) {
         wl_pointer_destroy(seat->wl_pointer);
         seat->wl_pointer = NULL;
@@ -582,7 +618,7 @@ static void seat_handle_capabilities(void *data, struct wl_seat *wl_seat, enum w
 
     if ((caps & WL_SEAT_CAPABILITY_KEYBOARD) && !seat->wl_keyboard) {
         seat->wl_keyboard = wl_seat_get_keyboard(wl_seat);
-        wl_keyboard_add_listener(seat->wl_keyboard, &keyboard_listener, seat->application);
+        wl_keyboard_add_listener(seat->wl_keyboard, &keyboard_listener, application);
     } else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && seat->wl_keyboard) {
         wl_keyboard_destroy(seat->wl_keyboard);
         seat->wl_keyboard = NULL;
@@ -590,7 +626,7 @@ static void seat_handle_capabilities(void *data, struct wl_seat *wl_seat, enum w
 
     if ((caps & WL_SEAT_CAPABILITY_TOUCH) && !seat->wl_touch) {
         seat->wl_touch = wl_seat_get_touch(wl_seat);
-        wl_touch_add_listener(seat->wl_touch, &touch_listener, seat->application);
+        wl_touch_add_listener(seat->wl_touch, &touch_listener, application);
     } else if (!(caps & WL_SEAT_CAPABILITY_TOUCH) && seat->wl_touch) {
         wl_touch_destroy(seat->wl_touch);
         seat->wl_touch = NULL;
@@ -601,24 +637,36 @@ static void pointer_handle_enter(void *data, struct wl_pointer *pointer,
                                  uint32_t serial, struct wl_surface *surface,
                                  wl_fixed_t sx, wl_fixed_t sy)
 {
+    struct application *app = data;
+    struct window *window = wl_surface_get_user_data(surface);
+    app->pointer_window = window;
+
+    window->input.mouse.x = wl_fixed_to_int(sx);
+    window->input.mouse.y = wl_fixed_to_int(sy);
 }
 
 static void pointer_handle_leave(void *data, struct wl_pointer *pointer,
                                  uint32_t serial, struct wl_surface *surface)
 {
+    struct application *app = data;
+    struct window *window = wl_surface_get_user_data(surface);
+
+    if (app->pointer_window == window) {
+        app->pointer_window = NULL;
+    }
 }
 
 static void pointer_handle_motion(void *data, struct wl_pointer *pointer,
                                   uint32_t time, wl_fixed_t sx, wl_fixed_t sy)
 {
     struct application *app = data;
+    struct window *window = app->pointer_window;
 
-    pthread_mutex_lock(&app->mutex);
+    if (!window)
+        return;
 
-    app->input.mouse.x = wl_fixed_to_int(sx);
-    app->input.mouse.y = wl_fixed_to_int(sy);
-
-    pthread_mutex_unlock(&app->mutex);
+    window->input.mouse.x = wl_fixed_to_int(sx);
+    window->input.mouse.y = wl_fixed_to_int(sy);
 }
 
 static void pointer_handle_button(void *data, struct wl_pointer *wl_pointer,
@@ -626,43 +674,44 @@ static void pointer_handle_button(void *data, struct wl_pointer *wl_pointer,
                                   uint32_t state)
 {
     struct application *app = data;
+    struct window *window = app->pointer_window;
     const lv_indev_state_t lv_state =
         (state == WL_POINTER_BUTTON_STATE_PRESSED) ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
 
-    pthread_mutex_lock(&app->mutex);
+    if (!window)
+        return;
 
     switch (button & 0xF) {
     case 0:
-        app->input.mouse.left_button = lv_state;
+        window->input.mouse.left_button = lv_state;
         break;
     case 1:
-        app->input.mouse.right_button = lv_state;
+        window->input.mouse.right_button = lv_state;
         break;
     case 2:
-        app->input.mouse.wheel_button = lv_state;
+        window->input.mouse.wheel_button = lv_state;
         break;
     default:
         break;
     }
-
-    pthread_mutex_unlock(&app->mutex);
 }
 
 static void pointer_handle_axis(void *data, struct wl_pointer *wl_pointer,
                                 uint32_t time, uint32_t axis, wl_fixed_t value)
 {
     struct application *app = data;
+    struct window *window = app->pointer_window;
     const int diff = wl_fixed_to_int(value);
 
+    if (!window)
+        return;
+
     if (axis == 0) {
-        pthread_mutex_lock(&app->mutex);
         if (diff > 0) {
-            app->input.mouse.wheel_diff++;
+            window->input.mouse.wheel_diff++;
+        } else if (diff < 0) {
+            window->input.mouse.wheel_diff--;
         }
-        else if (diff < 0) {
-            app->input.mouse.wheel_diff--;
-        }
-        pthread_mutex_unlock(&app->mutex);
     }
 }
 
@@ -715,11 +764,20 @@ static void keyboard_handle_enter(void *data, struct wl_keyboard *keyboard,
                                   uint32_t serial, struct wl_surface *surface,
                                   struct wl_array *keys)
 {
+    struct application *app = data;
+    struct window *window = wl_surface_get_user_data(surface);
+    app->keyboard_window = window;
 }
 
 static void keyboard_handle_leave(void *data, struct wl_keyboard *keyboard,
                                   uint32_t serial, struct wl_surface *surface)
 {
+    struct application *app = data;
+    struct window *window = wl_surface_get_user_data(surface);
+
+    if (app->keyboard_window == window) {
+        app->keyboard_window = NULL;
+    }
 }
 
 static void keyboard_handle_key(void *data, struct wl_keyboard *keyboard,
@@ -727,6 +785,10 @@ static void keyboard_handle_key(void *data, struct wl_keyboard *keyboard,
                                 uint32_t state)
 {
     struct application *app = data;
+    struct window *window = app->keyboard_window;
+
+    if (!window)
+        return;
 
     const uint32_t code = (key + 8);
     const xkb_keysym_t *syms;
@@ -744,10 +806,8 @@ static void keyboard_handle_key(void *data, struct wl_keyboard *keyboard,
         (state == WL_KEYBOARD_KEY_STATE_PRESSED) ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
 
     if (lv_key != 0) {
-        pthread_mutex_lock(&app->mutex);
-        app->input.keyboard.key = lv_key;
-        app->input.keyboard.state = lv_state;
-        pthread_mutex_unlock(&app->mutex);
+        window->input.keyboard.key = lv_key;
+        window->input.keyboard.state = lv_state;
     }
 }
 
@@ -771,39 +831,38 @@ static void touch_handle_down(void *data, struct wl_touch *wl_touch,
                               int32_t id, wl_fixed_t x_w, wl_fixed_t y_w)
 {
     struct application *app = data;
+    struct window *window = wl_surface_get_user_data(surface);
 
-    pthread_mutex_lock(&app->mutex);
+    app->touch_window = window;
 
-    app->input.touch.x = wl_fixed_to_int(x_w);
-    app->input.touch.y = wl_fixed_to_int(y_w);
-    app->input.touch.state = LV_INDEV_STATE_PR;
-
-    pthread_mutex_unlock(&app->mutex);
+    window->input.touch.x = wl_fixed_to_int(x_w);
+    window->input.touch.y = wl_fixed_to_int(y_w);
+    window->input.touch.state = LV_INDEV_STATE_PR;
 }
 
 static void touch_handle_up(void *data, struct wl_touch *wl_touch,
                             uint32_t serial, uint32_t time, int32_t id)
 {
     struct application *app = data;
+    struct window *window = app->touch_window;
 
-    pthread_mutex_lock(&app->mutex);
+    if (!window)
+        return;
 
-    app->input.touch.state = LV_INDEV_STATE_REL;
-
-    pthread_mutex_unlock(&app->mutex);
+    window->input.touch.state = LV_INDEV_STATE_REL;
 }
 
 static void touch_handle_motion(void *data, struct wl_touch *wl_touch,
                                 uint32_t time, int32_t id, wl_fixed_t x_w, wl_fixed_t y_w)
 {
     struct application *app = data;
+    struct window *window = app->touch_window;
 
-    pthread_mutex_lock(&app->mutex);
+    if (!window)
+        return;
 
-    app->input.touch.x = wl_fixed_to_int(x_w);
-    app->input.touch.y = wl_fixed_to_int(y_w);
-
-    pthread_mutex_unlock(&app->mutex);
+    window->input.touch.x = wl_fixed_to_int(x_w);
+    window->input.touch.y = wl_fixed_to_int(y_w);
 }
 
 static void touch_handle_frame(void *data, struct wl_touch *wl_touch)
