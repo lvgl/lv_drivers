@@ -15,7 +15,6 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <stdbool.h>
-#include <poll.h>
 #include <dirent.h>
 #include <libinput.h>
 
@@ -24,10 +23,6 @@
 #else
 #include <linux/input.h>
 #endif
-
-#if USE_XKB
-#include "xkb.h"
-#endif /* USE_XKB */
 
 /*********************
  *      DEFINES
@@ -48,8 +43,8 @@ static bool rescan_devices(void);
 static bool add_scanned_device(char *path, libinput_capability capabilities);
 static void reset_scanned_devices(void);
 
-static void read_pointer(struct libinput_event *event);
-static void read_keypad(struct libinput_event *event);
+static void read_pointer(libinput_drv_state_t *state, struct libinput_event *event);
+static void read_keypad(libinput_drv_state_t *state, struct libinput_event *event);
 
 static int open_restricted(const char *path, int flags, void *user_data);
 static void close_restricted(int fd, void *user_data);
@@ -60,16 +55,11 @@ static void close_restricted(int fd, void *user_data);
 static struct input_device *devices = NULL;
 static size_t num_devices = 0;
 
-static int libinput_fd;
-static int libinput_button;
-static int libinput_key_val;
+static libinput_drv_state_t default_state = { .most_recent_touch_point = { .x = 0, .y = 0 } };
+
 static const int timeout = 0; // do not block
 static const nfds_t nfds = 1;
-static struct pollfd fds[1];
-static lv_point_t most_recent_touch_point = { .x = 0, .y = 0};
 
-static struct libinput *libinput_context;
-static struct libinput_device *libinput_device;
 static const struct libinput_interface interface = {
   .open_restricted = open_restricted,
   .close_restricted = close_restricted,
@@ -123,74 +113,112 @@ size_t libinput_find_devs(libinput_capability capabilities, char **found, size_t
 }
 
 /**
- * reconfigure the device file for libinput
- * @param dev_name set the libinput device filename
+ * Reconfigure the device file for libinput using the default driver state. Use this function if you only want
+ * to connect a single device.
+ * @param dev_name input device node path (e.g. /dev/input/event0)
  * @return true: the device file set complete
  *         false: the device file doesn't exist current system
  */
 bool libinput_set_file(char* dev_name)
 {
+  return libinput_set_file_state(&default_state, dev_name);
+}
+
+/**
+ * Reconfigure the device file for libinput using a specific driver state. Use this function if you want to
+ * connect multiple devices.
+ * @param state the driver state to configure
+ * @param dev_name input device node path (e.g. /dev/input/event0)
+ * @return true: the device file set complete
+ *         false: the device file doesn't exist current system
+ */
+bool libinput_set_file_state(libinput_drv_state_t *state, char* dev_name)
+{
   // This check *should* not be necessary, yet applications crashes even on NULL handles.
   // citing libinput.h:libinput_path_remove_device:
   // > If no matching device exists, this function does nothing.
-  if (libinput_device) {
-    libinput_device = libinput_device_unref(libinput_device);
-    libinput_path_remove_device(libinput_device);
+  if (state->libinput_device) {
+    state->libinput_device = libinput_device_unref(state->libinput_device);
+    libinput_path_remove_device(state->libinput_device);
   }
 
-  libinput_device = libinput_path_add_device(libinput_context, dev_name);
-  if(!libinput_device) {
+  state->libinput_device = libinput_path_add_device(state->libinput_context, dev_name);
+  if(!state->libinput_device) {
     perror("unable to add device to libinput context:");
     return false;
   }
-  libinput_device = libinput_device_ref(libinput_device);
-  if(!libinput_device) {
+  state->libinput_device = libinput_device_ref(state->libinput_device);
+  if(!state->libinput_device) {
     perror("unable to reference device within libinput context:");
     return false;
   }
 
-  libinput_button = LV_INDEV_STATE_REL;
-  libinput_key_val = 0;
+  state->button = LV_INDEV_STATE_REL;
+  state->key_val = 0;
 
   return true;
 }
 
 /**
- * Initialize the libinput interface
+ * Prepare for reading input via libinput using the default driver state. Use this function if you only want
+ * to connect a single device.
  */
 void libinput_init(void)
 {
-  libinput_device = NULL;
-  libinput_context = libinput_path_create_context(&interface, NULL);
+  libinput_init_state(&default_state, LIBINPUT_NAME);
+}
 
-  const char *path = LIBINPUT_NAME;
-  if(path == NULL || !libinput_set_file(path)) {
+/**
+ * Prepare for reading input via libinput using the a specific driver state. Use this function if you want to
+ * connect multiple devices.
+ * @param state driver state to initialize
+ * @param path input device node path (e.g. /dev/input/event0)
+ */
+void libinput_init_state(libinput_drv_state_t *state, char* path)
+{
+  state->libinput_device = NULL;
+  state->libinput_context = libinput_path_create_context(&interface, NULL);
+
+  if(path == NULL || !libinput_set_file_state(state, path)) {
       fprintf(stderr, "unable to add device \"%s\" to libinput context: %s\n", path ? path : "NULL", strerror(errno));
       return;
   }
-  libinput_fd = libinput_get_fd(libinput_context);
+  state->fd = libinput_get_fd(state->libinput_context);
 
   /* prepare poll */
-  fds[0].fd = libinput_fd;
-  fds[0].events = POLLIN;
-  fds[0].revents = 0;
+  state->fds[0].fd = state->fd;
+  state->fds[0].events = POLLIN;
+  state->fds[0].revents = 0;
 
 #if USE_XKB
-  xkb_init();
+  xkb_init_state(&(state->xkb_state));
 #endif
 }
 
 /**
- * Get the current position and state of the libinput
+ * Read available input events via libinput using the default driver state. Use this function if you only want
+ * to connect a single device.
  * @param indev_drv driver object itself
  * @param data store the libinput data here
  */
 void libinput_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 {
+  libinput_read_state(&default_state, indev_drv, data);
+}
+
+/**
+ * Read available input events via libinput using a specific driver state. Use this function if you want to
+ * connect multiple devices.
+ * @param state the driver state to use
+ * @param indev_drv driver object itself
+ * @param data store the libinput data here
+ */
+void libinput_read_state(libinput_drv_state_t * state, lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
+{
   struct libinput_event *event;
   int rc = 0;
 
-  rc = poll(fds, nfds, timeout);
+  rc = poll(state->fds, nfds, timeout);
   switch (rc){
     case -1:
       perror(NULL);
@@ -199,14 +227,14 @@ void libinput_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
     default:
       break;
   }
-  libinput_dispatch(libinput_context);
-  while((event = libinput_get_event(libinput_context)) != NULL) {
+  libinput_dispatch(state->libinput_context);
+  while((event = libinput_get_event(state->libinput_context)) != NULL) {
     switch (indev_drv->type) {
       case LV_INDEV_TYPE_POINTER:
-        read_pointer(event);
+        read_pointer(state, event);
         break;
       case LV_INDEV_TYPE_KEYPAD:
-        read_keypad(event);
+        read_keypad(state, event);
         break;
       default:
         break;
@@ -214,10 +242,10 @@ void libinput_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
     libinput_event_destroy(event);
   }
 report_most_recent_state:
-  data->point.x = most_recent_touch_point.x;
-  data->point.y = most_recent_touch_point.y;
-  data->state = libinput_button;
-  data->key = libinput_key_val;
+  data->point.x = state->most_recent_touch_point.x;
+  data->point.y = state->most_recent_touch_point.y;
+  data->state = state->button;
+  data->key = state->key_val;
 }
 
 
@@ -342,9 +370,10 @@ static void reset_scanned_devices(void) {
 
 /**
  * Handle libinput touch / pointer events
+ * @param state driver state to use
  * @param event libinput event
  */
-static void read_pointer(struct libinput_event *event) {
+static void read_pointer(libinput_drv_state_t *state, struct libinput_event *event) {
   struct libinput_event_touch *touch_event = NULL;
   struct libinput_event_pointer *pointer_event = NULL;
   enum libinput_event_type type = libinput_event_get_type(event);
@@ -352,26 +381,26 @@ static void read_pointer(struct libinput_event *event) {
     case LIBINPUT_EVENT_TOUCH_MOTION:
     case LIBINPUT_EVENT_TOUCH_DOWN:
       touch_event = libinput_event_get_touch_event(event);
-      most_recent_touch_point.x = libinput_event_touch_get_x_transformed(touch_event, LV_HOR_RES);
-      most_recent_touch_point.y = libinput_event_touch_get_y_transformed(touch_event, LV_VER_RES);
-      libinput_button = LV_INDEV_STATE_PR;
+      state->most_recent_touch_point.x = libinput_event_touch_get_x_transformed(touch_event, LV_HOR_RES);
+      state->most_recent_touch_point.y = libinput_event_touch_get_y_transformed(touch_event, LV_VER_RES);
+      state->button = LV_INDEV_STATE_PR;
       break;
     case LIBINPUT_EVENT_TOUCH_UP:
-      libinput_button = LV_INDEV_STATE_REL;
+      state->button = LV_INDEV_STATE_REL;
       break;
     case LIBINPUT_EVENT_POINTER_MOTION:
       pointer_event = libinput_event_get_pointer_event(event);
-      most_recent_touch_point.x += libinput_event_pointer_get_dx(pointer_event);
-      most_recent_touch_point.y += libinput_event_pointer_get_dy(pointer_event);
-      most_recent_touch_point.x = most_recent_touch_point.x < 0 ? 0 : most_recent_touch_point.x;
-      most_recent_touch_point.x = most_recent_touch_point.x > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : most_recent_touch_point.x;
-      most_recent_touch_point.y = most_recent_touch_point.y < 0 ? 0 : most_recent_touch_point.y;
-      most_recent_touch_point.y = most_recent_touch_point.y > LV_VER_RES - 1 ? LV_VER_RES - 1 : most_recent_touch_point.y;
+      state->most_recent_touch_point.x += libinput_event_pointer_get_dx(pointer_event);
+      state->most_recent_touch_point.y += libinput_event_pointer_get_dy(pointer_event);
+      state->most_recent_touch_point.x = state->most_recent_touch_point.x < 0 ? 0 : state->most_recent_touch_point.x;
+      state->most_recent_touch_point.x = state->most_recent_touch_point.x > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : state->most_recent_touch_point.x;
+      state->most_recent_touch_point.y = state->most_recent_touch_point.y < 0 ? 0 : state->most_recent_touch_point.y;
+      state->most_recent_touch_point.y = state->most_recent_touch_point.y > LV_VER_RES - 1 ? LV_VER_RES - 1 : state->most_recent_touch_point.y;
       break;
     case LIBINPUT_EVENT_POINTER_BUTTON:
       pointer_event = libinput_event_get_pointer_event(event);
       enum libinput_button_state button_state = libinput_event_pointer_get_button_state(pointer_event); 
-      libinput_button = button_state == LIBINPUT_BUTTON_STATE_RELEASED ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
+      state->button = button_state == LIBINPUT_BUTTON_STATE_RELEASED ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
       break;
     default:
       break;
@@ -380,9 +409,10 @@ static void read_pointer(struct libinput_event *event) {
 
 /**
  * Handle libinput keyboard events
+ * @param state driver state to use
  * @param event libinput event
  */
-static void read_keypad(struct libinput_event *event) {
+static void read_keypad(libinput_drv_state_t *state, struct libinput_event *event) {
   struct libinput_event_keyboard *keyboard_event = NULL;
   enum libinput_event_type type = libinput_event_get_type(event);
   switch (type) {
@@ -391,44 +421,44 @@ static void read_keypad(struct libinput_event *event) {
       enum libinput_key_state key_state = libinput_event_keyboard_get_key_state(keyboard_event);
       uint32_t code = libinput_event_keyboard_get_key(keyboard_event);
 #if USE_XKB
-      libinput_key_val = xkb_process_key(code, key_state == LIBINPUT_KEY_STATE_PRESSED);
+      state->key_val = xkb_process_key_state(&(state->xkb_state), code, key_state == LIBINPUT_KEY_STATE_PRESSED);
 #else
       switch(code) {
         case KEY_BACKSPACE:
-          libinput_key_val = LV_KEY_BACKSPACE;
+          state->key_val = LV_KEY_BACKSPACE;
           break;
         case KEY_ENTER:
-          libinput_key_val = LV_KEY_ENTER;
+          state->key_val = LV_KEY_ENTER;
           break;
         case KEY_PREVIOUS:
-          libinput_key_val = LV_KEY_PREV;
+          state->key_val = LV_KEY_PREV;
           break;
         case KEY_NEXT:
-          libinput_key_val = LV_KEY_NEXT;
+          state->key_val = LV_KEY_NEXT;
           break;
         case KEY_UP:
-          libinput_key_val = LV_KEY_UP;
+          state->key_val = LV_KEY_UP;
           break;
         case KEY_LEFT:
-          libinput_key_val = LV_KEY_LEFT;
+          state->key_val = LV_KEY_LEFT;
           break;
         case KEY_RIGHT:
-          libinput_key_val = LV_KEY_RIGHT;
+          state->key_val = LV_KEY_RIGHT;
           break;
         case KEY_DOWN:
-          libinput_key_val = LV_KEY_DOWN;
+          state->key_val = LV_KEY_DOWN;
           break;
         case KEY_TAB:
-          libinput_key_val = LV_KEY_NEXT;
+          state->key_val = LV_KEY_NEXT;
           break;
         default:
-          libinput_key_val = 0;
+          state->key_val = 0;
           break;
       }
 #endif /* USE_XKB */
-      if (libinput_key_val != 0) {
+      if (state->key_val != 0) {
         /* Only record button state when actual output is produced to prevent widgets from refreshing */
-        libinput_button = (key_state == LIBINPUT_KEY_STATE_RELEASED) ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
+        state->button = (key_state == LIBINPUT_KEY_STATE_RELEASED) ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
       }
       break;
     default:
