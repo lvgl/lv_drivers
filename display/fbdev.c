@@ -92,7 +92,7 @@ void fbdev_init(void)
         perror("Error: cannot open framebuffer device");
         return;
     }
-    printf("The framebuffer device was opened successfully.\n");
+    LV_LOG_INFO("The framebuffer device was opened successfully");
 
     // Make sure that the display is on.
     if (ioctl(fbfd, FBIOBLANK, FB_BLANK_UNBLANK) != 0) {
@@ -138,7 +138,7 @@ void fbdev_init(void)
     }
 #endif /* USE_BSD_FBDEV */
 
-    printf("%dx%d, %dbpp\n", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);
+    LV_LOG_INFO("%dx%d, %dbpp", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);
 
     // Figure out the size of the screen in bytes
     screensize =  finfo.smem_len; //finfo.line_length * vinfo.yres;    
@@ -151,7 +151,7 @@ void fbdev_init(void)
     }
     memset(fbp, 0, screensize);
 
-    printf("The framebuffer device was mapped to memory successfully.\n");
+    LV_LOG_INFO("The framebuffer device was mapped to memory successfully");
 
 }
 
