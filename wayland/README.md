@@ -65,15 +65,18 @@ In "Project properties > C/C++ Build > Settings" set the followings:
 5. Before `lv_deinit()` call `wayland_deinit()`
 6. Add a display:
 ```c
-  static lv_disp_buf_t disp_buf1;
-  static lv_color_t buf1[LV_HOR_RES_MAX * LV_VER_RES_MAX];
-  lv_disp_buf_init(&disp_buf1, buf1, NULL, LV_HOR_RES_MAX * LV_VER_RES_MAX);
+  static lv_disp_draw_buf_t draw_buf;
+  static lv_color_t buf1[WAYLAND_HOR_RES * WAYLAND_VER_RES];
+  lv_disp_draw_buf_init(&draw_buf, buf1, NULL, WAYLAND_HOR_RES * WAYLAND_VER_RES);
 
   /* Create a display */
-  lv_disp_drv_t disp_drv;
+  static lv_disp_drv_t disp_drv;
   lv_disp_drv_init(&disp_drv);
-  disp_drv.buffer = &disp_buf1;
+  disp_drv.draw_buf = &draw_buf;
+  disp_drv.hor_res = WAYLAND_HOR_RES;
+  disp_drv.ver_res = WAYLAND_VER_RES;
   disp_drv.flush_cb = wayland_flush;
+  lv_disp_t * disp = lv_disp_drv_register(&disp_drv);
 ```
 7. Add keyboard:
 ```c
