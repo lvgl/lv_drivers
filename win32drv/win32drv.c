@@ -30,6 +30,10 @@
 #define WIN32DRV_MONITOR_ZOOM 1
 #endif
 
+#ifndef USER_DEFAULT_SCREEN_DPI
+#define USER_DEFAULT_SCREEN_DPI 96
+#endif
+
 /**********************
  *      TYPEDEFS
  **********************/
