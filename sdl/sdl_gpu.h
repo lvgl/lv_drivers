@@ -77,6 +77,14 @@ void sdl_display_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
 void sdl_display_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p);
 
 /**
+ * Resize SDL display
+ * @param disp pointer to lvgl display object
+ * @param width new display width in pixels
+ * @param height new display height in pixels
+ */
+void sdl_display_resize(lv_disp_t *disp, int width, int height);
+
+/**
  * Get the current position and state of the mouse
  * @param indev_drv pointer to the related input device driver
  * @param data store the mouse data here
