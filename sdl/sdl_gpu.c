@@ -214,6 +214,7 @@ void sdl_display_resize(lv_disp_t *disp, int width, int height)
     }
     SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, width,
                                              height);
+    monitor.texture = texture;
     lv_disp_draw_buf_init(driver->draw_buf, texture, NULL, width * height);
     driver->hor_res = (lv_coord_t) width;
     driver->ver_res = (lv_coord_t) height;
