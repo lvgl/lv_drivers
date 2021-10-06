@@ -5,8 +5,6 @@ project(lv_drivers
 file(GLOB_RECURSE SOURCES ./*.c)
 add_library(lv_drivers STATIC ${SOURCES})
 
-option(install "Enable install to system" OFF)
-if(install)
 include_directories(${CMAKE_SOURCE_DIR})
 
 if("${LIB_INSTALL_DIR}" STREQUAL "")
@@ -41,4 +39,3 @@ install(TARGETS ${CMAKE_PROJECT_NAME}
   ARCHIVE DESTINATION "${LIB_INSTALL_DIR}"
   PUBLIC_HEADER DESTINATION "${INC_INSTALL_DIR}"
 )
-endif(install)
