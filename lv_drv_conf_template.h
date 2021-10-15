@@ -7,6 +7,7 @@
  * COPY THIS FILE AS lv_drv_conf.h
  */
 
+/* clang-format off */
 #if 0 /*Set it to "1" to enable the content*/
 
 #ifndef LV_DRV_CONF_H
