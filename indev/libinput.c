@@ -381,8 +381,8 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
     case LIBINPUT_EVENT_TOUCH_MOTION:
     case LIBINPUT_EVENT_TOUCH_DOWN:
       touch_event = libinput_event_get_touch_event(event);
-      lv_coord_t x = libinput_event_touch_get_x_transformed(touch_event, LV_PHYS_HOR_RES) - LV_OFFSET_X;
-      lv_coord_t y = libinput_event_touch_get_y_transformed(touch_event, LV_PHYS_VER_RES) - LV_OFFSET_Y;
+      lv_coord_t x = libinput_event_touch_get_x_transformed(touch_event, lv_disp_get_physical_hor_res(NULL)) - lv_disp_get_offset_x(NULL);
+      lv_coord_t y = libinput_event_touch_get_y_transformed(touch_event, lv_disp_get_physical_ver_res(NULL)) - lv_disp_get_offset_y(NULL);
       if (x < 0 || x > LV_HOR_RES || y < 0 || y > LV_VER_RES) {
         break; /* ignore touches that are out of bounds */
       }
