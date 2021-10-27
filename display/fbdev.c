@@ -149,7 +149,9 @@ void fbdev_init(void)
         perror("Error: failed to map framebuffer device to memory");
         return;
     }
-    memset(fbp, 0, screensize);
+
+    // Don't initialise the memory to retain what's currently displayed / avoid clearing the screen.
+    // This is important for applications that only draw to a subsection of the full framebuffer.
 
     printf("The framebuffer device was mapped to memory successfully.\n");
 
