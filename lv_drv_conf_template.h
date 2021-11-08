@@ -178,9 +178,18 @@
 #endif
 
 #if USE_WAYLAND
-#  define WAYLAND_HOR_RES      480
-#  define WAYLAND_VER_RES      320
-#  define WAYLAND_SURF_TITLE   "LVGL"
+/* Support for client-side decorations */
+#  ifndef LV_WAYLAND_CLIENT_SIDE_DECORATIONS
+#    define LV_WAYLAND_CLIENT_SIDE_DECORATIONS 1
+#  endif
+/* Support for (deprecated) wl-shell protocol */
+#  ifndef LV_WAYLAND_WL_SHELL
+#    define LV_WAYLAND_WL_SHELL 1
+#  endif
+/* Support for xdg-shell protocol */
+#  ifndef LV_WAYLAND_XDG_SHELL
+#    define LV_WAYLAND_XDG_SHELL 0
+#  endif
 #endif
 
 /*----------------
