@@ -41,13 +41,11 @@
 # define SDL_INCLUDE_PATH       MONITOR_SDL_INCLUDE_PATH
 # define SDL_VIRTUAL_MACHINE    MONITOR_VIRTUAL_MACHINE
 # define SDL_DUAL_DISPLAY       MONITOR_DUAL
+#endif
 
 #ifndef SDL_FULLSCREEN
-#define SDL_FULLSCREEN        0
+# define SDL_FULLSCREEN        0
 #endif
-
-#endif
-
 
 #include <stdlib.h>
 #include <stdbool.h>
