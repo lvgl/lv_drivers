@@ -520,6 +520,7 @@ static void pointer_handle_button(void *data, struct wl_pointer *wl_pointer,
                     xdg_toplevel_set_maximized(window->xdg_toplevel);
                 }
                 window->maximized ^= true;
+                window->flush_pending = true;
             }
         }
         break;
