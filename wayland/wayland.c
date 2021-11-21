@@ -771,7 +771,7 @@ static void keyboard_handle_keymap(void *data, struct wl_keyboard *keyboard,
 
     if (!keymap)
     {
-        LV_LOG_ERROR("failed to compile keymap\n");
+        LV_LOG_ERROR("failed to compile keymap");
         return;
     }
 
@@ -779,7 +779,7 @@ static void keyboard_handle_keymap(void *data, struct wl_keyboard *keyboard,
     state = xkb_state_new(keymap);
     if (!state)
     {
-        LV_LOG_ERROR("failed to create XKB state\n");
+        LV_LOG_ERROR("failed to create XKB state");
         xkb_keymap_unref(keymap);
         return;
     }
@@ -1175,7 +1175,7 @@ static bool initialize_allocator(struct buffer_allocator *allocator, const char 
 
     // Create file for shared memory allocation
     name = lv_mem_alloc(strlen(dir) + sizeof(template));
-    LV_ASSERT_MSG(name, "cannot allocate memory for name\n");
+    LV_ASSERT_MSG(name, "cannot allocate memory for name");
     if (!name)
     {
         return false;
@@ -1188,7 +1188,7 @@ static bool initialize_allocator(struct buffer_allocator *allocator, const char 
 
     lv_mem_free(name);
 
-    LV_ASSERT_MSG((allocator->shm_mem_fd >= 0), "cannot create tmpfile\n");
+    LV_ASSERT_MSG((allocator->shm_mem_fd >= 0), "cannot create tmpfile");
     if (allocator->shm_mem_fd < 0)
     {
         return false;
@@ -1225,7 +1225,7 @@ static bool initialize_buffer(struct window *window, struct buffer_hdl *buffer_h
 
     buffer_hdl->size = (((width * height * BYTES_PER_PIXEL) + sz - 1) / sz) * sz;
 
-    LV_LOG_TRACE("initializing buffer %dx%d (alloc size: %d)\n",
+    LV_LOG_TRACE("initializing buffer %dx%d (alloc size: %d)",
                  width, height, buffer_hdl->size);
 
     if (allocator->shm_file_free_size < buffer_hdl->size)
@@ -1239,7 +1239,7 @@ static bool initialize_buffer(struct window *window, struct buffer_hdl *buffer_h
 
         if (ret < 0)
         {
-            LV_LOG_ERROR("ftruncate failed: %s\n", strerror(errno));
+            LV_LOG_ERROR("ftruncate failed: %s", strerror(errno));
             goto err_out;
         }
         else
@@ -1256,7 +1256,7 @@ static bool initialize_buffer(struct window *window, struct buffer_hdl *buffer_h
                             allocator->shm_mem_size - allocator->shm_file_free_size);
     if (buffer_hdl->base == MAP_FAILED)
     {
-        LV_LOG_ERROR("mmap failed: %s\n", strerror(errno));
+        LV_LOG_ERROR("mmap failed: %s", strerror(errno));
         goto err_inc_free;
     }
 
@@ -1268,7 +1268,7 @@ static bool initialize_buffer(struct window *window, struct buffer_hdl *buffer_h
                                                  allocator->shm_mem_size + allocated_size);
         if (!allocator->shm_pool)
         {
-            LV_LOG_ERROR("cannot create shm pool\n");
+            LV_LOG_ERROR("cannot create shm pool");
             goto err_unmap;
         }
     }
@@ -1287,7 +1287,7 @@ static bool initialize_buffer(struct window *window, struct buffer_hdl *buffer_h
                                                       app->format);
     if (!buffer_hdl->wl_buffer)
     {
-        LV_LOG_ERROR("cannot create shm buffer\n");
+        LV_LOG_ERROR("cannot create shm buffer");
         goto err_unmap;
     }
 
@@ -1551,7 +1551,7 @@ static bool create_and_attach_decoration(struct window *window,
 
 static bool resize_window(struct window *window, int width, int height)
 {
-    LV_LOG_TRACE("resize window %dx%d\n", width, height);
+    LV_LOG_TRACE("resize window %dx%d", width, height);
 
     // De-initialize previous buffers
 #if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
@@ -1569,7 +1569,7 @@ static bool resize_window(struct window *window, int width, int height)
     // Initialize backing buffer
     if (!initialize_buffer(window, &window->body->buffer, width, height))
     {
-        LV_LOG_ERROR("failed to initialize window buffer\n");
+        LV_LOG_ERROR("failed to initialize window buffer");
         return false;
     }
 
@@ -1588,7 +1588,7 @@ static bool resize_window(struct window *window, int width, int height)
         {
             if (!create_and_attach_decoration(window, window->decoration[b]))
             {
-                LV_LOG_ERROR("failed to create decoration %d\n", b);
+                LV_LOG_ERROR("failed to create decoration %d", b);
             }
         }
     }
@@ -1794,7 +1794,7 @@ static void _lv_wayland_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv
     /* If private data is not set, it means window has not been initialized */
     if (!window)
     {
-        LV_LOG_ERROR("please intialize wayland display using lv_wayland_create_window()\n");
+        LV_LOG_ERROR("please intialize wayland display using lv_wayland_create_window()");
         return;
     }
     /* If window has been / is being closed, or is not visible, skip rendering */
@@ -1980,7 +1980,7 @@ static void _lv_wayland_touch_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
 void lv_wayland_init(void)
 {
     application.xdg_runtime_dir = getenv("XDG_RUNTIME_DIR");
-    LV_ASSERT_MSG(application.xdg_runtime_dir, "cannot get XDG_RUNTIME_DIR\n");
+    LV_ASSERT_MSG(application.xdg_runtime_dir, "cannot get XDG_RUNTIME_DIR");
 
     // Create XKB context
     application.xkb_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
@@ -2112,7 +2112,7 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
     window = create_window(&application, hor_res, ver_res, title);
     if (!window)
     {
-        LV_LOG_ERROR("failed to create wayland window\n");
+        LV_LOG_ERROR("failed to create wayland window");
         return NULL;
     }
 
@@ -2122,7 +2122,7 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
     buf1 = lv_mem_alloc(hor_res * ver_res * sizeof(lv_color_t));
     if (!buf1)
     {
-        LV_LOG_ERROR("failed to allocate draw buffer\n");
+        LV_LOG_ERROR("failed to allocate draw buffer");
         destroy_window(window);
         return NULL;
     }
@@ -2148,7 +2148,7 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
     window->lv_indev_pointer = lv_indev_drv_register(&window->lv_indev_drv_pointer);
     if (!window->lv_indev_pointer)
     {
-        LV_LOG_ERROR("failed to register pointer indev\n");
+        LV_LOG_ERROR("failed to register pointer indev");
     }
 
     lv_indev_drv_init(&window->lv_indev_drv_pointeraxis);
@@ -2158,7 +2158,7 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
     window->lv_indev_pointeraxis = lv_indev_drv_register(&window->lv_indev_drv_pointeraxis);
     if (!window->lv_indev_pointeraxis)
     {
-        LV_LOG_ERROR("failed to register pointeraxis indev\n");
+        LV_LOG_ERROR("failed to register pointeraxis indev");
     }
 
     lv_indev_drv_init(&window->lv_indev_drv_touch);
@@ -2168,7 +2168,7 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
     window->lv_indev_touch = lv_indev_drv_register(&window->lv_indev_drv_touch);
     if (!window->lv_indev_touch)
     {
-        LV_LOG_ERROR("failed to register touch indev\n");
+        LV_LOG_ERROR("failed to register touch indev");
     }
 
     lv_indev_drv_init(&window->lv_indev_drv_keyboard);
@@ -2178,7 +2178,7 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
     window->lv_indev_keyboard = lv_indev_drv_register(&window->lv_indev_drv_keyboard);
     if (!window->lv_indev_keyboard)
     {
-        LV_LOG_ERROR("failed to register keyboard indev\n");
+        LV_LOG_ERROR("failed to register keyboard indev");
     }
 
     return window->lv_disp;
