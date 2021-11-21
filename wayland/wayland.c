@@ -1186,6 +1186,7 @@ static bool initialize_allocator(struct buffer_allocator *allocator, const char 
 
     allocator->shm_mem_fd = mkstemp(name);
 
+    unlink(name);
     lv_mem_free(name);
 
     LV_ASSERT_MSG((allocator->shm_mem_fd >= 0), "cannot create tmpfile");
