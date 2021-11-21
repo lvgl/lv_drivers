@@ -1326,6 +1326,8 @@ static bool deinitialize_buffer(struct window *window, struct buffer_hdl *buffer
         buffer_hdl->base = 0;
         buffer_hdl->size = 0;
     }
+
+    return true;
 }
 
 static struct graphic_object * create_graphic_obj(struct application *app, struct window *window,
