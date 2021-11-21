@@ -377,13 +377,18 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
   struct libinput_event_touch *touch_event = NULL;
   struct libinput_event_pointer *pointer_event = NULL;
   enum libinput_event_type type = libinput_event_get_type(event);
+
+  /* We need to read unrotated display dimensions directly from the driver because libinput won't account
+   * for any rotation inside of LVGL */
+  lv_disp_drv_t *drv = lv_disp_get_default()->driver;
+
   switch (type) {
     case LIBINPUT_EVENT_TOUCH_MOTION:
     case LIBINPUT_EVENT_TOUCH_DOWN:
       touch_event = libinput_event_get_touch_event(event);
-      lv_coord_t x = libinput_event_touch_get_x_transformed(touch_event, lv_disp_get_physical_hor_res(NULL)) - lv_disp_get_offset_x(NULL);
-      lv_coord_t y = libinput_event_touch_get_y_transformed(touch_event, lv_disp_get_physical_ver_res(NULL)) - lv_disp_get_offset_y(NULL);
-      if (x < 0 || x > LV_HOR_RES || y < 0 || y > LV_VER_RES) {
+      lv_coord_t x = libinput_event_touch_get_x_transformed(touch_event, drv->physical_hor_res) - drv->offset_x;
+      lv_coord_t y = libinput_event_touch_get_y_transformed(touch_event, drv->physical_ver_res) - drv->offset_y;
+      if (x < 0 || x > drv->hor_res || y < 0 || y > drv->ver_res) {
         break; /* ignore touches that are out of bounds */
       }
       state->most_recent_touch_point.x = x;
@@ -397,10 +402,8 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
       pointer_event = libinput_event_get_pointer_event(event);
       state->most_recent_touch_point.x += libinput_event_pointer_get_dx(pointer_event);
       state->most_recent_touch_point.y += libinput_event_pointer_get_dy(pointer_event);
-      state->most_recent_touch_point.x = state->most_recent_touch_point.x < 0 ? 0 : state->most_recent_touch_point.x;
-      state->most_recent_touch_point.x = state->most_recent_touch_point.x > LV_HOR_RES - 1 ? LV_HOR_RES - 1 : state->most_recent_touch_point.x;
-      state->most_recent_touch_point.y = state->most_recent_touch_point.y < 0 ? 0 : state->most_recent_touch_point.y;
-      state->most_recent_touch_point.y = state->most_recent_touch_point.y > LV_VER_RES - 1 ? LV_VER_RES - 1 : state->most_recent_touch_point.y;
+      state->most_recent_touch_point.x = LV_CLAMP(0, state->most_recent_touch_point.x, drv->hor_res - 1);
+      state->most_recent_touch_point.y = LV_CLAMP(0, state->most_recent_touch_point.y, drv->ver_res - 1);
       break;
     case LIBINPUT_EVENT_POINTER_BUTTON:
       pointer_event = libinput_event_get_pointer_event(event);
