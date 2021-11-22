@@ -37,8 +37,6 @@
 /*********************
  *      DEFINES
  *********************/
-#define SDL_REFR_PERIOD     50  /*ms*/
-
 #ifndef KEYBOARD_BUFFER_SIZE
 #define KEYBOARD_BUFFER_SIZE SDL_TEXTINPUTEVENT_TEXT_SIZE
 #endif
@@ -81,7 +79,6 @@ monitor_t monitor;
 monitor_t monitor2;
 #endif
 
-static volatile bool sdl_inited = false;
 static volatile bool sdl_quit_qry = false;
 
 static bool left_button_down = false;
@@ -116,8 +113,6 @@ void sdl_init(void)
     SDL_SetWindowPosition(monitor.window, x + (SDL_HOR_RES * SDL_ZOOM) / 2 + 10, y);
     SDL_SetWindowPosition(monitor2.window, x - (SDL_HOR_RES * SDL_ZOOM) / 2 - 10, y);
 #endif
-
-    sdl_inited = true;
 
     SDL_StartTextInput();
 
