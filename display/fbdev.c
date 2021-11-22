@@ -166,7 +166,7 @@ void fbdev_exit(void)
  * Flush a buffer to the marked area
  * @param drv pointer to driver where this function belongs
  * @param area an area where to copy `color_p`
- * @param color_p an array of pixel to copy to the `area` part of the screen
+ * @param color_p an array of pixels to copy to the `area` part of the screen
  */
 void fbdev_flush(lv_disp_drv_t * drv, const lv_area_t * area, lv_color_t * color_p)
 {
