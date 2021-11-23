@@ -101,7 +101,7 @@ bool evdev_set_file(char* dev_name)
 #endif
 
      if(evdev_fd == -1) {
-        perror("unable open evdev interface:");
+        perror("unable to open evdev interface:");
         return false;
      }
 
