@@ -87,7 +87,10 @@ static void mouse_handler(SDL_Event * event);
 static void mousewheel_handler(SDL_Event * event);
 static uint32_t keycode_to_ctrl_key(SDL_Keycode sdl_key);
 static void keyboard_handler(SDL_Event * event);
+
+#if LV_TICK_CUSTOM == 0
 static int tick_thread(void *data);
+#endif
 
 /***********************
  *   GLOBAL PROTOTYPES
@@ -139,11 +142,12 @@ void sdl_init(void)
 
     SDL_StartTextInput();
 
+#if LV_TICK_CUSTOM == 0
     /* Tick init.
      * You have to call 'lv_tick_inc()' in periodically to inform LittelvGL about
      * how much time were elapsed Create an SDL thread to do this*/
     SDL_CreateThread(tick_thread, "tick", NULL);
-
+#endif
     lv_timer_create(sdl_event_handler, 10, NULL);
 }
 
@@ -628,6 +632,7 @@ static uint32_t keycode_to_ctrl_key(SDL_Keycode sdl_key)
 }
 
 
+#if LV_TICK_CUSTOM == 0
 /**
  * A task to measure the elapsed time for LVGL
  * @param data unused
@@ -644,6 +649,6 @@ static int tick_thread(void *data)
 
     return 0;
 }
-
+#endif
 
 #endif /*USE_MONITOR || USE_SDL*/
