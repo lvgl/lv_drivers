@@ -1,10 +1,10 @@
 /**
- * @file sdl_gpu.h
+ * @file sdl_common.h
  *
  */
 
-#ifndef SDL_GPU_H
-#define SDL_GPU_H
+#ifndef SDL_COMMON_H
+#define SDL_COMMON_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,15 +21,13 @@ extern "C" {
 #endif
 #endif
 
-#if USE_SDL_GPU
-
-#include "sdl_common.h"
-
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
 #include "lvgl.h"
 #else
 #include "lvgl/lvgl.h"
 #endif
+
+#include SDL_INCLUDE_PATH
 
 /*********************
  *      DEFINES
@@ -42,18 +40,12 @@ extern "C" {
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
+extern volatile bool sdl_quit_qry;
 
 /**
  * Initialize SDL to be used as display, mouse and mouse wheel drivers.
  */
 void sdl_init(void);
-
-/**
- * IMPORTANT: Initialize draw buffer with one `SDL_Texture`.
- * Use this instead of `lv_disp_draw_buf_init` because `buf1` isn't a real
- * pixels buffer.
- */
-void sdl_gpu_disp_draw_buf_init(lv_disp_draw_buf_t *draw_buf);
 
 /**
  * Flush a buffer to the marked area
@@ -92,19 +84,20 @@ void sdl_mousewheel_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
  */
 void sdl_keyboard_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
 
-/*For backward compatibility. Will be removed.*/
-#define monitor_init sdl_init
-#define monitor_flush sdl_display_flush
-#define monitor_flush2 sdl_display_flush2
+int quit_filter(void * userdata, SDL_Event * event);
+
+void mouse_handler(SDL_Event * event);
+void mousewheel_handler(SDL_Event * event);
+uint32_t keycode_to_ctrl_key(SDL_Keycode sdl_key);
+void keyboard_handler(SDL_Event * event);
+int tick_thread(void *data);
 
 /**********************
  *      MACROS
  **********************/
 
-#endif /* USE_SDL_GPU */
-
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
 
-#endif /* SDL_GPU_H */
+#endif /* SDL_COMMON_H */
