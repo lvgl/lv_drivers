@@ -1922,7 +1922,7 @@ static void _lv_wayland_cycle(lv_timer_t * tmr)
 static void _lv_wayland_pointer_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
 {
     struct window *window = drv->disp->driver->user_data;
-    if (!window)
+    if (!window || window->closed)
     {
         return;
     }
@@ -1935,7 +1935,7 @@ static void _lv_wayland_pointer_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
 static void _lv_wayland_pointeraxis_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
 {
     struct window *window = drv->disp->driver->user_data;
-    if (!window)
+    if (!window || window->closed)
     {
         return;
     }
@@ -1949,7 +1949,7 @@ static void _lv_wayland_pointeraxis_read(lv_indev_drv_t *drv, lv_indev_data_t *d
 static void _lv_wayland_keyboard_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
 {
     struct window *window = drv->disp->driver->user_data;
-    if (!window)
+    if (!window || window->closed)
     {
         return;
     }
@@ -1961,7 +1961,7 @@ static void _lv_wayland_keyboard_read(lv_indev_drv_t *drv, lv_indev_data_t *data
 static void _lv_wayland_touch_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
 {
     struct window *window = drv->disp->driver->user_data;
-    if (!window)
+    if (!window || window->closed)
     {
         return;
     }
