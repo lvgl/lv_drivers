@@ -121,6 +121,7 @@ struct buffer_hdl
     void *base;
     int size;
     struct wl_buffer *wl_buffer;
+    bool busy;
 };
 
 struct buffer_allocator
@@ -231,17 +232,20 @@ struct window
     int width;
     int height;
 
+    bool resize_pending;
+    int resize_width;
+    int resize_height;
+
     bool flush_pending;
     bool shall_close;
     bool closed;
     bool maximized;
+    bool fullscreen;
 };
 
 /*********************************
  *   STATIC VARIABLES and FUNTIONS
  *********************************/
-
-static bool resize_window(struct window *window, int width, int height);
 
 static struct application application;
 
@@ -520,6 +524,7 @@ static void pointer_handle_button(void *data, struct wl_pointer *wl_pointer,
                     xdg_toplevel_set_maximized(window->xdg_toplevel);
                 }
                 window->maximized ^= true;
+                window->flush_pending = true;
             }
         }
         break;
@@ -770,7 +775,7 @@ static void keyboard_handle_keymap(void *data, struct wl_keyboard *keyboard,
 
     if (!keymap)
     {
-        LV_LOG_ERROR("failed to compile keymap\n");
+        LV_LOG_ERROR("failed to compile keymap");
         return;
     }
 
@@ -778,7 +783,7 @@ static void keyboard_handle_keymap(void *data, struct wl_keyboard *keyboard,
     state = xkb_state_new(keymap);
     if (!state)
     {
-        LV_LOG_ERROR("failed to create XKB state\n");
+        LV_LOG_ERROR("failed to create XKB state");
         xkb_keymap_unref(keymap);
         return;
     }
@@ -1055,6 +1060,18 @@ static void wl_shell_handle_ping(void *data, struct wl_shell_surface *shell_surf
 static void wl_shell_handle_configure(void *data, struct wl_shell_surface *shell_surface,
                                       uint32_t edges, int32_t width, int32_t height)
 {
+    struct window *window = (struct window *)data;
+
+    if ((width <= 0) || (height <= 0))
+    {
+        return;
+    }
+    else if ((width != window->width) || (height != window->height))
+    {
+        window->resize_width = width;
+        window->resize_height = height;
+        window->resize_pending = true;
+    }
 }
 
 static const struct wl_shell_surface_listener shell_surface_listener = {
@@ -1073,13 +1090,13 @@ static const struct xdg_surface_listener xdg_surface_listener = {
     .configure = xdg_surface_handle_configure,
 };
 
-void xdg_toplevel_handle_configure(void *data, struct xdg_toplevel *xdg_toplevel,
-                                   int32_t width, int32_t height, struct wl_array *states)
+static void xdg_toplevel_handle_configure(void *data, struct xdg_toplevel *xdg_toplevel,
+                                          int32_t width, int32_t height, struct wl_array *states)
 {
     struct window *window = (struct window *)data;
 
 #if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
-    if (!window->application->opt_disable_decorations)
+    if (!window->application->opt_disable_decorations && !window->fullscreen)
     {
         width -= (2 * BORDER_SIZE);
         height -= (TITLE_BAR_HEIGHT + (2 * BORDER_SIZE));
@@ -1093,7 +1110,9 @@ void xdg_toplevel_handle_configure(void *data, struct xdg_toplevel *xdg_toplevel
 
     if ((width != window->width) || (height != window->height))
     {
-        resize_window(window, width, height);
+        window->resize_width = width;
+        window->resize_height = height;
+        window->resize_pending = true;
     }
 }
 
@@ -1167,6 +1186,16 @@ static const struct wl_registry_listener registry_listener = {
     .global_remove  = handle_global_remove
 };
 
+static void handle_wl_buffer_release(void *data, struct wl_buffer *wl_buffer)
+{
+    struct buffer_hdl *buffer_hdl = (struct buffer_hdl *)data;
+    buffer_hdl->busy = false;
+}
+
+static const struct wl_buffer_listener wl_buffer_listener = {
+    .release = handle_wl_buffer_release,
+};
+
 static bool initialize_allocator(struct buffer_allocator *allocator, const char *dir)
 {
     static const char template[] = "/lvgl-wayland-XXXXXX";
@@ -1174,7 +1203,7 @@ static bool initialize_allocator(struct buffer_allocator *allocator, const char 
 
     // Create file for shared memory allocation
     name = lv_mem_alloc(strlen(dir) + sizeof(template));
-    LV_ASSERT_MSG(name, "cannot allocate memory for name\n");
+    LV_ASSERT_MSG(name, "cannot allocate memory for name");
     if (!name)
     {
         return false;
@@ -1185,9 +1214,10 @@ static bool initialize_allocator(struct buffer_allocator *allocator, const char 
 
     allocator->shm_mem_fd = mkstemp(name);
 
+    unlink(name);
     lv_mem_free(name);
 
-    LV_ASSERT_MSG((allocator->shm_mem_fd >= 0), "cannot create tmpfile\n");
+    LV_ASSERT_MSG((allocator->shm_mem_fd >= 0), "cannot create tmpfile");
     if (allocator->shm_mem_fd < 0)
     {
         return false;
@@ -1224,7 +1254,7 @@ static bool initialize_buffer(struct window *window, struct buffer_hdl *buffer_h
 
     buffer_hdl->size = (((width * height * BYTES_PER_PIXEL) + sz - 1) / sz) * sz;
 
-    LV_LOG_TRACE("initializing buffer %dx%d (alloc size: %d)\n",
+    LV_LOG_TRACE("initializing buffer %dx%d (alloc size: %d)",
                  width, height, buffer_hdl->size);
 
     if (allocator->shm_file_free_size < buffer_hdl->size)
@@ -1238,7 +1268,7 @@ static bool initialize_buffer(struct window *window, struct buffer_hdl *buffer_h
 
         if (ret < 0)
         {
-            LV_LOG_ERROR("ftruncate failed: %s\n", strerror(errno));
+            LV_LOG_ERROR("ftruncate failed: %s", strerror(errno));
             goto err_out;
         }
         else
@@ -1255,7 +1285,7 @@ static bool initialize_buffer(struct window *window, struct buffer_hdl *buffer_h
                             allocator->shm_mem_size - allocator->shm_file_free_size);
     if (buffer_hdl->base == MAP_FAILED)
     {
-        LV_LOG_ERROR("mmap failed: %s\n", strerror(errno));
+        LV_LOG_ERROR("mmap failed: %s", strerror(errno));
         goto err_inc_free;
     }
 
@@ -1267,7 +1297,7 @@ static bool initialize_buffer(struct window *window, struct buffer_hdl *buffer_h
                                                  allocator->shm_mem_size + allocated_size);
         if (!allocator->shm_pool)
         {
-            LV_LOG_ERROR("cannot create shm pool\n");
+            LV_LOG_ERROR("cannot create shm pool");
             goto err_unmap;
         }
     }
@@ -1286,9 +1316,10 @@ static bool initialize_buffer(struct window *window, struct buffer_hdl *buffer_h
                                                       app->format);
     if (!buffer_hdl->wl_buffer)
     {
-        LV_LOG_ERROR("cannot create shm buffer\n");
+        LV_LOG_ERROR("cannot create shm buffer");
         goto err_unmap;
     }
+    wl_buffer_add_listener(buffer_hdl->wl_buffer, &wl_buffer_listener, buffer_hdl);
 
     /* Update size of SHM */
     allocator->shm_mem_size += allocated_size;
@@ -1325,6 +1356,8 @@ static bool deinitialize_buffer(struct window *window, struct buffer_hdl *buffer
         buffer_hdl->base = 0;
         buffer_hdl->size = 0;
     }
+
+    return true;
 }
 
 static struct graphic_object * create_graphic_obj(struct application *app, struct window *window,
@@ -1354,20 +1387,6 @@ static struct graphic_object * create_graphic_obj(struct application *app, struc
 
     wl_surface_set_user_data(obj->surface, obj);
 
-    if (parent != NULL)
-    {
-        obj->subsurface = wl_subcompositor_get_subsurface(app->subcompositor,
-                                                          obj->surface,
-                                                          parent->surface);
-        if (!obj->subsurface)
-        {
-            LV_LOG_ERROR("cannot get subsurface for graphic object");
-            goto err_destroy_surface;
-        }
-
-        wl_subsurface_set_desync(obj->subsurface);
-    }
-
     return obj;
 
 err_destroy_surface:
@@ -1382,76 +1401,66 @@ err_out:
 
 static void destroy_graphic_obj(struct graphic_object * obj)
 {
+    if (obj->subsurface)
+    {
+        wl_subsurface_destroy(obj->subsurface);
+    }
+
     wl_surface_destroy(obj->surface);
 
     lv_mem_free(obj);
 }
 
 #if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
-static bool create_and_attach_decoration(struct window *window,
-                                         struct graphic_object * decoration)
+static bool create_decoration(struct window *window,
+                              struct graphic_object * decoration,
+                              int window_width, int window_height)
 {
-    int pos_x, pos_y;
+    struct buffer_hdl * buffer = &decoration->buffer;
     int x, y;
 
     switch (decoration->type)
     {
     case OBJECT_TITLEBAR:
-        decoration->width = window->width;
+        decoration->width = window_width;
         decoration->height = TITLE_BAR_HEIGHT;
-        pos_x = 0;
-        pos_y = -TITLE_BAR_HEIGHT;
         break;
     case OBJECT_BUTTON_CLOSE:
         decoration->width = BUTTON_SIZE;
         decoration->height = BUTTON_SIZE;
-        pos_x = window->width - 1 * (BUTTON_MARGIN + BUTTON_SIZE);
-        pos_y = -1 * (BUTTON_MARGIN + BUTTON_SIZE + (BORDER_SIZE / 2));
         break;
 #if LV_WAYLAND_XDG_SHELL
     case OBJECT_BUTTON_MAXIMIZE:
         decoration->width = BUTTON_SIZE;
         decoration->height = BUTTON_SIZE;
-        pos_x = window->width - 2 * (BUTTON_MARGIN + BUTTON_SIZE);
-        pos_y = -1 * (BUTTON_MARGIN + BUTTON_SIZE + (BORDER_SIZE / 2));
         break;
     case OBJECT_BUTTON_MINIMIZE:
         decoration->width = BUTTON_SIZE;
         decoration->height = BUTTON_SIZE;
-        pos_x = window->width - 3 * (BUTTON_MARGIN + BUTTON_SIZE);
-        pos_y = -1 * (BUTTON_MARGIN + BUTTON_SIZE + (BORDER_SIZE / 2));
         break;
 #endif
     case OBJECT_BORDER_TOP:
-        decoration->width = window->width + 2 * (BORDER_SIZE);
+        decoration->width = window_width + 2 * (BORDER_SIZE);
         decoration->height = BORDER_SIZE;
-        pos_x = -BORDER_SIZE;
-        pos_y = -(BORDER_SIZE + TITLE_BAR_HEIGHT);
         break;
     case OBJECT_BORDER_BOTTOM:
-        decoration->width = window->width + 2 * (BORDER_SIZE);
+        decoration->width = window_width + 2 * (BORDER_SIZE);
         decoration->height = BORDER_SIZE;
-        pos_x = -BORDER_SIZE;
-        pos_y = window->height;
         break;
     case OBJECT_BORDER_LEFT:
         decoration->width = BORDER_SIZE;
-        decoration->height = window->height + TITLE_BAR_HEIGHT;
-        pos_x = -BORDER_SIZE;
-        pos_y = -TITLE_BAR_HEIGHT;
+        decoration->height = window_height + TITLE_BAR_HEIGHT;
         break;
     case OBJECT_BORDER_RIGHT:
         decoration->width = BORDER_SIZE;
-        decoration->height = window->height + TITLE_BAR_HEIGHT;
-        pos_x = window->width;
-        pos_y = -TITLE_BAR_HEIGHT;
+        decoration->height = window_height + TITLE_BAR_HEIGHT;
         break;
     default:
         LV_ASSERT_MSG(0, "Invalid object type");
         return false;
     }
 
-    if (!initialize_buffer(window, &decoration->buffer, decoration->width, decoration->height))
+    if (!initialize_buffer(window, buffer, decoration->width, decoration->height))
     {
         LV_LOG_ERROR("cannot create buffer for decoration");
         return false;
@@ -1460,17 +1469,17 @@ static bool create_and_attach_decoration(struct window *window,
     switch (decoration->type)
     {
     case OBJECT_TITLEBAR:
-        lv_color_fill((lv_color_t *)decoration->buffer.base,
+        lv_color_fill((lv_color_t *)buffer->base,
                       lv_color_make(0x66, 0x66, 0x66), (decoration->width * decoration->height));
         break;
     case OBJECT_BUTTON_CLOSE:
-        lv_color_fill((lv_color_t *)decoration->buffer.base,
+        lv_color_fill((lv_color_t *)buffer->base,
                       lv_color_make(0xCC, 0xCC, 0xCC), (decoration->width * decoration->height));
         for (y = 0; y < decoration->height; y++)
         {
             for (x = 0; x < decoration->width; x++)
             {
-                lv_color_t *pixel = ((lv_color_t *)decoration->buffer.base + (y * decoration->width) + x);
+                lv_color_t *pixel = ((lv_color_t *)buffer->base + (y * decoration->width) + x);
                 if ((x >= BUTTON_PADDING) && (x < decoration->width - BUTTON_PADDING))
                 {
                     if ((x == y) || (x == decoration->width - 1 - y))
@@ -1487,13 +1496,13 @@ static bool create_and_attach_decoration(struct window *window,
         break;
 #if LV_WAYLAND_XDG_SHELL
     case OBJECT_BUTTON_MAXIMIZE:
-        lv_color_fill((lv_color_t *)decoration->buffer.base,
+        lv_color_fill((lv_color_t *)buffer->base,
                       lv_color_make(0xCC, 0xCC, 0xCC), (decoration->width * decoration->height));
         for (y = 0; y < decoration->height; y++)
         {
             for (x = 0; x < decoration->width; x++)
             {
-                lv_color_t *pixel = ((lv_color_t *)decoration->buffer.base + (y * decoration->width) + x);
+                lv_color_t *pixel = ((lv_color_t *)buffer->base + (y * decoration->width) + x);
                 if (((x == BUTTON_PADDING) && (y >= BUTTON_PADDING) && (y < decoration->height - BUTTON_PADDING)) ||
                     ((x == (decoration->width - BUTTON_PADDING)) && (y >= BUTTON_PADDING) && (y <= decoration->height - BUTTON_PADDING)) ||
                     ((y == BUTTON_PADDING) && (x >= BUTTON_PADDING) && (x < decoration->width - BUTTON_PADDING)) ||
@@ -1506,13 +1515,13 @@ static bool create_and_attach_decoration(struct window *window,
         }
         break;
     case OBJECT_BUTTON_MINIMIZE:
-        lv_color_fill((lv_color_t *)decoration->buffer.base,
+        lv_color_fill((lv_color_t *)buffer->base,
                       lv_color_make(0xCC, 0xCC, 0xCC), (decoration->width * decoration->height));
         for (y = 0; y < decoration->height; y++)
         {
             for (x = 0; x < decoration->width; x++)
             {
-                lv_color_t *pixel = ((lv_color_t *)decoration->buffer.base + (y * decoration->width) + x);
+                lv_color_t *pixel = ((lv_color_t *)buffer->base + (y * decoration->width) + x);
                 if ((x >= BUTTON_PADDING) && (x < decoration->width - BUTTON_PADDING) &&
                     (y > decoration->height - (2 * BUTTON_PADDING)) && (y < decoration->height - BUTTON_PADDING))
                 {
@@ -1529,7 +1538,7 @@ static bool create_and_attach_decoration(struct window *window,
     case OBJECT_BORDER_LEFT:
         /* fallthrough */
     case OBJECT_BORDER_RIGHT:
-        lv_color_fill((lv_color_t *)decoration->buffer.base,
+        lv_color_fill((lv_color_t *)buffer->base,
                       lv_color_make(0x66, 0x66, 0x66), (decoration->width * decoration->height));
         break;
     default:
@@ -1537,36 +1546,130 @@ static bool create_and_attach_decoration(struct window *window,
         return false;
     }
 
-    wl_surface_attach(decoration->surface, decoration->buffer.wl_buffer, 0, 0);
-    wl_surface_commit(decoration->surface);
+    return true;
+}
 
+static bool attach_decoration(struct window *window, struct graphic_object * decoration,
+                              struct graphic_object * parent)
+{
+    struct buffer_hdl * buffer = &decoration->buffer;
+    int pos_x, pos_y;
+    int x, y;
+
+    switch (decoration->type)
+    {
+    case OBJECT_TITLEBAR:
+        pos_x = 0;
+        pos_y = -TITLE_BAR_HEIGHT;
+        break;
+    case OBJECT_BUTTON_CLOSE:
+        pos_x = parent->width - 1 * (BUTTON_MARGIN + BUTTON_SIZE);
+        pos_y = -1 * (BUTTON_MARGIN + BUTTON_SIZE + (BORDER_SIZE / 2));
+        break;
+#if LV_WAYLAND_XDG_SHELL
+    case OBJECT_BUTTON_MAXIMIZE:
+        pos_x = parent->width - 2 * (BUTTON_MARGIN + BUTTON_SIZE);
+        pos_y = -1 * (BUTTON_MARGIN + BUTTON_SIZE + (BORDER_SIZE / 2));
+        break;
+    case OBJECT_BUTTON_MINIMIZE:
+        pos_x = parent->width - 3 * (BUTTON_MARGIN + BUTTON_SIZE);
+        pos_y = -1 * (BUTTON_MARGIN + BUTTON_SIZE + (BORDER_SIZE / 2));
+        break;
+#endif
+    case OBJECT_BORDER_TOP:
+        pos_x = -BORDER_SIZE;
+        pos_y = -(BORDER_SIZE + TITLE_BAR_HEIGHT);
+        break;
+    case OBJECT_BORDER_BOTTOM:
+        pos_x = -BORDER_SIZE;
+        pos_y = parent->height;
+        break;
+    case OBJECT_BORDER_LEFT:
+        pos_x = -BORDER_SIZE;
+        pos_y = -TITLE_BAR_HEIGHT;
+        break;
+    case OBJECT_BORDER_RIGHT:
+        pos_x = parent->width;
+        pos_y = -TITLE_BAR_HEIGHT;
+        break;
+    default:
+        LV_ASSERT_MSG(0, "Invalid object type");
+        return false;
+    }
+
+    decoration->subsurface = wl_subcompositor_get_subsurface(window->application->subcompositor,
+                                                             decoration->surface,
+                                                             parent->surface);
+    if (!decoration->subsurface)
+    {
+        LV_LOG_ERROR("cannot get subsurface for decoration");
+        goto err_destroy_surface;
+    }
+
+    wl_subsurface_set_desync(decoration->subsurface);
     wl_subsurface_set_position(decoration->subsurface, pos_x, pos_y);
 
+    wl_surface_attach(decoration->surface, buffer->wl_buffer, 0, 0);
+    wl_surface_commit(decoration->surface);
+    buffer->busy = true;
+
     return true;
+
+err_destroy_surface:
+    wl_surface_destroy(decoration->surface);
+    decoration->surface = NULL;
+
+    return false;
+}
+
+static void detach_decoration(struct window *window,
+                              struct graphic_object * decoration)
+{
+    if (decoration->subsurface)
+    {
+        wl_subsurface_destroy(decoration->subsurface);
+        decoration->subsurface = NULL;
+    }
 }
 #endif
 
 static bool resize_window(struct window *window, int width, int height)
 {
-    LV_LOG_TRACE("resize window %dx%d\n", width, height);
+    struct buffer_hdl *buffer = &window->body->buffer;
+
+    LV_LOG_TRACE("resize window %dx%d", width, height);
 
     // De-initialize previous buffers
+    if (buffer->busy)
+    {
+        LV_LOG_WARN("Deinitializing busy window buffer...");
+        wl_surface_attach(window->body->surface, NULL, 0, 0);
+        wl_surface_commit(window->body->surface);
+        buffer->busy = false;
+    }
+
+    if (!deinitialize_buffer(window, buffer))
+    {
+        LV_LOG_ERROR("failed to deinitialize window buffer");
+        return false;
+    }
+
 #if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
     int b;
     for (b = 0; b < NUM_DECORATIONS; b++)
     {
-        if (window->decoration[b])
+        if (window->decoration[b] != NULL)
         {
+            detach_decoration(window, window->decoration[b]);
             deinitialize_buffer(window, &window->decoration[b]->buffer);
         }
     }
 #endif
-    deinitialize_buffer(window, &window->body->buffer);
 
     // Initialize backing buffer
-    if (!initialize_buffer(window, &window->body->buffer, width, height))
+    if (!initialize_buffer(window, buffer, width, height))
     {
-        LV_LOG_ERROR("failed to initialize window buffer\n");
+        LV_LOG_ERROR("failed to initialize window buffer");
         return false;
     }
 
@@ -1576,16 +1679,19 @@ static bool resize_window(struct window *window, int width, int height)
     window->body->width = width;
     window->body->height = height;
 
-    wl_surface_attach(window->body->surface, window->body->buffer.wl_buffer, 0, 0);
-
 #if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
-    if (!window->application->opt_disable_decorations)
+    if (!window->application->opt_disable_decorations && !window->fullscreen)
     {
         for (b = 0; b < NUM_DECORATIONS; b++)
         {
-            if (!create_and_attach_decoration(window, window->decoration[b]))
+            if (!create_decoration(window, window->decoration[b],
+                                   window->body->width, window->body->height))
             {
-                LV_LOG_ERROR("failed to create decoration %d\n", b);
+                LV_LOG_ERROR("failed to create decoration %d", b);
+            }
+            else if (!attach_decoration(window, window->decoration[b], window->body))
+            {
+                LV_LOG_ERROR("failed to attach decoration %d", b);
             }
         }
     }
@@ -1674,7 +1780,7 @@ static struct window *create_window(struct application *app, int width, int heig
             goto err_destroy_surface;
         }
 
-        wl_shell_surface_add_listener(window->wl_shell_surface, &shell_surface_listener, &window);
+        wl_shell_surface_add_listener(window->wl_shell_surface, &shell_surface_listener, window);
         wl_shell_surface_set_toplevel(window->wl_shell_surface);
         wl_shell_surface_set_title(window->wl_shell_surface, title);
     }
@@ -1785,13 +1891,15 @@ static void destroy_window(struct window *window)
 static void _lv_wayland_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p)
 {
     struct window *window = disp_drv->user_data;
-    lv_coord_t hres = (disp_drv->rotated == 0) ? (disp_drv->hor_res) : (disp_drv->ver_res);
-    lv_coord_t vres = (disp_drv->rotated == 0) ? (disp_drv->ver_res) : (disp_drv->hor_res);
+    struct buffer_hdl *buffer = &window->body->buffer;
+
+    const lv_coord_t hres = (disp_drv->rotated == 0) ? (disp_drv->hor_res) : (disp_drv->ver_res);
+    const lv_coord_t vres = (disp_drv->rotated == 0) ? (disp_drv->ver_res) : (disp_drv->hor_res);
 
     /* If private data is not set, it means window has not been initialized */
     if (!window)
     {
-        LV_LOG_ERROR("please intialize wayland display using lv_wayland_create_window()\n");
+        LV_LOG_ERROR("please intialize wayland display using lv_wayland_create_window()");
         return;
     }
     /* If window has been / is being closed, or is not visible, skip rendering */
@@ -1806,6 +1914,12 @@ static void _lv_wayland_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv
         lv_disp_flush_ready(disp_drv);
         return;
     }
+    else if (window->resize_pending)
+    {
+        LV_LOG_TRACE("skip flush since resize is pending");
+        lv_disp_flush_ready(disp_drv);
+        return;
+    }
 
     int32_t x;
     int32_t y;
@@ -1816,16 +1930,16 @@ static void _lv_wayland_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv
         {
             int offset = (y * disp_drv->hor_res) + x;
 #if (LV_COLOR_DEPTH == 32)
-            uint32_t * const buf = (uint32_t *)window->body->buffer.base + offset;
+            uint32_t * const buf = (uint32_t *)buffer->base + offset;
             *buf = color_p->full;
 #elif (LV_COLOR_DEPTH == 16)
-            uint16_t * const buf = (uint16_t *)window->body->buffer.base + offset;
+            uint16_t * const buf = (uint16_t *)buffer->base + offset;
             *buf = color_p->full;
 #elif (LV_COLOR_DEPTH == 8)
-            uint8_t * const buf = (uint8_t *)window->body->buffer.base + offset;
+            uint8_t * const buf = (uint8_t *)buffer->base + offset;
             *buf = color_p->full;
 #elif (LV_COLOR_DEPTH == 1)
-            uint8_t * const buf = (uint8_t *)window->body->buffer.base + offset;
+            uint8_t * const buf = (uint8_t *)buffer->base + offset;
             *buf = ((0x07 * color_p->ch.red)   << 5) |
                    ((0x07 * color_p->ch.green) << 2) |
                    ((0x03 * color_p->ch.blue)  << 0);
@@ -1839,7 +1953,9 @@ static void _lv_wayland_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv
 
     if (lv_disp_flush_is_last(disp_drv))
     {
+        wl_surface_attach(window->body->surface, buffer->wl_buffer, 0, 0);
         wl_surface_commit(window->body->surface);
+        buffer->busy = true;
         window->flush_pending = true;
     }
 
@@ -1864,8 +1980,12 @@ static void _lv_wayland_cycle(lv_timer_t * tmr)
         {
             window->shall_close = window->close_cb(window->lv_disp);
         }
-
-        if (window->shall_close)
+        
+        if (window->closed)
+        {
+            continue;
+        }
+        else if (window->shall_close)
         {
             destroy_window(window);
             window->closed = true;
@@ -1898,7 +2018,31 @@ static void _lv_wayland_cycle(lv_timer_t * tmr)
                 window->application->keyboard_obj = NULL;
             }
         }
-        else if (!window->closed)
+        else if (window->resize_pending)
+        {
+            bool do_resize = !window->body->buffer.busy;
+#if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
+            if (!window->application->opt_disable_decorations && !window->fullscreen)
+            {
+                int d;
+                for (d = 0; d < NUM_DECORATIONS; d++)
+                {
+                    if ((window->decoration[d] != NULL) && (window->decoration[d]->buffer.busy))
+                    {
+                        do_resize = false;
+                        break;
+                    }
+                }
+            }
+#endif
+            if (do_resize && resize_window(window, window->resize_width, window->resize_height))
+            {
+                window->resize_width = window->width;
+                window->resize_height = window->height;
+                window->resize_pending = false;
+            }
+        }
+        else
         {
             shall_flush |= window->flush_pending;
         }
@@ -1918,7 +2062,7 @@ static void _lv_wayland_cycle(lv_timer_t * tmr)
 static void _lv_wayland_pointer_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
 {
     struct window *window = drv->disp->driver->user_data;
-    if (!window)
+    if (!window || window->closed)
     {
         return;
     }
@@ -1931,7 +2075,7 @@ static void _lv_wayland_pointer_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
 static void _lv_wayland_pointeraxis_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
 {
     struct window *window = drv->disp->driver->user_data;
-    if (!window)
+    if (!window || window->closed)
     {
         return;
     }
@@ -1945,7 +2089,7 @@ static void _lv_wayland_pointeraxis_read(lv_indev_drv_t *drv, lv_indev_data_t *d
 static void _lv_wayland_keyboard_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
 {
     struct window *window = drv->disp->driver->user_data;
-    if (!window)
+    if (!window || window->closed)
     {
         return;
     }
@@ -1957,7 +2101,7 @@ static void _lv_wayland_keyboard_read(lv_indev_drv_t *drv, lv_indev_data_t *data
 static void _lv_wayland_touch_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
 {
     struct window *window = drv->disp->driver->user_data;
-    if (!window)
+    if (!window || window->closed)
     {
         return;
     }
@@ -1977,7 +2121,7 @@ static void _lv_wayland_touch_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
 void lv_wayland_init(void)
 {
     application.xdg_runtime_dir = getenv("XDG_RUNTIME_DIR");
-    LV_ASSERT_MSG(application.xdg_runtime_dir, "cannot get XDG_RUNTIME_DIR\n");
+    LV_ASSERT_MSG(application.xdg_runtime_dir, "cannot get XDG_RUNTIME_DIR");
 
     // Create XKB context
     application.xkb_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
@@ -2109,7 +2253,7 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
     window = create_window(&application, hor_res, ver_res, title);
     if (!window)
     {
-        LV_LOG_ERROR("failed to create wayland window\n");
+        LV_LOG_ERROR("failed to create wayland window");
         return NULL;
     }
 
@@ -2119,7 +2263,7 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
     buf1 = lv_mem_alloc(hor_res * ver_res * sizeof(lv_color_t));
     if (!buf1)
     {
-        LV_LOG_ERROR("failed to allocate draw buffer\n");
+        LV_LOG_ERROR("failed to allocate draw buffer");
         destroy_window(window);
         return NULL;
     }
@@ -2145,7 +2289,7 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
     window->lv_indev_pointer = lv_indev_drv_register(&window->lv_indev_drv_pointer);
     if (!window->lv_indev_pointer)
     {
-        LV_LOG_ERROR("failed to register pointer indev\n");
+        LV_LOG_ERROR("failed to register pointer indev");
     }
 
     lv_indev_drv_init(&window->lv_indev_drv_pointeraxis);
@@ -2155,7 +2299,7 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
     window->lv_indev_pointeraxis = lv_indev_drv_register(&window->lv_indev_drv_pointeraxis);
     if (!window->lv_indev_pointeraxis)
     {
-        LV_LOG_ERROR("failed to register pointeraxis indev\n");
+        LV_LOG_ERROR("failed to register pointeraxis indev");
     }
 
     lv_indev_drv_init(&window->lv_indev_drv_touch);
@@ -2165,7 +2309,7 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
     window->lv_indev_touch = lv_indev_drv_register(&window->lv_indev_drv_touch);
     if (!window->lv_indev_touch)
     {
-        LV_LOG_ERROR("failed to register touch indev\n");
+        LV_LOG_ERROR("failed to register touch indev");
     }
 
     lv_indev_drv_init(&window->lv_indev_drv_keyboard);
@@ -2175,7 +2319,7 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
     window->lv_indev_keyboard = lv_indev_drv_register(&window->lv_indev_drv_keyboard);
     if (!window->lv_indev_keyboard)
     {
-        LV_LOG_ERROR("failed to register keyboard indev\n");
+        LV_LOG_ERROR("failed to register keyboard indev");
     }
 
     return window->lv_disp;
@@ -2194,6 +2338,64 @@ void lv_wayland_close_window(lv_disp_t * disp)
     }
     window->shall_close = true;
     window->close_cb = NULL;
+}
+
+/**
+ * Set/unset window fullscreen mode
+ * @param disp LVGL display using window to be set/unset fullscreen
+ * @param fullscreen requested status (true = fullscreen)
+ */
+void lv_wayland_window_set_fullscreen(lv_disp_t * disp, bool fullscreen)
+{
+    struct window *window = disp->driver->user_data;
+    if (!window || window->closed)
+    {
+        return;
+    }
+
+    if (window->fullscreen != fullscreen)
+    {
+        if (0)
+        {
+            // Needed for #if madness below
+        }
+#if LV_WAYLAND_XDG_SHELL
+        else if (window->xdg_toplevel)
+        {
+            if (fullscreen)
+            {
+                xdg_toplevel_set_fullscreen(window->xdg_toplevel, NULL);
+            }
+            else
+            {
+                xdg_toplevel_unset_fullscreen(window->xdg_toplevel);
+            }
+            window->fullscreen = fullscreen;
+            window->flush_pending = true;
+        }
+#endif
+#if LV_WAYLAND_WL_SHELL
+        else if (window->wl_shell_surface)
+        {
+            if (fullscreen)
+            {
+                wl_shell_surface_set_fullscreen(window->wl_shell_surface,
+                                                WL_SHELL_SURFACE_FULLSCREEN_METHOD_SCALE,
+                                                0, NULL);
+            }
+            else
+            {
+                wl_shell_surface_set_toplevel(window->wl_shell_surface);
+            }
+            window->fullscreen = fullscreen;
+            window->flush_pending = true;
+        }
+#endif
+        else
+        {
+            LV_LOG_WARN("Wayland fullscreen mode not supported");
+        }
+    }
 }
 
 /**

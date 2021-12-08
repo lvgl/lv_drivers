@@ -103,6 +103,12 @@ In "Project properties > C/C++ Build > Settings" set the followings:
 5. After `lv_deinit()` (if used), or in any case during de-initialization, call
   `lv_wayland_deinit()`.
 
+### Fullscreen mode
+
+In order to set one window as fullscreen or restore it as a normal one,
+call the `lv_wayland_window_set_fullscreen()` function respectively with `true`
+or `false` as `fullscreen` argument.
+
 ### Disable window client-side decoration at runtime
 
 Even when client-side decorations are enabled at compile time, they can be
