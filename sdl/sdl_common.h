@@ -27,7 +27,14 @@ extern "C" {
 #include "lvgl/lvgl.h"
 #endif
 
+#ifndef SDL_INCLUDE_PATH
+#define SDL_INCLUDE_PATH MONITOR_SDL_INCLUDE_PATH
+#endif
 #include SDL_INCLUDE_PATH
+
+#ifndef SDL_ZOOM
+#define SDL_ZOOM MONITOR_ZOOM
+#endif
 
 /*********************
  *      DEFINES
@@ -56,14 +63,6 @@ void sdl_init(void);
 void sdl_display_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p);
 
 /**
- * Flush a buffer to the marked area
- * @param drv pointer to driver where this function belongs
- * @param area an area where to copy `color_p`
- * @param color_p an array of pixel to copy to the `area` part of the screen
- */
-void sdl_display_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p);
-
-/**
  * Get the current position and state of the mouse
  * @param indev_drv pointer to the related input device driver
  * @param data store the mouse data here
@@ -90,7 +89,6 @@ void mouse_handler(SDL_Event * event);
 void mousewheel_handler(SDL_Event * event);
 uint32_t keycode_to_ctrl_key(SDL_Keycode sdl_key);
 void keyboard_handler(SDL_Event * event);
-int tick_thread(void *data);
 
 /**********************
  *      MACROS

@@ -268,20 +268,3 @@ uint32_t keycode_to_ctrl_key(SDL_Keycode sdl_key)
 }
 
 
-/**
- * A task to measure the elapsed time for LVGL
- * @param data unused
- * @return never return
- */
-int tick_thread(void *data)
-{
-    (void)data;
-
-    while(1) {
-        Uint32 ticks = SDL_GetTicks();
-        SDL_Delay(5);
-        lv_tick_elaps(ticks); /*Tell LittelvGL that 5 milliseconds were elapsed*/
-    }
-
-    return 0;
-}
