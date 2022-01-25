@@ -101,12 +101,7 @@ int quit_filter(void * userdata, SDL_Event * event)
 {
     (void)userdata;
 
-    if(event->type == SDL_WINDOWEVENT) {
-        if(event->window.event == SDL_WINDOWEVENT_CLOSE) {
-            sdl_quit_qry = true;
-        }
-    }
-    else if(event->type == SDL_QUIT) {
+    if(event->type == SDL_QUIT) {
         sdl_quit_qry = true;
     }
 

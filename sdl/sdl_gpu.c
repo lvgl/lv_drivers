@@ -48,15 +48,16 @@
  *      TYPEDEFS
  **********************/
 typedef struct {
-    lv_draw_sdl_context_t context;
+    lv_draw_sdl_drv_param_t drv_param;
     SDL_Window * window;
+    SDL_Texture * texture;
 }monitor_t;
 
 /**********************
  *  STATIC PROTOTYPES
  **********************/
 static void window_create(monitor_t * m);
-static void window_update(lv_disp_drv_t *disp_drv);
+static void window_update(lv_disp_drv_t *disp_drv, void * buf);
 static void monitor_sdl_clean_up(void);
 static void sdl_event_handler(lv_timer_t * t);
 
@@ -87,18 +88,10 @@ void sdl_init(void)
     SDL_StartTextInput();
 
     lv_timer_create(sdl_event_handler, 1, NULL);
-
-    lv_draw_sdl_init();
-
-    static lv_draw_backend_t backend;
-    lv_draw_sdl_backend_init(&backend);
-    lv_draw_backend_add(&backend);
 }
 
 void sdl_disp_drv_init(lv_disp_drv_t * disp_drv, lv_coord_t hor_res, lv_coord_t ver_res)
 {
-    lv_disp_draw_buf_t *disp_buf = lv_mem_alloc(sizeof(lv_disp_draw_buf_t));
-    lv_disp_draw_buf_init(disp_buf, NULL, NULL, hor_res * ver_res);
     monitor_t *m = lv_mem_alloc(sizeof(monitor_t));
     window_create(m);
     lv_disp_drv_init(disp_drv);
@@ -106,9 +99,11 @@ void sdl_disp_drv_init(lv_disp_drv_t * disp_drv, lv_coord_t hor_res, lv_coord_t 
     disp_drv->flush_cb = monitor_flush;
     disp_drv->hor_res = hor_res;
     disp_drv->ver_res = ver_res;
+    lv_disp_draw_buf_t *disp_buf = lv_mem_alloc(sizeof(lv_disp_draw_buf_t));
+    lv_disp_draw_buf_init(disp_buf, m->texture, NULL, hor_res * ver_res);
     disp_drv->draw_buf = disp_buf;
     disp_drv->antialiasing = 1;
-    disp_drv->user_data = m;
+    disp_drv->user_data = &m->drv_param;
 }
 
 /**
@@ -133,7 +128,7 @@ void sdl_display_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
     /* TYPICALLY YOU DO NOT NEED THIS
      * If it was the last part to refresh update the texture of the window.*/
     if(lv_disp_flush_is_last(disp_drv)) {
-        window_update(disp_drv);
+        window_update(disp_drv, color_p);
     }
 
     /*IMPORTANT! It must be called to tell the system the flush is ready*/
@@ -144,12 +139,11 @@ void sdl_display_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
 void sdl_display_resize(lv_disp_t *disp, int width, int height)
 {
     lv_disp_drv_t *driver = disp->driver;
-    SDL_Renderer *renderer = driver->user_data;
+    SDL_Renderer *renderer = ((lv_draw_sdl_drv_param_t *) driver->user_data)->renderer;
     if (driver->draw_buf->buf1) {
         SDL_DestroyTexture(driver->draw_buf->buf1);
     }
-    SDL_Texture *texture = SDL_CreateTexture(renderer, LV_DRAW_SDL_TEXTURE_FORMAT,
-                                             SDL_TEXTUREACCESS_TARGET, width, height);
+    SDL_Texture *texture = lv_draw_sdl_create_screen_texture(renderer, width, height);
     lv_disp_draw_buf_init(driver->draw_buf, texture, NULL, width * height);
     driver->hor_res = (lv_coord_t) width;
     driver->ver_res = (lv_coord_t) height;
@@ -182,18 +176,47 @@ static void sdl_event_handler(lv_timer_t * t)
         mousewheel_handler(&event);
         keyboard_handler(&event);
 
-        if((&event)->type == SDL_WINDOWEVENT) {
-            switch((&event)->window.event) {
+        switch (event.type) {
+            case SDL_WINDOWEVENT: {
+                SDL_Window * window = SDL_GetWindowFromID(event.window.windowID);
+                switch (event.window.event) {
 #if SDL_VERSION_ATLEAST(2, 0, 5)
-                case SDL_WINDOWEVENT_TAKE_FOCUS:
+                    case SDL_WINDOWEVENT_TAKE_FOCUS:
 #endif
-                case SDL_WINDOWEVENT_EXPOSED:
-                    for (lv_disp_t *cur = lv_disp_get_next(NULL); cur; cur = lv_disp_get_next(cur)) {
-                        window_update(cur->driver);
+                    case SDL_WINDOWEVENT_EXPOSED:
+                        for (lv_disp_t *cur = lv_disp_get_next(NULL); cur; cur = lv_disp_get_next(cur)) {
+                            window_update(cur->driver, cur->driver->draw_buf->buf_act);
+                        }
+                        break;
+                    case SDL_WINDOWEVENT_SIZE_CHANGED: {
+                        for (lv_disp_t *cur = lv_disp_get_next(NULL); cur; cur = lv_disp_get_next(cur)) {
+                            lv_draw_sdl_drv_param_t *param = cur->driver->user_data;
+                            SDL_Renderer *renderer = SDL_GetRenderer(window);
+                            if (param->renderer != renderer) continue;
+                            int w, h;
+                            SDL_GetWindowSize(window, &w, &h);
+                            sdl_display_resize(cur, w, h);
+                        }
+                        break;
                     }
-                    break;
-                default:
-                    break;
+                    case SDL_WINDOWEVENT_CLOSE: {
+                        for (lv_disp_t *cur = lv_disp_get_next(NULL); cur; ) {
+                            lv_disp_t * tmp = cur;
+                            cur = lv_disp_get_next(tmp);
+                            monitor_t * m = tmp->driver->user_data;
+                            SDL_Renderer *renderer = SDL_GetRenderer(window);
+                            if (m->drv_param.renderer != renderer) continue;
+                            SDL_DestroyTexture(tmp->driver->draw_buf->buf1);
+                            SDL_DestroyRenderer(m->drv_param.renderer);
+                            lv_disp_remove(tmp);
+                        }
+
+                        break;
+                    }
+                    default:
+                        break;
+                }
+                break;
             }
         }
     }
@@ -207,11 +230,13 @@ static void sdl_event_handler(lv_timer_t * t)
 
 static void monitor_sdl_clean_up(void)
 {
-    for (lv_disp_t *cur = lv_disp_get_next(NULL); cur; cur = lv_disp_get_next(cur)) {
-        monitor_t *m = cur->driver->user_data;
-        SDL_DestroyTexture(m->context.texture);
-        SDL_DestroyRenderer(m->context.renderer);
-        SDL_DestroyWindow(m->window);
+    for (lv_disp_t *cur = lv_disp_get_next(NULL); cur; ) {
+        lv_disp_t * tmp = cur;
+        monitor_t * m = tmp->driver->user_data;
+        SDL_DestroyTexture(tmp->driver->draw_buf->buf1);
+        SDL_DestroyRenderer(m->drv_param.renderer);
+        cur = lv_disp_get_next(cur);
+        lv_disp_remove(tmp);
     }
 
     SDL_Quit();
@@ -219,24 +244,22 @@ static void monitor_sdl_clean_up(void)
 
 static void window_create(monitor_t * m)
 {
-    lv_draw_sdl_context_init(&m->context);
+//    SDL_SetHint( SDL_HINT_RENDER_SCALE_QUALITY, "1");
     m->window = SDL_CreateWindow("TFT Simulator",
                               SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                              SDL_HOR_RES * SDL_ZOOM, SDL_VER_RES * SDL_ZOOM, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
+                              SDL_HOR_RES * SDL_ZOOM, SDL_VER_RES * SDL_ZOOM, SDL_WINDOW_RESIZABLE);
 
-    m->context.renderer = SDL_CreateRenderer(m->window, -1, SDL_RENDERER_ACCELERATED);
-    m->context.texture = SDL_CreateTexture(m->context.renderer, LV_DRAW_SDL_TEXTURE_FORMAT,
-                                           SDL_TEXTUREACCESS_TARGET, SDL_HOR_RES, SDL_VER_RES);
-    SDL_SetTextureBlendMode(m->context.texture, SDL_BLENDMODE_BLEND);
+    m->drv_param.renderer = SDL_CreateRenderer(m->window, -1, SDL_RENDERER_ACCELERATED);
+
+    m->texture = lv_draw_sdl_create_screen_texture(m->drv_param.renderer, SDL_HOR_RES, SDL_VER_RES);
     /* For first frame */
-    SDL_SetRenderTarget(m->context.renderer, m->context.texture);
+    SDL_SetRenderTarget(m->drv_param.renderer, m->texture);
 }
 
-static void window_update(lv_disp_drv_t *disp_drv)
+static void window_update(lv_disp_drv_t *disp_drv, void * buf)
 {
-    lv_draw_sdl_context_t *context = disp_drv->user_data;
-    SDL_Renderer *renderer = context->renderer;
-    SDL_Texture *texture = context->texture;
+    SDL_Renderer *renderer = ((lv_draw_sdl_drv_param_t *) disp_drv->user_data)->renderer;
+    SDL_Texture *texture = buf;
     SDL_SetRenderTarget(renderer, NULL);
     SDL_RenderClear(renderer);
 #if LV_COLOR_SCREEN_TRANSP
