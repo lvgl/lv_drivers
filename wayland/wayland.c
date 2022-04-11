@@ -137,6 +137,7 @@ struct graphic_object
     struct window *window;
 
     struct wl_surface *surface;
+    bool surface_configured;
     struct wl_subsurface *subsurface;
 
     enum object_type type;
@@ -1083,7 +1084,19 @@ static const struct wl_shell_surface_listener shell_surface_listener = {
 #if LV_WAYLAND_XDG_SHELL
 static void xdg_surface_handle_configure(void *data, struct xdg_surface *xdg_surface, uint32_t serial)
 {
-    return xdg_surface_ack_configure(xdg_surface, serial);
+    struct window *window = (struct window *)data;
+    struct buffer_hdl *buffer = &window->body->buffer;
+
+    xdg_surface_ack_configure(xdg_surface, serial);
+
+    if ((!window->body->surface_configured) && (buffer->busy)) {
+       // Flush occured before surface was configured, so add buffer here
+       wl_surface_attach(window->body->surface, buffer->wl_buffer, 0, 0);
+       wl_surface_commit(window->body->surface);
+       window->flush_pending = true;
+    }
+
+    window->body->surface_configured = true;
 }
 
 static const struct xdg_surface_listener xdg_surface_listener = {
@@ -1385,6 +1398,7 @@ static struct graphic_object * create_graphic_obj(struct application *app, struc
         goto err_out;
     }
 
+    obj->surface_configured = true;
     wl_surface_set_user_data(obj->surface, obj);
 
     return obj;
@@ -1768,6 +1782,12 @@ static struct window *create_window(struct application *app, int width, int heig
         xdg_toplevel_add_listener(window->xdg_toplevel, &xdg_toplevel_listener, window);
         xdg_toplevel_set_title(window->xdg_toplevel, title);
         xdg_toplevel_set_app_id(window->xdg_toplevel, title);
+
+        // XDG surfaces need to be configured before a buffer can be attached.
+        // An (XDG) surface commit (without an attached buffer) triggers this
+        // configure event
+        window->body->surface_configured = false;
+        wl_surface_commit(window->body->surface);
     }
 #endif
 #if LV_WAYLAND_WL_SHELL
@@ -1953,8 +1973,10 @@ static void _lv_wayland_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv
 
     if (lv_disp_flush_is_last(disp_drv))
     {
-        wl_surface_attach(window->body->surface, buffer->wl_buffer, 0, 0);
-        wl_surface_commit(window->body->surface);
+        if (window->body->surface_configured) {
+           wl_surface_attach(window->body->surface, buffer->wl_buffer, 0, 0);
+           wl_surface_commit(window->body->surface);
+        }
         buffer->busy = true;
         window->flush_pending = true;
     }
