@@ -1984,17 +1984,21 @@ static void _lv_wayland_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv
     lv_disp_flush_ready(disp_drv);
 }
 
-static void _lv_wayland_cycle(lv_timer_t * tmr)
+static void _lv_wayland_handle_input(void)
 {
-    struct window *window = NULL;
-    bool shall_flush = application.cursor_flush_pending;
-
-    LV_UNUSED(tmr);
-
     while (wl_display_prepare_read(application.display) != 0)
     {
         wl_display_dispatch_pending(application.display);
     }
+
+    wl_display_read_events(application.display);
+    wl_display_dispatch_pending(application.display);
+}
+
+static void _lv_wayland_handle_output(void)
+{
+    struct window *window;
+    bool shall_flush = application.cursor_flush_pending;
 
     _LV_LL_READ(&application.window_ll, window)
     {
@@ -2076,9 +2080,13 @@ static void _lv_wayland_cycle(lv_timer_t * tmr)
         wl_display_flush(application.display);
         application.cursor_flush_pending = false;
     }
+}
 
-    wl_display_read_events(application.display);
-    wl_display_dispatch_pending(application.display);
+static void _lv_wayland_cycle(lv_timer_t * tmr)
+{
+    LV_UNUSED(tmr);
+    _lv_wayland_handle_input();
+    _lv_wayland_handle_output();
 }
 
 static void _lv_wayland_pointer_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
@@ -2259,6 +2267,15 @@ void lv_wayland_deinit(void)
 }
 
 /**
+ * Get Wayland display file descriptor
+ * @return Wayland display file descriptor
+ */
+int lv_wayland_get_fd(void)
+{
+    return wl_display_get_fd(application.display);
+}
+
+/**
  * Create wayland window
  * @param hor_res initial horizontal window size in pixels
  * @param ver_res initial vertical window size in pixels
@@ -2360,6 +2377,31 @@ void lv_wayland_close_window(lv_disp_t * disp)
     }
     window->shall_close = true;
     window->close_cb = NULL;
+}
+
+/**
+ * Check if a Wayland window is open on the specified display. Otherwise (if
+ * argument is NULL), check if any Wayland window is open.
+ * @return true if window open, false otherwise
+ */
+bool lv_wayland_window_is_open(lv_disp_t * disp)
+{
+    struct window *window;
+    bool open = false;
+
+    if (disp == NULL) {
+        _LV_LL_READ(&application.window_ll, window) {
+            if (!window->closed) {
+                open = true;
+                break;
+            }
+        }
+    } else {
+        window = disp->driver->user_data;
+        open = (!window->closed);
+    }
+
+   return open;
 }
 
 /**
@@ -2480,4 +2522,48 @@ lv_indev_t * lv_wayland_get_touchscreen(lv_disp_t * disp)
     return window->lv_indev_touch;
 }
 
+#ifdef LV_WAYLAND_TIMER_HANDLER
+/**
+ * Wayland specific timer handler (use in place of LVGL lv_timer_handler)
+ * @return time until next timer expiry in milliseconds
+ */
+uint32_t lv_wayland_timer_handler(void)
+{
+    int i;
+    struct window *window;
+    lv_timer_t *input_timer[4];
+    uint32_t time_till_next;
+
+    /* Remove cycle timer (as this function is doing its work) */
+    if (application.cycle_timer != NULL) {
+        lv_timer_del(application.cycle_timer);
+        application.cycle_timer = NULL;
+    }
+
+    /* Wayland input handling */
+    _lv_wayland_handle_input();
+
+    /* Ready input timers (to probe for any input recieved) */
+    _LV_LL_READ(&application.window_ll, window) {
+        input_timer[0] = window->lv_indev_pointer->driver->read_timer;
+        input_timer[1] = window->lv_indev_pointeraxis->driver->read_timer;
+        input_timer[2] = window->lv_indev_keyboard->driver->read_timer;
+        input_timer[3] = window->lv_indev_touch->driver->read_timer;
+
+        for (i = 0; i < 4; i++) {
+            if (input_timer[i]) {
+                lv_timer_ready(input_timer[i]);
+            }
+        }
+    }
+
+    /* LVGL handling */
+    time_till_next = lv_timer_handler();
+
+    /* Wayland output handling */
+    _lv_wayland_handle_output();
+
+    return time_till_next;
+}
+#endif
 #endif // USE_WAYLAND
