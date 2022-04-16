@@ -31,8 +31,7 @@
  *  STATIC VARIABLES
  **********************/
 static struct xkb_context *context = NULL;
-static struct xkb_keymap *keymap = NULL;
-static struct xkb_state *state = NULL;
+static xkb_drv_state_t default_state = { .keymap = NULL, .state = NULL };
 
 /**********************
  *      MACROS
@@ -43,64 +42,85 @@ static struct xkb_state *state = NULL;
  **********************/
 
 /**
- * Initialise the XKB system
+ * Initialise the XKB system using the default driver state. Use this function if you only want
+ * to connect a single device.
  * @return true if the initialisation was successful
  */
 bool xkb_init(void) {
-  if (context) {
-    return true; /* already initialised */
-  }
+  return xkb_init_state(&default_state);
+}
 
-  context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+/**
+ * Initialise the XKB system using a specific driver state. Use this function if you want to
+ * connect multiple devices.
+ * @param state XKB driver state to use
+ * @return true if the initialisation was successful
+ */
+bool xkb_init_state(xkb_drv_state_t *state) {
   if (!context) {
-    perror("could not create new XKB context");
-    return false;
+    context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+    if (!context) {
+      perror("could not create new XKB context");
+      return false;
+    }
   }
 
 #ifdef XKB_KEY_MAP
   struct xkb_rule_names names = XKB_KEY_MAP;
-  return xkb_set_keymap(names);
+  return xkb_set_keymap_state(state, names);
 #else
-  return false; /* Keymap needs to be set manually using xkb_set_keymap to complete initialisation */
+  return false; /* Keymap needs to be set manually using xkb_set_keymap_state to complete initialisation */
 #endif
 }
 
 /**
- * Set a new keymap to be used for processing future key events
+ * Set a new keymap to be used for processing future key events using the default driver state. Use
+ * this function if you only want to connect a single device.
  * @param names XKB rule names structure (use NULL components for default values)
  * @return true if creating the keymap and associated state succeeded
  */
 bool xkb_set_keymap(struct xkb_rule_names names) {
-  if (keymap) {
-    xkb_keymap_unref(keymap);
-    keymap = NULL;
+  return xkb_set_keymap_state(&default_state, names);
+}
+
+/**
+ * Set a new keymap to be used for processing future key events using a specific driver state. Use
+ * this function if you want to connect multiple devices.
+ * @param state XKB driver state to use
+ * @param names XKB rule names structure (use NULL components for default values)
+ * @return true if creating the keymap and associated state succeeded
+ */
+bool xkb_set_keymap_state(xkb_drv_state_t *state, struct xkb_rule_names names) {
+  if (state->keymap) {
+    xkb_keymap_unref(state->keymap);
+    state->keymap = NULL;
   }
  
-  keymap = xkb_keymap_new_from_names(context, &names, XKB_KEYMAP_COMPILE_NO_FLAGS);
-  if (!keymap) {
+  state->keymap = xkb_keymap_new_from_names(context, &names, XKB_KEYMAP_COMPILE_NO_FLAGS);
+  if (!state->keymap) {
     perror("could not create XKB keymap");
     return false;
   }
 
-  keymap = xkb_keymap_ref(keymap);
-  if (!keymap) {
+  state->keymap = xkb_keymap_ref(state->keymap);
+  if (!state->keymap) {
     perror("could not reference XKB keymap");
     return false;
   }
 
-  if (state) {
-    xkb_state_unref(state);
-    state = NULL;
+  if (state->state) {
+    xkb_state_unref(state->state);
+    state->state = NULL;
   }
 
-  state = xkb_state_new(keymap);
-  if (!state) {
+  state->state = xkb_state_new(state->keymap);
+  if (!state->state) {
     perror("could not create XKB state");
     return false;
   }
 
-  state = xkb_state_ref(state);
-  if (!state) {
+  state->state = xkb_state_ref(state->state);
+  if (!state->state) {
     perror("could not reference XKB state");
     return false;
   }
@@ -109,19 +129,31 @@ bool xkb_set_keymap(struct xkb_rule_names names) {
 }
 
 /**
- * Process an evdev scancode
+ * Process an evdev scancode using the default driver state. Use this function if you only want to
+ * connect a single device.
  * @param scancode evdev scancode to process
  * @param down true if the key was pressed, false if it was releases
- * @param state associated XKB state
  * @return the (first) UTF-8 character produced by the event or 0 if no output was produced
  */
 uint32_t xkb_process_key(uint32_t scancode, bool down) {
+  return xkb_process_key_state(&default_state, scancode, down);
+}
+
+/**
+ * Process an evdev scancode using a specific driver state. Use this function if you want to connect
+ * multiple devices.
+ * @param state XKB driver state to use
+ * @param scancode evdev scancode to process
+ * @param down true if the key was pressed, false if it was releases
+ * @return the (first) UTF-8 character produced by the event or 0 if no output was produced
+ */
+uint32_t xkb_process_key_state(xkb_drv_state_t *state, uint32_t scancode, bool down) {
   /* Offset the evdev scancode by 8, see https://xkbcommon.org/doc/current/xkbcommon_8h.html#ac29aee92124c08d1953910ab28ee1997 */
   xkb_keycode_t keycode = scancode + 8;
 
   uint32_t result = 0;
 
-  switch (xkb_state_key_get_one_sym(state, keycode)) {
+  switch (xkb_state_key_get_one_sym(state->state, keycode)) {
     case XKB_KEY_BackSpace:
       result = LV_KEY_BACKSPACE;
       break;
@@ -166,14 +198,14 @@ uint32_t xkb_process_key(uint32_t scancode, bool down) {
 
   if (result == 0) {
     char buffer[4] = { 0, 0, 0, 0 };
-    int size = xkb_state_key_get_utf8(state, keycode, NULL, 0) + 1;
+    int size = xkb_state_key_get_utf8(state->state, keycode, NULL, 0) + 1;
     if (size > 1) {
-      xkb_state_key_get_utf8(state, keycode, buffer, size);
+      xkb_state_key_get_utf8(state->state, keycode, buffer, size);
       memcpy(&result, buffer, 4);
     }
   }
 
-  xkb_state_update_key(state, keycode, down ? XKB_KEY_DOWN : XKB_KEY_UP);
+  xkb_state_update_key(state->state, keycode, down ? XKB_KEY_DOWN : XKB_KEY_UP);
 
   return result;
 }

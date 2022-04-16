@@ -43,6 +43,9 @@
 # define SDL_DUAL_DISPLAY       MONITOR_DUAL
 #endif
 
+#ifndef SDL_FULLSCREEN
+# define SDL_FULLSCREEN        0
+#endif
 
 #include <stdlib.h>
 #include <stdbool.h>
@@ -52,8 +55,6 @@
 /*********************
  *      DEFINES
  *********************/
-#define SDL_REFR_PERIOD     50  /*ms*/
-
 #ifndef KEYBOARD_BUFFER_SIZE
 #define KEYBOARD_BUFFER_SIZE SDL_TEXTINPUTEVENT_TEXT_SIZE
 #endif
@@ -130,8 +131,6 @@ void sdl_init(void)
     SDL_SetWindowPosition(monitor2.window, x - (SDL_HOR_RES * SDL_ZOOM) / 2 - 10, y);
 #endif
 
-    sdl_inited = true;
-
     SDL_StartTextInput();
 
     lv_timer_create(sdl_event_handler, 10, NULL);
@@ -139,9 +138,9 @@ void sdl_init(void)
 
 /**
  * Flush a buffer to the marked area
- * @param drv pointer to driver where this function belongs
+ * @param disp_drv pointer to driver where this function belongs
  * @param area an area where to copy `color_p`
- * @param color_p an array of pixel to copy to the `area` part of the screen
+ * @param color_p an array of pixels to copy to the `area` part of the screen
  */
 void sdl_display_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
@@ -197,9 +196,9 @@ void sdl_display_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
 
 /**
  * Flush a buffer to the marked area
- * @param drv pointer to driver where this function belongs
+ * @param disp_drv pointer to driver where this function belongs
  * @param area an area where to copy `color_p`
- * @param color_p an array of pixel to copy to the `area` part of the screen
+ * @param color_p an array of pixels to copy to the `area` part of the screen
  */
 void sdl_display_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
@@ -339,9 +338,15 @@ static void monitor_sdl_clean_up(void)
 
 static void window_create(monitor_t * m)
 {
+
+    int flag = 0;
+#if SDL_FULLSCREEN
+    flag |= SDL_WINDOW_FULLSCREEN;
+#endif
+
     m->window = SDL_CreateWindow("TFT Simulator",
                               SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                              SDL_HOR_RES * SDL_ZOOM, SDL_VER_RES * SDL_ZOOM, 0);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
+                              SDL_HOR_RES * SDL_ZOOM, SDL_VER_RES * SDL_ZOOM, flag);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
 
     m->renderer = SDL_CreateRenderer(m->window, -1, SDL_RENDERER_SOFTWARE);
     m->texture = SDL_CreateTexture(m->renderer,

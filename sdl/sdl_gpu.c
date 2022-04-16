@@ -38,8 +38,6 @@
 /*********************
  *      DEFINES
  *********************/
-#define SDL_REFR_PERIOD     50  /*ms*/
-
 #ifndef KEYBOARD_BUFFER_SIZE
 #define KEYBOARD_BUFFER_SIZE SDL_TEXTINPUTEVENT_TEXT_SIZE
 #endif
@@ -108,9 +106,9 @@ void sdl_disp_drv_init(lv_disp_drv_t * disp_drv, lv_coord_t hor_res, lv_coord_t 
 
 /**
  * Flush a buffer to the marked area
- * @param drv pointer to driver where this function belongs
+ * @param disp_drv pointer to driver where this function belongs
  * @param area an area where to copy `color_p`
- * @param color_p an array of pixel to copy to the `area` part of the screen
+ * @param color_p an array of pixels to copy to the `area` part of the screen
  */
 void sdl_display_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {

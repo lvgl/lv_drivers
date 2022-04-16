@@ -38,7 +38,7 @@ int map(int x, int in_min, int in_max, int out_min, int out_max);
 /**********************
  *  STATIC VARIABLES
  **********************/
-int evdev_fd;
+int evdev_fd = -1;
 int evdev_root_x;
 int evdev_root_y;
 int evdev_button;
@@ -58,26 +58,9 @@ int evdev_key_val;
  */
 void evdev_init(void)
 {
-#if USE_BSD_EVDEV
-    evdev_fd = open(EVDEV_NAME, O_RDWR | O_NOCTTY);
-#else
-    evdev_fd = open(EVDEV_NAME, O_RDWR | O_NOCTTY | O_NDELAY);
-#endif
-    if(evdev_fd == -1) {
-        perror("unable open evdev interface:");
+    if (!evdev_set_file(EVDEV_NAME)) {
         return;
     }
-
-#if USE_BSD_EVDEV
-    fcntl(evdev_fd, F_SETFL, O_NONBLOCK);
-#else
-    fcntl(evdev_fd, F_SETFL, O_ASYNC | O_NONBLOCK);
-#endif
-
-    evdev_root_x = 0;
-    evdev_root_y = 0;
-    evdev_key_val = 0;
-    evdev_button = LV_INDEV_STATE_REL;
 
 #if USE_XKB
     xkb_init();
@@ -101,7 +84,7 @@ bool evdev_set_file(char* dev_name)
 #endif
 
      if(evdev_fd == -1) {
-        perror("unable open evdev interface:");
+        perror("unable to open evdev interface:");
         return false;
      }
 
@@ -165,11 +148,12 @@ void evdev_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
                                 #else
                                         evdev_root_y = in.value;
                                 #endif
-            else if(in.code == ABS_MT_TRACKING_ID)
+            else if(in.code == ABS_MT_TRACKING_ID) {
                                 if(in.value == -1)
                                     evdev_button = LV_INDEV_STATE_REL;
                                 else if(in.value == 0)
                                     evdev_button = LV_INDEV_STATE_PR;
+            }
         } else if(in.type == EV_KEY) {
             if(in.code == BTN_MOUSE || in.code == BTN_TOUCH) {
                 if(in.value == 0)
