@@ -1940,6 +1940,12 @@ static void _lv_wayland_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv
         lv_disp_flush_ready(disp_drv);
         return;
     }
+    else if (buffer->busy)
+    {
+        LV_LOG_WARN("skip flush since wayland backing buffer is busy");
+        lv_disp_flush_ready(disp_drv);
+        return;
+    }
 
     int32_t x;
     int32_t y;
@@ -2066,19 +2072,31 @@ static void _lv_wayland_handle_output(void)
                 window->resize_width = window->width;
                 window->resize_height = window->height;
                 window->resize_pending = false;
+                shall_flush = true;
             }
         }
-        else
-        {
-            shall_flush |= window->flush_pending;
-        }
-        window->flush_pending = false;
+
+        shall_flush |= window->flush_pending;
     }
 
     if (shall_flush)
     {
-        wl_display_flush(application.display);
-        application.cursor_flush_pending = false;
+        if (wl_display_flush(application.display) == -1)
+        {
+            if (errno != EAGAIN)
+            {
+                LV_LOG_ERROR("failed to flush wayland display");
+            }
+        }
+        else
+        {
+            /* All data flushed */
+            application.cursor_flush_pending = false;
+            _LV_LL_READ(&application.window_ll, window)
+            {
+                window->flush_pending = false;
+            }
+        }
     }
 }
 
@@ -2389,19 +2407,56 @@ bool lv_wayland_window_is_open(lv_disp_t * disp)
     struct window *window;
     bool open = false;
 
-    if (disp == NULL) {
-        _LV_LL_READ(&application.window_ll, window) {
-            if (!window->closed) {
+    if (disp == NULL)
+    {
+        _LV_LL_READ(&application.window_ll, window)
+        {
+            if (!window->closed)
+            {
                 open = true;
                 break;
             }
         }
-    } else {
+    }
+    else
+    {
         window = disp->driver->user_data;
         open = (!window->closed);
     }
 
    return open;
+}
+
+/**
+ * Check if a Wayland flush is outstanding (i.e. data still needs to be sent to
+ * the compositor, but the compositor pipe/connection  is unable to take more
+ * data at this time) for a window on the specified display. Otherwise (if
+ * argument is NULL), check if any window flush is outstanding.
+ * @return true if a flush is outstanding, false otherwise
+ */
+bool lv_wayland_window_is_flush_pending(lv_disp_t * disp)
+{
+    struct window *window;
+    bool flush_pending = false;
+
+    if (disp == NULL)
+    {
+        _LV_LL_READ(&application.window_ll, window)
+        {
+            if (window->flush_pending)
+            {
+                flush_pending = true;
+                break;
+            }
+        }
+    }
+    else
+    {
+        window = disp->driver->user_data;
+        flush_pending = window->flush_pending;
+    }
+
+    return flush_pending;
 }
 
 /**
@@ -2535,7 +2590,8 @@ uint32_t lv_wayland_timer_handler(void)
     uint32_t time_till_next;
 
     /* Remove cycle timer (as this function is doing its work) */
-    if (application.cycle_timer != NULL) {
+    if (application.cycle_timer != NULL)
+    {
         lv_timer_del(application.cycle_timer);
         application.cycle_timer = NULL;
     }
@@ -2544,14 +2600,17 @@ uint32_t lv_wayland_timer_handler(void)
     _lv_wayland_handle_input();
 
     /* Ready input timers (to probe for any input recieved) */
-    _LV_LL_READ(&application.window_ll, window) {
+    _LV_LL_READ(&application.window_ll, window)
+    {
         input_timer[0] = window->lv_indev_pointer->driver->read_timer;
         input_timer[1] = window->lv_indev_pointeraxis->driver->read_timer;
         input_timer[2] = window->lv_indev_keyboard->driver->read_timer;
         input_timer[3] = window->lv_indev_touch->driver->read_timer;
 
-        for (i = 0; i < 4; i++) {
-            if (input_timer[i]) {
+        for (i = 0; i < 4; i++)
+        {
+            if (input_timer[i])
+            {
                 lv_timer_ready(input_timer[i]);
             }
         }
