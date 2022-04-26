@@ -1,10 +1,10 @@
 /**
- * @file sdl.h
+ * @file sdl_common.h
  *
  */
 
-#ifndef SDL_H
-#define SDL_H
+#ifndef SDL_COMMON_H
+#define SDL_COMMON_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,14 +21,19 @@ extern "C" {
 #endif
 #endif
 
-#if USE_MONITOR || USE_SDL
-
-#include "sdl_common.h"
-
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
 #include "lvgl.h"
 #else
 #include "lvgl/lvgl.h"
+#endif
+
+#ifndef SDL_INCLUDE_PATH
+#define SDL_INCLUDE_PATH MONITOR_SDL_INCLUDE_PATH
+#endif
+#include SDL_INCLUDE_PATH
+
+#ifndef SDL_ZOOM
+#define SDL_ZOOM MONITOR_ZOOM
 #endif
 
 /*********************
@@ -42,6 +47,7 @@ extern "C" {
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
+extern volatile bool sdl_quit_qry;
 
 /**
  * Initialize SDL to be used as display, mouse and mouse wheel drivers.
@@ -50,19 +56,11 @@ void sdl_init(void);
 
 /**
  * Flush a buffer to the marked area
- * @param disp_drv pointer to driver where this function belongs
+ * @param drv pointer to driver where this function belongs
  * @param area an area where to copy `color_p`
- * @param color_p an array of pixels to copy to the `area` part of the screen
+ * @param color_p an array of pixel to copy to the `area` part of the screen
  */
 void sdl_display_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p);
-
-/**
- * Flush a buffer to the marked area
- * @param disp_drv pointer to driver where this function belongs
- * @param area an area where to copy `color_p`
- * @param color_p an array of pixels to copy to the `area` part of the screen
- */
-void sdl_display_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p);
 
 /**
  * Get the current position and state of the mouse
@@ -85,19 +83,19 @@ void sdl_mousewheel_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
  */
 void sdl_keyboard_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
 
-/*For backward compatibility. Will be removed.*/
-#define monitor_init sdl_init
-#define monitor_flush sdl_display_flush
-#define monitor_flush2 sdl_display_flush2
+int quit_filter(void * userdata, SDL_Event * event);
+
+void mouse_handler(SDL_Event * event);
+void mousewheel_handler(SDL_Event * event);
+uint32_t keycode_to_ctrl_key(SDL_Keycode sdl_key);
+void keyboard_handler(SDL_Event * event);
 
 /**********************
  *      MACROS
  **********************/
 
-#endif /* USE_MONITOR || USE_SDL */
-
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
 
-#endif /* SDL_H */
+#endif /* SDL_COMMON_H */
