@@ -9,7 +9,7 @@
 #include "sdl_gpu.h"
 #if USE_SDL_GPU
 
-#if LV_USE_DRAW_SDL == 0
+#if LV_USE_GPU_SDL == 0
 # error "LV_USE_DRAW_SDL must be enabled"
 #endif
 
@@ -261,10 +261,10 @@ static void window_update(lv_disp_drv_t *disp_drv, void * buf)
     SDL_SetRenderTarget(renderer, NULL);
     SDL_RenderClear(renderer);
 #if LV_COLOR_SCREEN_TRANSP
-    SDL_SetRenderDrawColor(m->renderer, 0xff, 0, 0, 0xff);
+    SDL_SetRenderDrawColor(renderer, 0xff, 0, 0, 0xff);
     SDL_Rect r;
     r.x = 0; r.y = 0; r.w = SDL_HOR_RES; r.h = SDL_VER_RES;
-    SDL_RenderDrawRect(m->renderer, &r);
+    SDL_RenderDrawRect(renderer, &r);
 #endif
 
     /*Update the renderer with the texture containing the rendered image*/
