@@ -132,10 +132,6 @@ static void lv_win32_display_driver_flush_callback(
     const lv_area_t* area,
     lv_color_t* color_p);
 
-static void lv_win32_display_driver_rounder_callback(
-    lv_disp_drv_t* disp_drv,
-    lv_area_t* area);
-
 static void lv_win32_pointer_driver_read_callback(
     lv_indev_drv_t* indev_drv,
     lv_indev_data_t* data);
@@ -329,11 +325,22 @@ EXTERN_C bool lv_win32_init(
     g_buffer_dc_handle = hNewBufferDC;
 
     static lv_disp_draw_buf_t display_buffer;
+#if (LV_COLOR_DEPTH == 32) || \
+    (LV_COLOR_DEPTH == 16 && LV_COLOR_16_SWAP == 0) || \
+    (LV_COLOR_DEPTH == 8) || \
+    (LV_COLOR_DEPTH == 1)
+    lv_disp_draw_buf_init(
+        &display_buffer,
+        (lv_color_t*)g_pixel_buffer,
+        NULL,
+        hor_res * ver_res);
+#else
     lv_disp_draw_buf_init(
         &display_buffer,
         (lv_color_t*)malloc(hor_res * ver_res * sizeof(lv_color_t)),
         NULL,
         hor_res * ver_res);
+#endif
 
     static lv_disp_drv_t display_driver;
     lv_disp_drv_init(&display_driver);
@@ -341,7 +348,7 @@ EXTERN_C bool lv_win32_init(
     display_driver.ver_res = ver_res;
     display_driver.flush_cb = lv_win32_display_driver_flush_callback;
     display_driver.draw_buf = &display_buffer;
-    display_driver.rounder_cb = lv_win32_display_driver_rounder_callback;
+    display_driver.direct_mode = 1;
     g_display = lv_disp_drv_register(&display_driver);
 
     static lv_indev_drv_t pointer_driver;
@@ -418,7 +425,7 @@ static HDC lv_win32_create_frame_buffer(
 #else
             BITMAPINFO BitmapInfo = { 0 };
 #endif
-            
+
             BitmapInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
             BitmapInfo.bmiHeader.biWidth = Width;
             BitmapInfo.bmiHeader.biHeight = -Height;
@@ -483,7 +490,7 @@ static HDC lv_win32_create_frame_buffer(
 #else
                 *PixelBufferSize = Width * Height * sizeof(UINT32);
 #endif
-             
+
                 DeleteObject(SelectObject(hFrameBufferDC, hBitmap));
                 DeleteObject(hBitmap);
             }
@@ -500,7 +507,7 @@ static HDC lv_win32_create_frame_buffer(
 
 static BOOL lv_win32_enable_child_window_dpi_message(
     HWND WindowHandle)
-{ 
+{
     // This hack is only for Windows 10 TH1/TH2 only.
     // We don't need this hack if the Per Monitor Aware V2 is existed.
     OSVERSIONINFOEXW OSVersionInfoEx = { 0 };
@@ -674,79 +681,66 @@ static void lv_win32_display_driver_flush_callback(
     const lv_area_t* area,
     lv_color_t* color_p)
 {
+    if (lv_disp_flush_is_last(disp_drv))
+    {
 #if (LV_COLOR_DEPTH == 32) || \
     (LV_COLOR_DEPTH == 16 && LV_COLOR_16_SWAP == 0) || \
     (LV_COLOR_DEPTH == 8) || \
     (LV_COLOR_DEPTH == 1)
-    UNREFERENCED_PARAMETER(area);
-    memcpy(g_pixel_buffer, color_p, g_pixel_buffer_size);
+        UNREFERENCED_PARAMETER(area);
+        UNREFERENCED_PARAMETER(color_p);
 #elif (LV_COLOR_DEPTH == 16 && LV_COLOR_16_SWAP != 0)
-    SIZE_T count = g_pixel_buffer_size / sizeof(UINT16);
-    PUINT16 source = (PUINT16)color_p;
-    PUINT16 destination = (PUINT16)g_pixel_buffer;
-    for (SIZE_T i = 0; i < count; ++i)
-    {
-        UINT16 current = *source;
-        *destination = (LOBYTE(current) << 8) | HIBYTE(current);
-
-        ++source;
-        ++destination;
-    }
-#else
-    for (int y = area->y1; y <= area->y2; ++y)
-    {
-        for (int x = area->x1; x <= area->x2; ++x)
+        SIZE_T count = g_pixel_buffer_size / sizeof(UINT16);
+        PUINT16 source = (PUINT16)color_p;
+        PUINT16 destination = (PUINT16)g_pixel_buffer;
+        for (SIZE_T i = 0; i < count; ++i)
         {
-            g_pixel_buffer[y * disp_drv->hor_res + x] = lv_color_to32(*color_p);
-            color_p++;
+            UINT16 current = *source;
+            *destination = (LOBYTE(current) << 8) | HIBYTE(current);
+
+            ++source;
+            ++destination;
         }
-    }
+#else
+        for (int y = area->y1; y <= area->y2; ++y)
+        {
+            for (int x = area->x1; x <= area->x2; ++x)
+            {
+                g_pixel_buffer[y * disp_drv->hor_res + x] = lv_color_to32(*color_p);
+                color_p++;
+            }
+        }
 #endif
 
-    HDC hWindowDC = GetDC(g_window_handle);
-    if (hWindowDC)
-    {
-        int PreviousMode = SetStretchBltMode(
-            hWindowDC,
-            HALFTONE);
+        HDC hWindowDC = GetDC(g_window_handle);
+        if (hWindowDC)
+        {
+            SetStretchBltMode(hWindowDC, HALFTONE);
 
-        StretchBlt(
-            hWindowDC,
-            0,
-            0,
-            MulDiv(
-                disp_drv->hor_res * WIN32DRV_MONITOR_ZOOM,
-                g_dpi_value,
-                USER_DEFAULT_SCREEN_DPI),
-            MulDiv(
-                disp_drv->ver_res * WIN32DRV_MONITOR_ZOOM,
-                g_dpi_value,
-                USER_DEFAULT_SCREEN_DPI),
-            g_buffer_dc_handle,
-            0,
-            0,
-            disp_drv->hor_res,
-            disp_drv->ver_res,
-            SRCCOPY);
+            StretchBlt(
+                hWindowDC,
+                0,
+                0,
+                MulDiv(
+                    disp_drv->hor_res * WIN32DRV_MONITOR_ZOOM,
+                    g_dpi_value,
+                    USER_DEFAULT_SCREEN_DPI),
+                MulDiv(
+                    disp_drv->ver_res * WIN32DRV_MONITOR_ZOOM,
+                    g_dpi_value,
+                    USER_DEFAULT_SCREEN_DPI),
+                g_buffer_dc_handle,
+                0,
+                0,
+                disp_drv->hor_res,
+                disp_drv->ver_res,
+                SRCCOPY);
 
-        SetStretchBltMode(
-            hWindowDC,
-            PreviousMode);
-
-        ReleaseDC(g_window_handle, hWindowDC);
+            ReleaseDC(g_window_handle, hWindowDC);
+        }
     }
 
     lv_disp_flush_ready(disp_drv);
-}
-
-static void lv_win32_display_driver_rounder_callback(
-    lv_disp_drv_t* disp_drv,
-    lv_area_t* area)
-{
-    area->x1 = 0;
-    area->x2 = disp_drv->hor_res - 1;
-    area->y1 = 0;
-    area->y2 = disp_drv->ver_res - 1;
 }
 
 static void lv_win32_pointer_driver_read_callback(
