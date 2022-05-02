@@ -27,6 +27,8 @@ extern "C" {
 #include "lvgl/lvgl.h"
 #endif
 
+#if USE_SDL || USE_SDL_GPU
+
 #ifndef SDL_INCLUDE_PATH
 #define SDL_INCLUDE_PATH MONITOR_SDL_INCLUDE_PATH
 #endif
@@ -93,6 +95,7 @@ void keyboard_handler(SDL_Event * event);
 /**********************
  *      MACROS
  **********************/
+#endif /* USE_SDL || USE_SDL_GPU */
 
 #ifdef __cplusplus
 } /* extern "C" */

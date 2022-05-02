@@ -4,6 +4,7 @@
 
 #include "sdl_common.h"
 
+#if USE_SDL || USE_SDL_GPU
 /*********************
  *      DEFINES
  *********************/
@@ -262,4 +263,4 @@ uint32_t keycode_to_ctrl_key(SDL_Keycode sdl_key)
     }
 }
 
-
+#endif  /* USE_SDL || USD_SDL_GPU */
