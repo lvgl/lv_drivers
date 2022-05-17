@@ -374,12 +374,13 @@ static void window_update(monitor_t * m)
     SDL_UpdateTexture(m->texture, NULL, m->tft_fb_act, SDL_HOR_RES * sizeof(uint32_t));
 #endif
     SDL_RenderClear(m->renderer);
-#if LV_COLOR_SCREEN_TRANSP
-    SDL_SetRenderDrawColor(m->renderer, 0xff, 0, 0, 0xff);
-    SDL_Rect r;
-    r.x = 0; r.y = 0; r.w = SDL_HOR_RES; r.h = SDL_VER_RES;
-    SDL_RenderDrawRect(m->renderer, &r);
-#endif
+    lv_disp_t * d = _lv_refr_get_disp_refreshing();
+    if(d->driver->screen_transp) {
+        SDL_SetRenderDrawColor(m->renderer, 0xff, 0, 0, 0xff);
+        SDL_Rect r;
+        r.x = 0; r.y = 0; r.w = SDL_HOR_RES; r.h = SDL_VER_RES;
+        SDL_RenderDrawRect(m->renderer, &r);
+    }
 
     /*Update the renderer with the texture containing the rendered image*/
     SDL_RenderCopy(m->renderer, m->texture, NULL, NULL);
