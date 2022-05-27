@@ -359,7 +359,7 @@ static void reset_scanned_devices(void) {
     return;
   }
 
-  for (int i = 0; i < num_devices; ++i) {
+  for (size_t i = 0; i < num_devices; ++i) {
     free(devices[i].path);
   }
   free(devices);
@@ -476,12 +476,14 @@ static void read_keypad(libinput_drv_state_t *state, struct libinput_event *even
 
 static int open_restricted(const char *path, int flags, void *user_data)
 {
+  LV_UNUSED(user_data);
   int fd = open(path, flags);
   return fd < 0 ? -errno : fd;
 }
 
 static void close_restricted(int fd, void *user_data)
 {
+  LV_UNUSED(user_data);
   close(fd);
 }
 
