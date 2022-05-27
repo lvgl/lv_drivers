@@ -43,7 +43,7 @@ extern "C" {
 void fbdev_init(void);
 void fbdev_exit(void);
 void fbdev_flush(lv_disp_drv_t * drv, const lv_area_t * area, lv_color_t * color_p);
-void fbdev_get_sizes(uint32_t *width, uint32_t *height);
+void fbdev_get_sizes(uint32_t *width, uint32_t *height, uint32_t *dpi);
 /**
  * Set the X and Y offset in the variable framebuffer info.
  * @param xoffset horizontal offset
