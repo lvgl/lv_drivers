@@ -120,10 +120,10 @@ HWND windrv_init(void)
     ShowWindow(hwnd, SW_SHOWDEFAULT);
     UpdateWindow(hwnd);
 
-
-    lv_task_create(msg_handler, 0, LV_TASK_PRIO_HIGHEST, NULL);
+    lv_timer_create((lv_timer_cb_t) msg_handler, 0, NULL);
     lv_win_exit_flag = false;
     do_register();
+    return hwnd;
 }
 
 /**********************
@@ -134,7 +134,7 @@ static void do_register(void)
 {
     static lv_disp_draw_buf_t disp_buf_1;
     static lv_color_t buf1_1[WINDOW_HOR_RES * 100];                      /*A buffer for 10 rows*/
-    lv_disp_draw_buf_init(&disp_draw_buf_1, buf1_1, NULL, WINDOW_HOR_RES * 100);   /*Initialize the display buffer*/
+    lv_disp_draw_buf_init(&disp_buf_1, buf1_1, NULL, WINDOW_HOR_RES * 100);   /*Initialize the display buffer*/
 
 
     /*-----------------------------------
