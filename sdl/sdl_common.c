@@ -223,6 +223,9 @@ void keyboard_handler(SDL_Event * event)
 uint32_t keycode_to_ctrl_key(SDL_Keycode sdl_key)
 {
     /*Remap some key to LV_KEY_... to manage groups*/
+    
+    SDL_Keymod mode = SDL_GetModState();
+    
     switch(sdl_key) {
         case SDLK_RIGHT:
         case SDLK_KP_PLUS:
@@ -252,6 +255,8 @@ uint32_t keycode_to_ctrl_key(SDL_Keycode sdl_key)
             return LV_KEY_ENTER;
 
         case SDLK_TAB:
+            return (mode & KMOD_SHIFT)? LV_KEY_PREV: LV_KEY_NEXT;
+            
         case SDLK_PAGEDOWN:
             return LV_KEY_NEXT;
 
