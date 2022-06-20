@@ -274,7 +274,8 @@ static bool rescan_devices(void) {
       continue;
     }
 
-    char *path = malloc((11 + strlen(ent->d_name)) * sizeof(char));
+    /* 11 characters for /dev/input/ + length of name + 1 NUL terminator */
+    char *path = malloc((11 + strlen(ent->d_name) + 1) * sizeof(char));
     if (!path) {
       perror("could not allocate memory for device node path");
       libinput_unref(context);
