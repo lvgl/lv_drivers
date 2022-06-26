@@ -1135,9 +1135,19 @@ static void xdg_toplevel_handle_close(void *data, struct xdg_toplevel *xdg_tople
     window->shall_close = true;
 }
 
+static void xdg_toplevel_handle_configure_bounds(void *data, struct xdg_toplevel *xdg_toplevel,
+                                                 int32_t width, int32_t height)
+{
+    struct window *window = (struct window *)data;
+    /* Optional: Could set window width/height upper bounds, however, currently
+     *           we'll honor the set width/height.
+     */
+}
+
 static const struct xdg_toplevel_listener xdg_toplevel_listener = {
     .configure = xdg_toplevel_handle_configure,
     .close = xdg_toplevel_handle_close,
+    .configure_bounds = xdg_toplevel_handle_configure_bounds
 };
 
 static void xdg_wm_base_ping(void *data, struct xdg_wm_base *xdg_wm_base, uint32_t serial)
