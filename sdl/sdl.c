@@ -144,8 +144,8 @@ void sdl_init(void)
  */
 void sdl_display_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
-    lv_coord_t hres = disp_drv->hor_res;
-    lv_coord_t vres = disp_drv->ver_res;
+    const lv_coord_t hres = disp_drv->physical_hor_res == -1 ? disp_drv->hor_res : disp_drv->physical_hor_res;
+    const lv_coord_t vres = disp_drv->physical_ver_res == -1 ? disp_drv->ver_res : disp_drv->physical_ver_res;
 
 //    printf("x1:%d,y1:%d,x2:%d,y2:%d\n", area->x1, area->y1, area->x2, area->y2);
 
@@ -162,17 +162,17 @@ void sdl_display_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
     int32_t y;
 #if LV_COLOR_DEPTH != 24 && LV_COLOR_DEPTH != 32    /*32 is valid but support 24 for backward compatibility too*/
     int32_t x;
-    for(y = area->y1; y <= area->y2 && y < disp_drv->ver_res; y++) {
+    for(y = area->y1; y <= area->y2 && y < vres; y++) {
         for(x = area->x1; x <= area->x2; x++) {
-            monitor.tft_fb[y * disp_drv->hor_res + x] = lv_color_to32(*color_p);
+            monitor.tft_fb[y * hres + x] = lv_color_to32(*color_p);
             color_p++;
         }
 
     }
 #else
     uint32_t w = lv_area_get_width(area);
-    for(y = area->y1; y <= area->y2 && y < disp_drv->ver_res; y++) {
-        memcpy(&monitor.tft_fb[y * SDL_HOR_RES + area->x1], color_p, w * sizeof(lv_color_t));
+    for(y = area->y1; y <= area->y2 && y < vres; y++) {
+        memcpy(&monitor.tft_fb[y * hres + area->x1], color_p, w * sizeof(lv_color_t));
         color_p += w;
     }
 #endif
@@ -202,8 +202,8 @@ void sdl_display_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
  */
 void sdl_display_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
-    lv_coord_t hres = disp_drv->hor_res;
-    lv_coord_t vres = disp_drv->ver_res;
+    const lv_coord_t hres = disp_drv->physical_hor_res == -1 ? disp_drv->hor_res : disp_drv->physical_hor_res;
+    const lv_coord_t vres = disp_drv->physical_ver_res == -1 ? disp_drv->ver_res : disp_drv->physical_ver_res;
 
     /*Return if the area is out the screen*/
     if(area->x2 < 0 || area->y2 < 0 || area->x1 > hres - 1 || area->y1 > vres - 1) {
@@ -223,17 +223,17 @@ void sdl_display_flush2(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_col
     int32_t y;
 #if LV_COLOR_DEPTH != 24 && LV_COLOR_DEPTH != 32    /*32 is valid but support 24 for backward compatibility too*/
     int32_t x;
-    for(y = area->y1; y <= area->y2 && y < disp_drv->ver_res; y++) {
+    for(y = area->y1; y <= area->y2 && y < vres; y++) {
         for(x = area->x1; x <= area->x2; x++) {
-            monitor2.tft_fb[y * disp_drv->hor_res + x] = lv_color_to32(*color_p);
+            monitor2.tft_fb[y * hres + x] = lv_color_to32(*color_p);
             color_p++;
         }
 
     }
 #else
     uint32_t w = lv_area_get_width(area);
-    for(y = area->y1; y <= area->y2 && y < disp_drv->ver_res; y++) {
-        memcpy(&monitor2.tft_fb[y * disp_drv->hor_res + area->x1], color_p, w * sizeof(lv_color_t));
+    for(y = area->y1; y <= area->y2 && y < vres; y++) {
+        memcpy(&monitor2.tft_fb[y * hres + area->x1], color_p, w * sizeof(lv_color_t));
         color_p += w;
     }
 #endif
