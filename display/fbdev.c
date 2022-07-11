@@ -101,7 +101,7 @@ void fbdev_init(void)
     // Make sure that the display is on.
     if (ioctl(fbfd, FBIOBLANK, FB_BLANK_UNBLANK) != 0) {
         perror("ioctl(FBIOBLANK)");
-        return;
+        // Don't return. Some framebuffer drivers like efifb or simplefb don't implement FBIOBLANK.
     }
 
 #if USE_BSD_FBDEV
