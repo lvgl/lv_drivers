@@ -47,6 +47,7 @@
 # define SDL_FULLSCREEN        0
 #endif
 
+#include "sdl_common_internal.h"
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>

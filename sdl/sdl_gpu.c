@@ -29,6 +29,7 @@
 # error "Cannot enable both MONITOR and SDL at the same time. "
 #endif
 
+#include "sdl_common_internal.h"
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>

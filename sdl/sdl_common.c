@@ -5,6 +5,8 @@
 #include "sdl_common.h"
 
 #if USE_SDL || USE_SDL_GPU
+#include "sdl_common_internal.h"
+
 /*********************
  *      DEFINES
  *********************/

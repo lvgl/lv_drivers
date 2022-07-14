@@ -32,7 +32,6 @@ extern "C" {
 #ifndef SDL_INCLUDE_PATH
 #define SDL_INCLUDE_PATH MONITOR_SDL_INCLUDE_PATH
 #endif
-#include SDL_INCLUDE_PATH
 
 #ifndef SDL_ZOOM
 #define SDL_ZOOM MONITOR_ZOOM
@@ -85,16 +84,6 @@ void sdl_mousewheel_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
  */
 void sdl_keyboard_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
 
-int quit_filter(void * userdata, SDL_Event * event);
-
-void mouse_handler(SDL_Event * event);
-void mousewheel_handler(SDL_Event * event);
-uint32_t keycode_to_ctrl_key(SDL_Keycode sdl_key);
-void keyboard_handler(SDL_Event * event);
-
-/**********************
- *      MACROS
- **********************/
 #endif /* USE_SDL || USE_SDL_GPU */
 
 #ifdef __cplusplus
