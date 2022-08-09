@@ -195,13 +195,30 @@ void fbdev_flush(lv_disp_drv_t * drv, const lv_area_t * area, lv_color_t * color
     long int byte_location = 0;
     unsigned char bit_location = 0;
 
-    /*32 or 24 bit per pixel*/
-    if(vinfo.bits_per_pixel == 32 || vinfo.bits_per_pixel == 24) {
+    /*32 bit per pixel*/
+    if(vinfo.bits_per_pixel == 32) {
         uint32_t * fbp32 = (uint32_t *)fbp;
         int32_t y;
         for(y = act_y1; y <= act_y2; y++) {
             location = (act_x1 + vinfo.xoffset) + (y + vinfo.yoffset) * finfo.line_length / 4;
             memcpy(&fbp32[location], (uint32_t *)color_p, (act_x2 - act_x1 + 1) * 4);
+            color_p += w;
+        }
+    }
+    /*24 bit per pixel*/
+    else if(vinfo.bits_per_pixel == 24 && LV_COLOR_DEPTH == 32) {
+        uint8_t * fbp8 = (uint8_t *)fbp;
+        lv_coord_t x;
+        int32_t y;
+        uint8_t *pixel;
+        for(y = act_y1; y <= act_y2; y++) {
+            location = (act_x1 + vinfo.xoffset) + (y + vinfo.yoffset) * finfo.line_length / 3;
+            for (x = 0; x < w; ++x) {
+                pixel = (uint8_t *)(&color_p[x]);
+                fbp8[3 * (location + x)] = pixel[0];
+                fbp8[3 * (location + x) + 1] = pixel[1];
+                fbp8[3 * (location + x) + 2] = pixel[2];
+            }
             color_p += w;
         }
     }
