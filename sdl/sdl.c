@@ -9,8 +9,8 @@
 #include "sdl.h"
 #if USE_MONITOR || USE_SDL
 
-#if defined(LV_USE_GPU_SDL) && LV_USE_GPU_SDL
-# error "LV_USE_GPU_SDL must not be enabled"
+#if LV_USE_DRAW_SDL 
+# error "LV_USE_DRAW_SDL must not be enabled"
 #endif
 
 #if USE_MONITOR
