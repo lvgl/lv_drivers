@@ -20,7 +20,7 @@
 
 #if USE_WIN32DRV
 
-#include <Windows.h>
+#include <windows.h>
 
 #if _MSC_VER >= 1200
  // Disable compilation warnings.
