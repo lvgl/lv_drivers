@@ -1393,7 +1393,7 @@ static struct graphic_object * create_graphic_obj(struct application *app, struc
     LV_ASSERT_MALLOC(obj);
     if (!obj)
     {
-        return NULL;
+        goto err_out;
     }
 
     lv_memset(obj, 0x00, sizeof(struct graphic_object));
@@ -1405,7 +1405,7 @@ static struct graphic_object * create_graphic_obj(struct application *app, struc
     if (!obj->surface)
     {
         LV_LOG_ERROR("cannot create surface for graphic object");
-        goto err_out;
+        goto err_free;
     }
 
     obj->surface_configured = true;
