@@ -51,7 +51,7 @@
 #endif
 
 #ifndef LV_WAYLAND_CYCLE_PERIOD
-#define LV_WAYLAND_CYCLE_PERIOD LV_MIN(LV_DISP_DEF_REFR_PERIOD,1)
+#define LV_WAYLAND_CYCLE_PERIOD LV_MIN(LV_DEF_REFR_PERIOD,1)
 #endif
 
 /**********************
