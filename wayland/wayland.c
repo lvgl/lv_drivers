@@ -51,7 +51,7 @@
 #endif
 
 #ifndef LV_WAYLAND_CYCLE_PERIOD
-#define LV_WAYLAND_CYCLE_PERIOD LV_MIN(LV_DISP_DEF_REFR_PERIOD,1)
+#define LV_WAYLAND_CYCLE_PERIOD LV_MIN(LV_DEF_REFR_PERIOD,1)
 #endif
 
 /**********************
@@ -1225,7 +1225,7 @@ static bool initialize_allocator(struct buffer_allocator *allocator, const char 
     char *name;
 
     // Create file for shared memory allocation
-    name = lv_mem_alloc(strlen(dir) + sizeof(template));
+    name = lv_malloc(strlen(dir) + sizeof(template));
     LV_ASSERT_MSG(name, "cannot allocate memory for name");
     if (!name)
     {
@@ -1238,7 +1238,7 @@ static bool initialize_allocator(struct buffer_allocator *allocator, const char 
     allocator->shm_mem_fd = mkstemp(name);
 
     unlink(name);
-    lv_mem_free(name);
+    lv_free(name);
 
     LV_ASSERT_MSG((allocator->shm_mem_fd >= 0), "cannot create tmpfile");
     if (allocator->shm_mem_fd < 0)
@@ -1348,7 +1348,7 @@ static bool initialize_buffer(struct window *window, struct buffer_hdl *buffer_h
     allocator->shm_mem_size += allocated_size;
     allocator->shm_file_free_size = LV_MAX(0, (allocator->shm_file_free_size - buffer_hdl->size));
 
-    lv_memset_00(buffer_hdl->base, buffer_hdl->size);
+    lv_memset(buffer_hdl->base, 0x00, buffer_hdl->size);
 
     return true;
 
@@ -1389,7 +1389,7 @@ static struct graphic_object * create_graphic_obj(struct application *app, struc
 {
     struct graphic_object *obj;
 
-    obj = lv_mem_alloc(sizeof(*obj));
+    obj = lv_malloc(sizeof(*obj));
     LV_ASSERT_MALLOC(obj);
     if (!obj)
     {
@@ -1417,7 +1417,7 @@ err_destroy_surface:
     wl_surface_destroy(obj->surface);
 
 err_free:
-    lv_mem_free(obj);
+    lv_free(obj);
 
 err_out:
     return NULL;
@@ -1432,7 +1432,7 @@ static void destroy_graphic_obj(struct graphic_object * obj)
 
     wl_surface_destroy(obj->surface);
 
-    lv_mem_free(obj);
+    lv_free(obj);
 }
 
 #if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
@@ -1874,7 +1874,7 @@ err_deinit_allocator:
 
 err_free_window:
     _lv_ll_remove(&app->window_ll, window);
-    lv_mem_free(window);
+    lv_free(window);
     return NULL;
 }
 
@@ -2327,7 +2327,7 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
     window->close_cb = close_cb;
 
     /* Initialize draw buffer */
-    buf1 = lv_mem_alloc(hor_res * ver_res * sizeof(lv_color_t));
+    buf1 = lv_malloc(hor_res * ver_res * sizeof(lv_color_t));
     if (!buf1)
     {
         LV_LOG_ERROR("failed to allocate draw buffer");
