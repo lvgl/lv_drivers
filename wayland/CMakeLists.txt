@@ -8,7 +8,7 @@ pkg_check_modules(xkbcommon REQUIRED xkbcommon)
 
 # Wayland protocols
 find_program(WAYLAND_SCANNER_EXECUTABLE NAMES wayland-scanner)
-pkg_check_modules(WAYLAND_PROTOCOLS REQUIRED wayland-protocols>=1.15)
+pkg_check_modules(WAYLAND_PROTOCOLS REQUIRED wayland-protocols>=1.25)
 pkg_get_variable(WAYLAND_PROTOCOLS_BASE wayland-protocols pkgdatadir)
 
 macro(wayland_generate protocol_xml_file output_dir target)
