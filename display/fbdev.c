@@ -98,11 +98,13 @@ void fbdev_init(void)
     }
     LV_LOG_INFO("The framebuffer device was opened successfully");
 
+#if FBDEV_DISPLAY_POWER_ON
     // Make sure that the display is on.
     if (ioctl(fbfd, FBIOBLANK, FB_BLANK_UNBLANK) != 0) {
         perror("ioctl(FBIOBLANK)");
         // Don't return. Some framebuffer drivers like efifb or simplefb don't implement FBIOBLANK.
     }
+#endif /* FBDEV_DISPLAY_POWER_ON */
 
 #if USE_BSD_FBDEV
     struct fbtype fb;

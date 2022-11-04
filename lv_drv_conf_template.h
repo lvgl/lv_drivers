@@ -320,7 +320,8 @@
 #endif
 
 #if USE_FBDEV
-#  define FBDEV_PATH          "/dev/fb0"
+#  define FBDEV_PATH              "/dev/fb0"
+#  define FBDEV_DISPLAY_POWER_ON  1 /* 1 to force display power during initialization */
 #endif
 
 /*-----------------------------------------
@@ -331,7 +332,8 @@
 #endif
 
 #if USE_BSD_FBDEV
-# define FBDEV_PATH		"/dev/fb0"
+#  define FBDEV_PATH              "/dev/fb0"
+#  define FBDEV_DISPLAY_POWER_ON  1 /* 1 to force display power during initialization */
 #endif
 
 /*-----------------------------------------
