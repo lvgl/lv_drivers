@@ -1957,32 +1957,33 @@ static void _lv_wayland_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv
         return;
     }
 
+#if LV_COLOR_DEPTH == 1
     int32_t x;
     int32_t y;
-
     for (y = area->y1; y <= area->y2 && y < disp_drv->ver_res; y++)
     {
         for (x = area->x1; x <= area->x2 && x < disp_drv->hor_res; x++)
         {
             int offset = (y * disp_drv->hor_res) + x;
-#if (LV_COLOR_DEPTH == 32)
-            uint32_t * const buf = (uint32_t *)buffer->base + offset;
-            *buf = color_p->full;
-#elif (LV_COLOR_DEPTH == 16)
-            uint16_t * const buf = (uint16_t *)buffer->base + offset;
-            *buf = color_p->full;
-#elif (LV_COLOR_DEPTH == 8)
-            uint8_t * const buf = (uint8_t *)buffer->base + offset;
-            *buf = color_p->full;
-#elif (LV_COLOR_DEPTH == 1)
             uint8_t * const buf = (uint8_t *)buffer->base + offset;
             *buf = ((0x07 * color_p->ch.red)   << 5) |
                    ((0x07 * color_p->ch.green) << 2) |
                    ((0x03 * color_p->ch.blue)  << 0);
-#endif
             color_p++;
         }
     }
+#else
+    int32_t bytes_pre_pixel = BYTES_PER_PIXEL;
+    int32_t x1 = area->x1, x2 = area->x2 <= disp_drv->hor_res - 1 ? area->x2 : disp_drv->hor_res - 1;
+    int32_t y1 = area->y1, y2 = area->y2 <= disp_drv->ver_res - 1 ? area->y2 : disp_drv->ver_res - 1;
+    int32_t act_w = x2 - x1 + 1;
+
+    for (int y = y1; y <= y2; y++)
+    {
+        lv_memcpy((uint8_t *)buffer->base + ((y * disp_drv->hor_res + x1) * bytes_pre_pixel), color_p, act_w * bytes_pre_pixel);
+        color_p += act_w;
+    }
+#endif /* LV_COLOR_DEPTH == 1 */
 
     wl_surface_damage(window->body->surface, area->x1, area->y1,
                       (area->x2 - area->x1 + 1), (area->y2 - area->y1 + 1));
