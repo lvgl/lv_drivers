@@ -1957,7 +1957,22 @@ static void _lv_wayland_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv
         return;
     }
 
-#if LV_COLOR_DEPTH == 1
+#if (LV_COLOR_DEPTH == BYTES_PER_PIXEL * 8)              /* memory align */ \
+    && !(LV_COLOR_DEPTH == 1 || LV_COLOR_DEPTH == 8)     /* not RGB332 */
+    int32_t bytes_pre_pixel = BYTES_PER_PIXEL;
+    int32_t x1 = area->x1, x2 = area->x2 <= disp_drv->hor_res - 1 ? area->x2 : disp_drv->hor_res - 1;
+    int32_t y1 = area->y1, y2 = area->y2 <= disp_drv->ver_res - 1 ? area->y2 : disp_drv->ver_res - 1;
+    int32_t act_w = x2 - x1 + 1;
+
+    for (int y = y1; y <= y2; y++)
+    {
+        lv_memcpy((uint8_t *)buffer->base + ((y * disp_drv->hor_res + x1) * bytes_pre_pixel), color_p, act_w * bytes_pre_pixel);
+        color_p += act_w;
+    }
+#else
+#if !(LV_COLOR_DEPTH == 1 || LV_COLOR_DEPTH == 8)
+#error "Unsupport LV_COLOR_DEPTH, support LV_COLOR_DEPTH: 1 (1 byte per pixel), 8 (RGB332), 16 (RGB565), 32 (ARGB8888)"
+#endif
     int32_t x;
     int32_t y;
     for (y = area->y1; y <= area->y2 && y < disp_drv->ver_res; y++)
@@ -1972,18 +1987,7 @@ static void _lv_wayland_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv
             color_p++;
         }
     }
-#else
-    int32_t bytes_pre_pixel = BYTES_PER_PIXEL;
-    int32_t x1 = area->x1, x2 = area->x2 <= disp_drv->hor_res - 1 ? area->x2 : disp_drv->hor_res - 1;
-    int32_t y1 = area->y1, y2 = area->y2 <= disp_drv->ver_res - 1 ? area->y2 : disp_drv->ver_res - 1;
-    int32_t act_w = x2 - x1 + 1;
-
-    for (int y = y1; y <= y2; y++)
-    {
-        lv_memcpy((uint8_t *)buffer->base + ((y * disp_drv->hor_res + x1) * bytes_pre_pixel), color_p, act_w * bytes_pre_pixel);
-        color_p += act_w;
-    }
-#endif /* LV_COLOR_DEPTH == 1 */
+#endif
 
     wl_surface_damage(window->body->surface, area->x1, area->y1,
                       (area->x2 - area->x1 + 1), (area->y2 - area->y1 + 1));
