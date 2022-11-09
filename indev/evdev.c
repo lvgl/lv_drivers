@@ -237,6 +237,11 @@ void evdev_read(lv_indev_drv_t * drv, lv_indev_data_t * data)
     if(data->point.y >= drv->disp->driver->ver_res)
       data->point.y = drv->disp->driver->ver_res - 1;
 
+    if (evdev_root_x != data->point.x)
+        evdev_root_x = data->point.x;
+    if (evdev_root_y != data->point.y)
+        evdev_root_y = data->point.y;
+
     return ;
 }
 
