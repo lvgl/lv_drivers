@@ -39,9 +39,6 @@
 /*********************
  *      DEFINES
  *********************/
-
-#define BYTES_PER_PIXEL ((LV_COLOR_DEPTH + 7) / 8)
-
 #if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
 #define TITLE_BAR_HEIGHT 24
 #define BORDER_SIZE 2
@@ -232,6 +229,7 @@ struct window
 
     int width;
     int height;
+    int bits_per_pixel;
 
     bool resize_pending;
     int resize_width;
@@ -297,6 +295,38 @@ static void shm_format(void *data, struct wl_shm *wl_shm, uint32_t format)
     default:
         break;
     }
+}
+
+static int get_shm_format_bits_per_pixel(uint32_t format)
+{
+    int bits_per_pixel = 0;
+    switch (format)
+    {
+#if (LV_COLOR_DEPTH == 32)
+    case WL_SHM_FORMAT_ARGB8888:
+        bits_per_pixel = 32;
+        break;
+    case WL_SHM_FORMAT_XRGB8888:
+        bits_per_pixel = 32;
+        break;
+#elif (LV_COLOR_DEPTH == 16)
+    case WL_SHM_FORMAT_RGB565:
+        bits_per_pixel = 16;
+        break;
+#elif (LV_COLOR_DEPTH == 8)
+    case WL_SHM_FORMAT_RGB332:
+        bits_per_pixel = 8;
+        break;
+#elif (LV_COLOR_DEPTH == 1)
+    case WL_SHM_FORMAT_RGB332:
+        bits_per_pixel = 8;
+        break;
+#endif
+    default:
+        break;
+    }
+
+    return bits_per_pixel;
 }
 
 static const struct wl_shm_listener shm_listener = {
@@ -1275,7 +1305,9 @@ static bool initialize_buffer(struct window *window, struct buffer_hdl *buffer_h
     int ret;
     long sz = sysconf(_SC_PAGESIZE);
 
-    buffer_hdl->size = (((width * height * BYTES_PER_PIXEL) + sz - 1) / sz) * sz;
+    window->bits_per_pixel = get_shm_format_bits_per_pixel(app->format);
+
+    buffer_hdl->size = (((width * height * window->bits_per_pixel / 8) + sz - 1) / sz) * sz;
 
     LV_LOG_TRACE("initializing buffer %dx%d (alloc size: %d)",
                  width, height, buffer_hdl->size);
@@ -1335,7 +1367,7 @@ static bool initialize_buffer(struct window *window, struct buffer_hdl *buffer_h
     buffer_hdl->wl_buffer = wl_shm_pool_create_buffer(allocator->shm_pool,
                                                       allocator->shm_mem_size - allocator->shm_file_free_size,
                                                       width, height,
-                                                      width * BYTES_PER_PIXEL,
+                                                      width * window->bits_per_pixel / 8,
                                                       app->format);
     if (!buffer_hdl->wl_buffer)
     {
@@ -1956,38 +1988,48 @@ static void _lv_wayland_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv
         lv_disp_flush_ready(disp_drv);
         return;
     }
-
-#if (LV_COLOR_DEPTH == BYTES_PER_PIXEL * 8)              /* memory align */ \
-    && !(LV_COLOR_DEPTH == 1 || LV_COLOR_DEPTH == 8)     /* not RGB332 */
-    int32_t bytes_pre_pixel = BYTES_PER_PIXEL;
-    int32_t x1 = area->x1, x2 = area->x2 <= disp_drv->hor_res - 1 ? area->x2 : disp_drv->hor_res - 1;
-    int32_t y1 = area->y1, y2 = area->y2 <= disp_drv->ver_res - 1 ? area->y2 : disp_drv->ver_res - 1;
-    int32_t act_w = x2 - x1 + 1;
-
-    for (int y = y1; y <= y2; y++)
+    
+    if (LV_COLOR_DEPTH == window->bits_per_pixel && LV_COLOR_DEPTH != 1 && LV_COLOR_DEPTH != 8)
     {
-        lv_memcpy((uint8_t *)buffer->base + ((y * disp_drv->hor_res + x1) * bytes_pre_pixel), color_p, act_w * bytes_pre_pixel);
-        color_p += act_w;
-    }
-#else
-#if !(LV_COLOR_DEPTH == 1 || LV_COLOR_DEPTH == 8)
-#error "Unsupport LV_COLOR_DEPTH, support LV_COLOR_DEPTH: 1 (1 byte per pixel), 8 (RGB332), 16 (RGB565), 32 (ARGB8888)"
-#endif
-    int32_t x;
-    int32_t y;
-    for (y = area->y1; y <= area->y2 && y < disp_drv->ver_res; y++)
-    {
-        for (x = area->x1; x <= area->x2 && x < disp_drv->hor_res; x++)
+        int32_t bytes_pre_pixel = window->bits_per_pixel / 8;
+        int32_t x1 = area->x1, x2 = area->x2 <= disp_drv->hor_res - 1 ? area->x2 : disp_drv->hor_res - 1;
+        int32_t y1 = area->y1, y2 = area->y2 <= disp_drv->ver_res - 1 ? area->y2 : disp_drv->ver_res - 1;
+        int32_t act_w = x2 - x1 + 1;
+
+        for (int y = y1; y <= y2; y++)
         {
-            int offset = (y * disp_drv->hor_res) + x;
-            uint8_t * const buf = (uint8_t *)buffer->base + offset;
-            *buf = ((0x07 * color_p->ch.red)   << 5) |
-                   ((0x07 * color_p->ch.green) << 2) |
-                   ((0x03 * color_p->ch.blue)  << 0);
-            color_p++;
+            lv_memcpy((uint8_t *)buffer->base + ((y * disp_drv->hor_res + x1) * bytes_pre_pixel), color_p, act_w * bytes_pre_pixel);
+            color_p += act_w;
         }
     }
+    else
+    {
+        int32_t x;
+        int32_t y;
+        for (y = area->y1; y <= area->y2 && y < disp_drv->ver_res; y++)
+        {
+            for (x = area->x1; x <= area->x2 && x < disp_drv->hor_res; x++)
+            {
+                int offset = (y * disp_drv->hor_res) + x;
+#if (LV_COLOR_DEPTH == 32)
+                uint32_t * const buf = (uint32_t *)buffer->base + offset;
+                *buf = color_p->full;
+#elif (LV_COLOR_DEPTH == 16)
+                uint16_t * const buf = (uint16_t *)buffer->base + offset;
+                *buf = color_p->full;
+#elif (LV_COLOR_DEPTH == 8)
+                uint8_t * const buf = (uint8_t *)buffer->base + offset;
+                *buf = color_p->full;
+#elif (LV_COLOR_DEPTH == 1)
+                uint8_t * const buf = (uint8_t *)buffer->base + offset;
+                *buf = ((0x07 * color_p->ch.red)   << 5) |
+                    ((0x07 * color_p->ch.green) << 2) |
+                    ((0x03 * color_p->ch.blue)  << 0);
 #endif
+                color_p++;
+            }
+        }
+    }
 
     wl_surface_damage(window->body->surface, area->x1, area->y1,
                       (area->x2 - area->x1 + 1), (area->y2 - area->y1 + 1));
