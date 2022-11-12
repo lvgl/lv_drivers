@@ -9,6 +9,10 @@ option(BUILD_USE_WAYLAND "Build the Wayland driver" OFF)
 # Append our module directory to CMake
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+if (BUILD_USE_WAYLAND)
+  include(wayland_driver)
+endif()
+
 file(GLOB_RECURSE SOURCES ./*.c)
 
 if (BUILD_SHARED_LIBS)
@@ -25,7 +29,6 @@ target_include_directories(lv_drivers SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(lv_drivers PUBLIC lvgl)
 
 if (BUILD_USE_WAYLAND)
-  include(wayland_driver)
   target_link_libraries(lv_drivers PUBLIC ${PKG_WAYLAND_LIBRARIES})
 endif()
 
