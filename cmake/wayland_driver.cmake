@@ -46,7 +46,7 @@ message("-- Find wayland dependences : ${PKG_WAYLAND_LIBRARIES}")
 if (USE_XDG_SHELL)
     message("-- select xdg shell")
     find_program(WAYLAND_SCANNER_EXECUTABLE NAMES wayland-scanner)
-    pkg_check_modules(WAYLAND_PROTOCOLS REQUIRED wayland-protocols>=1.15)
+    pkg_check_modules(WAYLAND_PROTOCOLS REQUIRED wayland-protocols>=1.25)
     if (NOT EXISTS WAYLAND_PROTOCOLS_BASE) # may be you need to specify wayland protocol path for cross compile
         pkg_get_variable(WAYLAND_PROTOCOLS_BASE wayland-protocols pkgdatadir)
     endif()
