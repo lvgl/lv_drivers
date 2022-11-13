@@ -1,7 +1,7 @@
 project(lv_wayland)
 
-option(USE_WL_SHELL "use wl shell (discard, no recommend)" OFF)
-option(USE_XDG_SHELL "use xdg shell" OFF)
+option(USE_WL_SHELL "use wl_shell (deprecated, not recommended)" OFF)
+option(USE_XDG_SHELL "use xdg_shell" OFF)
 option(USE_WAYLAND_TIMER_HANDLER "" OFF)
 
 set(WAYLAND_SCANNER_EXECUTABLE)
@@ -20,8 +20,8 @@ macro(wayland_generate protocol_xml_file output_dir)
     execute_process(COMMAND "${WAYLAND_SCANNER_EXECUTABLE}"  private-code "${protocol_xml_file}"  "${xdg_shell_file}.c")
 endmacro()
 
-if (NOT USE_WL_SHELL AND USE_XDG_SHELL)
-    message(FATAL_ERROR "Please select at least one of USE_WL_SHELL and USE_XDG_SHELL (that is, can both select)")
+if (NOT USE_WL_SHELL AND NOT USE_XDG_SHELL)
+    message(FATAL_ERROR "Please select at least one of USE_WL_SHELL and USE_XDG_SHELL (multiple choices allowed)")
 endif()
 
 if (USE_WL_SHELL)
