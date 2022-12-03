@@ -48,6 +48,12 @@ typedef struct _WINDOW_THREAD_PARAMETER
     int show_window_mode;
 } WINDOW_THREAD_PARAMETER, * PWINDOW_THREAD_PARAMETER;
 
+typedef struct _KEY_QUEUE_ITEM
+{
+    uint32_t key;
+    lv_indev_state_t state;
+} KEY_QUEUE_ITEM, *PKEY_QUEUE_ITEM;
+
 /**********************
  *  STATIC PROTOTYPES
  **********************/
@@ -195,8 +201,10 @@ static LPARAM volatile g_mouse_value = 0;
 static bool volatile g_mousewheel_pressed = false;
 static int16_t volatile g_mousewheel_value = 0;
 
-static bool volatile g_keyboard_pressed = false;
-static WPARAM volatile g_keyboard_value = 0;
+static CRITICAL_SECTION g_keyboard_mutex;
+static lv_ll_t g_key_queue;
+static uint16_t volatile g_utf16_high_surrogate = 0;
+static uint16_t volatile g_utf16_low_surrogate = 0;
 
 static int volatile g_dpi_value = USER_DEFAULT_SCREEN_DPI;
 
@@ -300,6 +308,8 @@ EXTERN_C bool lv_win32_init(
     pointer_driver.read_cb = lv_win32_pointer_driver_read_callback;
     lv_win32_pointer_device_object = lv_indev_drv_register(&pointer_driver);
 
+    InitializeCriticalSection(&g_keyboard_mutex);
+    _lv_ll_init(&g_key_queue, sizeof(KEY_QUEUE_ITEM));
     static lv_indev_drv_t keypad_driver;
     lv_indev_drv_init(&keypad_driver);
     keypad_driver.type = LV_INDEV_TYPE_KEYPAD;
@@ -711,59 +721,21 @@ static void lv_win32_keypad_driver_read_callback(
 {
     UNREFERENCED_PARAMETER(indev_drv);
 
-    data->state = (lv_indev_state_t)(
-        g_keyboard_pressed ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL);
+    EnterCriticalSection(&g_keyboard_mutex);
 
-    WPARAM KeyboardValue = g_keyboard_value;
-
-    switch (KeyboardValue)
+    PKEY_QUEUE_ITEM current = (PKEY_QUEUE_ITEM)(
+        _lv_ll_get_head(&g_key_queue));
+    if (current)
     {
-    case VK_UP:
-        data->key = LV_KEY_UP;
-        break;
-    case VK_DOWN:
-        data->key = LV_KEY_DOWN;
-        break;
-    case VK_LEFT:
-        data->key = LV_KEY_LEFT;
-        break;
-    case VK_RIGHT:
-        data->key = LV_KEY_RIGHT;
-        break;
-    case VK_ESCAPE:
-        data->key = LV_KEY_ESC;
-        break;
-    case VK_DELETE:
-        data->key = LV_KEY_DEL;
-        break;
-    case VK_BACK:
-        data->key = LV_KEY_BACKSPACE;
-        break;
-    case VK_RETURN:
-        data->key = LV_KEY_ENTER;
-        break;
-    case VK_NEXT:
-        data->key = LV_KEY_NEXT;
-        break;
-    case VK_PRIOR:
-        data->key = LV_KEY_PREV;
-        break;
-    case VK_HOME:
-        data->key = LV_KEY_HOME;
-        break;
-    case VK_END:
-        data->key = LV_KEY_END;
-        break;
-    default:
-        if (KeyboardValue >= 'A' && KeyboardValue <= 'Z')
-        {
-            KeyboardValue += 0x20;
-        }
+        data->key = current->key;
+        data->state = current->state;
 
-        data->key = (uint32_t)KeyboardValue;
+        _lv_ll_remove(&g_key_queue, current);
 
-        break;
+        data->continue_reading = true;
     }
+
+    LeaveCriticalSection(&g_keyboard_mutex);
 }
 
 static void lv_win32_encoder_driver_read_callback(
@@ -806,8 +778,116 @@ static LRESULT CALLBACK lv_win32_window_message_callback(
     case WM_KEYDOWN:
     case WM_KEYUP:
     {
-        g_keyboard_pressed = (uMsg == WM_KEYDOWN);
-        g_keyboard_value = wParam;
+        EnterCriticalSection(&g_keyboard_mutex);
+
+        bool skip_translation = false;
+        uint32_t translated_key = 0;
+
+        switch (wParam)
+        {
+        case VK_UP:
+            translated_key = LV_KEY_UP;
+            break;
+        case VK_DOWN:
+            translated_key = LV_KEY_DOWN;
+            break;
+        case VK_LEFT:
+            translated_key = LV_KEY_LEFT;
+            break;
+        case VK_RIGHT:
+            translated_key = LV_KEY_RIGHT;
+            break;
+        case VK_ESCAPE:
+            translated_key = LV_KEY_ESC;
+            break;
+        case VK_DELETE:
+            translated_key = LV_KEY_DEL;
+            break;
+        case VK_BACK:
+            translated_key = LV_KEY_BACKSPACE;
+            break;
+        case VK_RETURN:
+            translated_key = LV_KEY_ENTER;
+            break;
+        case VK_TAB:
+        case VK_NEXT:
+            translated_key = LV_KEY_NEXT;
+            break;
+        case VK_PRIOR:
+            translated_key = LV_KEY_PREV;
+            break;
+        case VK_HOME:
+            translated_key = LV_KEY_HOME;
+            break;
+        case VK_END:
+            translated_key = LV_KEY_END;
+            break;
+        default:
+            skip_translation = true;
+            break;
+        }
+
+        if (!skip_translation)
+        {
+            PKEY_QUEUE_ITEM current = (PKEY_QUEUE_ITEM)(
+                _lv_ll_ins_head(&g_key_queue));
+            current->key = translated_key;
+            current->state = ((uMsg == WM_KEYUP)
+                ? LV_INDEV_STATE_REL
+                : LV_INDEV_STATE_PR);
+        }
+
+        LeaveCriticalSection(&g_keyboard_mutex);
+
+        break;
+    }
+    case WM_CHAR:
+    {
+        EnterCriticalSection(&g_keyboard_mutex);
+
+        uint16_t raw_code_point = (uint16_t)(wParam);
+
+        if (raw_code_point >= 0x20 && raw_code_point != 0x7F)
+        {
+            if (IS_HIGH_SURROGATE(raw_code_point))
+            {
+                g_utf16_high_surrogate = raw_code_point;
+            }
+            else if (IS_LOW_SURROGATE(raw_code_point))
+            {
+                g_utf16_low_surrogate = raw_code_point;
+            }
+
+            uint32_t code_point = raw_code_point;
+
+            if (g_utf16_high_surrogate && g_utf16_low_surrogate)
+            {
+                code_point = (g_utf16_low_surrogate & 0x03FF);
+                code_point += (((g_utf16_high_surrogate & 0x03FF) + 0x40) << 10);
+
+                g_utf16_high_surrogate = 0;
+                g_utf16_low_surrogate = 0;
+            }
+
+            uint32_t lvgl_code_point = _lv_txt_unicode_to_encoded(code_point);
+
+            {
+                PKEY_QUEUE_ITEM current = (PKEY_QUEUE_ITEM)(
+                    _lv_ll_ins_head(&g_key_queue));
+                current->key = lvgl_code_point;
+                current->state = LV_INDEV_STATE_PR;
+            }
+
+            {
+                PKEY_QUEUE_ITEM current = (PKEY_QUEUE_ITEM)(
+                    _lv_ll_ins_head(&g_key_queue));
+                current->key = lvgl_code_point;
+                current->state = LV_INDEV_STATE_REL;
+            }
+        }
+
+        LeaveCriticalSection(&g_keyboard_mutex);
+
         break;
     }
     case WM_MOUSEWHEEL:
