@@ -1215,7 +1215,7 @@ static LRESULT CALLBACK lv_win32_window_message_callback(
     {
         lv_win32_window_context_t* context = (lv_win32_window_context_t*)(
             RemovePropW(hWnd, L"LVGL.SimulatorWindow.WindowContext"));
-        if (!context)
+        if (context)
         {
             lv_disp_t* display_device_object = context->display_device_object;
             context->display_device_object = NULL;
@@ -1229,14 +1229,20 @@ static LRESULT CALLBACK lv_win32_window_message_callback(
 #endif
             DeleteDC(context->display_framebuffer_context_handle);
 
+            lv_indev_t* mouse_device_object =
+                context->mouse_device_object;
             context->mouse_device_object = NULL;
-            lv_indev_delete(&context->mouse_driver);
+            lv_indev_delete(mouse_device_object);
 
+            lv_indev_t* mousewheel_device_object =
+                context->mousewheel_device_object;
             context->mousewheel_device_object = NULL;
-            lv_indev_delete(&context->mousewheel_driver);
+            lv_indev_delete(mousewheel_device_object);
 
+            lv_indev_t* keyboard_device_object =
+                context->keyboard_device_object;
             context->keyboard_device_object = NULL;
-            lv_indev_delete(&context->keyboard_driver);
+            lv_indev_delete(keyboard_device_object);
             _lv_ll_clear(&context->keyboard_queue);
             DeleteCriticalSection(&context->keyboard_mutex);
 
