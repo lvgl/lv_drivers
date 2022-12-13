@@ -245,6 +245,47 @@ EXTERN_C bool lv_win32_init_window_class()
     return RegisterClassExW(&window_class);
 }
 
+EXTERN_C HWND lv_win32_create_display_window(
+    const wchar_t* window_title,
+    lv_coord_t hor_res,
+    lv_coord_t ver_res,
+    HINSTANCE instance_handle,
+    HICON icon_handle,
+    int show_window_mode)
+{
+    HWND display_window_handle = CreateWindowExW(
+        WINDOW_EX_STYLE,
+        LVGL_SIMULATOR_WINDOW_CLASS,
+        window_title,
+        WINDOW_STYLE,
+        CW_USEDEFAULT,
+        0,
+        hor_res,
+        ver_res,
+        NULL,
+        NULL,
+        instance_handle,
+        NULL);
+    if (display_window_handle)
+    {
+        SendMessageW(
+            display_window_handle,
+            WM_SETICON,
+            TRUE,
+            (LPARAM)icon_handle);
+        SendMessageW(
+            display_window_handle,
+            WM_SETICON,
+            FALSE,
+            (LPARAM)icon_handle);
+
+        ShowWindow(display_window_handle, show_window_mode);
+        UpdateWindow(display_window_handle);
+    }
+
+    return display_window_handle;
+}
+
 EXTERN_C bool lv_win32_init(
     HINSTANCE instance_handle,
     int show_window_mode,
@@ -1266,39 +1307,17 @@ static unsigned int __stdcall lv_win32_window_thread_entrypoint(
     PWINDOW_THREAD_PARAMETER parameter =
         (PWINDOW_THREAD_PARAMETER)raw_parameter;
 
-    HWND window_handle = CreateWindowExW(
-        WINDOW_EX_STYLE,
-        LVGL_SIMULATOR_WINDOW_CLASS,
+    g_window_handle = lv_win32_create_display_window(
         L"LVGL Simulator for Windows Desktop (Display 1)",
-        WINDOW_STYLE,
-        CW_USEDEFAULT,
-        0,
         parameter->hor_res,
         parameter->ver_res,
-        NULL,
-        NULL,
         parameter->instance_handle,
-        NULL);
-
-    if (!window_handle)
+        parameter->icon_handle,
+        parameter->show_window_mode);
+    if (!g_window_handle)
     {
         return 0;
     }
-
-    SendMessageW(
-        window_handle,
-        WM_SETICON,
-        TRUE,
-        (LPARAM)parameter->icon_handle);
-    SendMessageW(
-        window_handle,
-        WM_SETICON,
-        FALSE,
-        (LPARAM)parameter->icon_handle);
-
-    ShowWindow(window_handle, parameter->show_window_mode);
-    UpdateWindow(window_handle);
-    g_window_handle = window_handle;
 
     SetEvent(parameter->window_mutex);
 
