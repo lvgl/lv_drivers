@@ -9,7 +9,7 @@
 #include "sdl_gpu.h"
 #if USE_SDL_GPU
 
-#if LV_USE_GPU_SDL == 0
+#if LV_USE_DRAW_SDL == 0
 # error "LV_USE_DRAW_SDL must be enabled"
 #endif
 
@@ -91,14 +91,14 @@ void sdl_init(void)
 
 void sdl_disp_drv_init(lv_disp_drv_t * disp_drv, lv_coord_t hor_res, lv_coord_t ver_res)
 {
-    monitor_t *m = lv_mem_alloc(sizeof(monitor_t));
+    monitor_t *m = lv_malloc(sizeof(monitor_t));
     window_create(m);
     lv_disp_drv_init(disp_drv);
     disp_drv->direct_mode = 1;
     disp_drv->flush_cb = monitor_flush;
     disp_drv->hor_res = hor_res;
     disp_drv->ver_res = ver_res;
-    lv_disp_draw_buf_t *disp_buf = lv_mem_alloc(sizeof(lv_disp_draw_buf_t));
+    lv_disp_draw_buf_t *disp_buf = lv_malloc(sizeof(lv_disp_draw_buf_t));
     lv_disp_draw_buf_init(disp_buf, m->texture, NULL, hor_res * ver_res);
     disp_drv->draw_buf = disp_buf;
     disp_drv->antialiasing = 1;
