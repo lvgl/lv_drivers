@@ -1,6 +1,6 @@
 # Display and Touch pad drivers
 
-Display controller and touchpad driver to can be directly used with [LittlevGL](https://littlevgl.com).
+Display controller and touchpad driver to can be directly used with [LVGL](https://lvgl.io/).
 
 To learn more about using drivers in LittlevGL visit the [Porting guide](https://docs.lvgl.io/latest/en/html/porting/index.html).
 
