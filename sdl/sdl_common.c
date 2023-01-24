@@ -132,17 +132,17 @@ void mouse_handler(SDL_Event * event)
 
         case SDL_FINGERUP:
             left_button_down = false;
-            last_x = LV_HOR_RES * event->tfinger.x / SDL_ZOOM;
-            last_y = LV_VER_RES * event->tfinger.y / SDL_ZOOM;
+            last_x = SDL_HOR_RES * event->tfinger.x / SDL_ZOOM;
+            last_y = SDL_VER_RES * event->tfinger.y / SDL_ZOOM;
             break;
         case SDL_FINGERDOWN:
             left_button_down = true;
-            last_x = LV_HOR_RES * event->tfinger.x / SDL_ZOOM;
-            last_y = LV_VER_RES * event->tfinger.y / SDL_ZOOM;
+            last_x = SDL_HOR_RES * event->tfinger.x / SDL_ZOOM;
+            last_y = SDL_VER_RES * event->tfinger.y / SDL_ZOOM;
             break;
         case SDL_FINGERMOTION:
-            last_x = LV_HOR_RES * event->tfinger.x / SDL_ZOOM;
-            last_y = LV_VER_RES * event->tfinger.y / SDL_ZOOM;
+            last_x = SDL_HOR_RES * event->tfinger.x / SDL_ZOOM;
+            last_y = SDL_VER_RES * event->tfinger.y / SDL_ZOOM;
             break;
     }
 
