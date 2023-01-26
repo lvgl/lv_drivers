@@ -119,6 +119,11 @@ struct buffer_hdl
     int size;
     struct wl_buffer *wl_buffer;
     bool busy;
+
+    lv_area_t inv_areas[LV_INV_BUF_SIZE];
+    uint8_t inv_area_joined[LV_INV_BUF_SIZE];
+    uint16_t inv_p;
+    bool is_first_flush;
 };
 
 struct buffer_allocator
@@ -141,7 +146,9 @@ struct graphic_object
     int width;
     int height;
 
-    struct buffer_hdl buffer;
+    struct buffer_hdl *buffer;
+    unsigned int num_buffers;
+    unsigned int active_buffer;
 
     struct input input;
 };
@@ -1115,7 +1122,7 @@ static const struct wl_shell_surface_listener shell_surface_listener = {
 static void xdg_surface_handle_configure(void *data, struct xdg_surface *xdg_surface, uint32_t serial)
 {
     struct window *window = (struct window *)data;
-    struct buffer_hdl *buffer = &window->body->buffer;
+    struct buffer_hdl *buffer = &window->body->buffer[window->body->active_buffer];
 
     xdg_surface_ack_configure(xdg_surface, serial);
 
@@ -1416,7 +1423,7 @@ static bool deinitialize_buffer(struct window *window, struct buffer_hdl *buffer
 }
 
 static struct graphic_object * create_graphic_obj(struct application *app, struct window *window,
-                                                  enum object_type type,
+                                                  enum object_type type, unsigned int num_buffers,
                                                   struct graphic_object *parent)
 {
     struct graphic_object *obj;
@@ -1432,12 +1439,22 @@ static struct graphic_object * create_graphic_obj(struct application *app, struc
 
     obj->window = window;
     obj->type = type;
+    obj->num_buffers = num_buffers;
+
+    obj->buffer = lv_malloc(sizeof(struct buffer_hdl) * obj->num_buffers);
+    LV_ASSERT_MALLOC(obj->buffer);
+    if (!obj->buffer)
+    {
+        goto err_free;
+    }
+
+    lv_memset(obj->buffer, 0x00, sizeof(struct buffer_hdl) * obj->num_buffers);
 
     obj->surface = wl_compositor_create_surface(app->compositor);
     if (!obj->surface)
     {
         LV_LOG_ERROR("cannot create surface for graphic object");
-        goto err_free;
+        goto err_free_buf;
     }
 
     obj->surface_configured = true;
@@ -1447,6 +1464,9 @@ static struct graphic_object * create_graphic_obj(struct application *app, struc
 
 err_destroy_surface:
     wl_surface_destroy(obj->surface);
+
+err_free_buf:
+    lv_free(obj->buffer);
 
 err_free:
     lv_free(obj);
@@ -1464,6 +1484,8 @@ static void destroy_graphic_obj(struct graphic_object * obj)
 
     wl_surface_destroy(obj->surface);
 
+    lv_free(obj->buffer);
+
     lv_free(obj);
 }
 
@@ -1472,7 +1494,7 @@ static bool create_decoration(struct window *window,
                               struct graphic_object * decoration,
                               int window_width, int window_height)
 {
-    struct buffer_hdl * buffer = &decoration->buffer;
+    struct buffer_hdl * buffer = &decoration->buffer[0];
     int x, y;
 
     switch (decoration->type)
@@ -1608,7 +1630,7 @@ static bool create_decoration(struct window *window,
 static bool attach_decoration(struct window *window, struct graphic_object * decoration,
                               struct graphic_object * parent)
 {
-    struct buffer_hdl * buffer = &decoration->buffer;
+    struct buffer_hdl * buffer = &decoration->buffer[0];
     int pos_x, pos_y;
     int x, y;
 
@@ -1691,42 +1713,50 @@ static void detach_decoration(struct window *window,
 
 static bool resize_window(struct window *window, int width, int height)
 {
-    struct buffer_hdl *buffer = &window->body->buffer;
+    unsigned int b;
 
     LV_LOG_TRACE("resize window %dx%d", width, height);
 
-    // De-initialize previous buffers
-    if (buffer->busy)
+    // Detach active buffer
+    if (window->body->buffer[window->body->active_buffer].busy)
     {
         LV_LOG_WARN("Deinitializing busy window buffer...");
         wl_surface_attach(window->body->surface, NULL, 0, 0);
         wl_surface_commit(window->body->surface);
-        buffer->busy = false;
+        window->body->buffer[window->body->active_buffer].busy = false;
     }
 
-    if (!deinitialize_buffer(window, buffer))
+    for (b = 0; b < window->body->num_buffers; b++)
     {
-        LV_LOG_ERROR("failed to deinitialize window buffer");
-        return false;
+        if (!deinitialize_buffer(window, &window->body->buffer[b]))
+        {
+            LV_LOG_ERROR("failed to deinitialize window buffer");
+        }
     }
 
 #if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
-    int b;
     for (b = 0; b < NUM_DECORATIONS; b++)
     {
         if (window->decoration[b] != NULL)
         {
             detach_decoration(window, window->decoration[b]);
-            deinitialize_buffer(window, &window->decoration[b]->buffer);
+            deinitialize_buffer(window, &window->decoration[b]->buffer[0]);
         }
     }
 #endif
 
-    // Initialize backing buffer
-    if (!initialize_buffer(window, buffer, width, height))
+    // Initialize backing buffers
+    for (b = 0; b < window->body->num_buffers; b++)
     {
-        LV_LOG_ERROR("failed to initialize window buffer");
-        return false;
+        if (!initialize_buffer(window, &window->body->buffer[b], width, height))
+        {
+            LV_LOG_ERROR("failed to initialize window buffer");
+            for (b--; b >= 0; b--)
+            {
+                deinitialize_buffer(window, &window->body->buffer[b]);
+            }
+            return false;
+        }
     }
 
     window->width = width;
@@ -1790,12 +1820,15 @@ static struct window *create_window(struct application *app, int width, int heig
     }
 
     // Create wayland buffer and surface
-    window->body = create_graphic_obj(app, window, OBJECT_WINDOW, NULL);
+    window->body = create_graphic_obj(app, window, OBJECT_WINDOW, 2, NULL);
     if (!window->body)
     {
         LV_LOG_ERROR("cannot create window body");
         goto err_deinit_allocator;
     }
+
+    // Start drawing into buffer 0, letting the driver believing buffer 1 is active
+    window->body->active_buffer = 1;
 
     // Create shell surface
      if (0)
@@ -1859,7 +1892,7 @@ static struct window *create_window(struct application *app, int width, int heig
         int d;
         for (d = 0; d < NUM_DECORATIONS; d++)
         {
-            window->decoration[d] = create_graphic_obj(app, window, (FIRST_DECORATION+d), window->body);
+            window->decoration[d] = create_graphic_obj(app, window, (FIRST_DECORATION+d), 1, window->body);
             if (!window->decoration[d])
             {
                 LV_LOG_ERROR("Failed to create decoration %d", d);
@@ -1937,14 +1970,18 @@ static void destroy_window(struct window *window)
     {
         if (window->decoration[b])
         {
-            deinitialize_buffer(window, &window->decoration[b]->buffer);
+            deinitialize_buffer(window, &window->decoration[b]->buffer[0]);
             destroy_graphic_obj(window->decoration[b]);
             window->decoration[b] = NULL;
         }
     }
 #endif
 
-    deinitialize_buffer(window, &window->body->buffer);
+    for (b = 0; b < window->body->num_buffers; b++)
+    {
+        deinitialize_buffer(window, &window->body->buffer[b]);
+    }
+
     destroy_graphic_obj(window->body);
 
     deinitialize_allocator(&window->allocator);
@@ -1953,7 +1990,8 @@ static void destroy_window(struct window *window)
 static void _lv_wayland_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p)
 {
     struct window *window = disp_drv->user_data;
-    struct buffer_hdl *buffer = &window->body->buffer;
+    struct buffer_hdl *buffer = &window->body->buffer[window->body->active_buffer ^ 1];
+    struct buffer_hdl *active_buffer = &window->body->buffer[window->body->active_buffer];
 
     const lv_coord_t hres = (disp_drv->rotated == 0) ? (disp_drv->hor_res) : (disp_drv->ver_res);
     const lv_coord_t vres = (disp_drv->rotated == 0) ? (disp_drv->ver_res) : (disp_drv->hor_res);
@@ -1988,24 +2026,67 @@ static void _lv_wayland_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv
         lv_disp_flush_ready(disp_drv);
         return;
     }
-    
+
+    // Copy previous invalidated area from active buffer
+    if (buffer->is_first_flush)
+    {
+        buffer->is_first_flush = false;
+
+        // No need to copy anything if current flush is a fullscreen refresh
+        if (((area->x2 - area->x1) != disp_drv->hor_res) ||
+            ((area->y2 - area->y1) != disp_drv->ver_res))
+        {
+
+            for (unsigned int a = 0; a < active_buffer->inv_p; a++)
+            {
+                lv_area_t * prev_area = &active_buffer->inv_areas[a];
+
+                if (active_buffer->inv_area_joined[a])
+                {
+                    continue;
+                }
+
+                int bytes_per_pixel = window->bits_per_pixel / 8;
+                lv_coord_t x1 = prev_area->x1;
+                lv_coord_t x2 = LV_MIN(prev_area->x2, (disp_drv->hor_res - 1));
+                lv_coord_t y1 = prev_area->y1;
+                lv_coord_t y2 = LV_MIN(prev_area->y2, (disp_drv->ver_res - 1));
+                int32_t act_w = x2 - x1 + 1;
+                int32_t act_h = y2 - y1 + 1;
+
+                for (lv_coord_t y = y1; y <= y2; y++)
+                {
+                    int offset = (((y * disp_drv->hor_res) + x1) * bytes_per_pixel);
+                    lv_memcpy((uint8_t *)buffer->base + offset,
+                              (uint8_t *)active_buffer->base + offset,
+                              act_w * bytes_per_pixel);
+                }
+
+                wl_surface_damage(window->body->surface, x1, y1, act_w, act_h);
+            }
+        }
+    }
+
     if (LV_COLOR_DEPTH == window->bits_per_pixel && LV_COLOR_DEPTH != 1 && LV_COLOR_DEPTH != 8)
     {
-        int32_t bytes_pre_pixel = window->bits_per_pixel / 8;
-        int32_t x1 = area->x1, x2 = area->x2 <= disp_drv->hor_res - 1 ? area->x2 : disp_drv->hor_res - 1;
-        int32_t y1 = area->y1, y2 = area->y2 <= disp_drv->ver_res - 1 ? area->y2 : disp_drv->ver_res - 1;
+        int bytes_per_pixel = window->bits_per_pixel / 8;
+        lv_coord_t x1 = area->x1;
+        lv_coord_t x2 = LV_MIN(area->x2, (disp_drv->hor_res - 1));
+        lv_coord_t y1 = area->y1;
+        lv_coord_t y2 = LV_MIN(area->y2, (disp_drv->ver_res - 1));
         int32_t act_w = x2 - x1 + 1;
 
         for (int y = y1; y <= y2; y++)
         {
-            lv_memcpy((uint8_t *)buffer->base + ((y * disp_drv->hor_res + x1) * bytes_pre_pixel), color_p, act_w * bytes_pre_pixel);
+            int offset = (((y * disp_drv->hor_res) + x1) * bytes_per_pixel);
+            lv_memcpy((uint8_t *)buffer->base + offset, color_p, act_w * bytes_per_pixel);
             color_p += act_w;
         }
     }
     else
     {
-        int32_t x;
-        int32_t y;
+        lv_coord_t x;
+        lv_coord_t y;
         for (y = area->y1; y <= area->y2 && y < disp_drv->ver_res; y++)
         {
             for (x = area->x1; x <= area->x2 && x < disp_drv->hor_res; x++)
@@ -2042,6 +2123,22 @@ static void _lv_wayland_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv
         }
         buffer->busy = true;
         window->flush_pending = true;
+
+        // Store invalidated areas for future use
+        if (lv_disp_is_invalidation_enabled(window->lv_disp))
+        {
+            buffer->inv_p = window->lv_disp->inv_p;
+            lv_memcpy(&buffer->inv_areas[0], &window->lv_disp->inv_areas[0],
+                      buffer->inv_p * sizeof(window->lv_disp->inv_areas[0]));
+            lv_memcpy(&buffer->inv_area_joined[0], &window->lv_disp->inv_area_joined[0],
+                      buffer->inv_p * sizeof(window->lv_disp->inv_area_joined[0]));
+
+            // Trigger firts flush processing for the will-be-incative buffer
+            active_buffer->is_first_flush = lv_disp_is_invalidation_enabled(window->lv_disp);
+        }
+
+        // Flip buffers
+        window->body->active_buffer ^= 1;
     }
 
     lv_disp_flush_ready(disp_drv);
@@ -2109,14 +2206,24 @@ static void _lv_wayland_handle_output(void)
         }
         else if (window->resize_pending)
         {
-            bool do_resize = !window->body->buffer.busy;
-#if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
-            if (!window->application->opt_disable_decorations && !window->fullscreen)
+            bool do_resize = true;
+            unsigned int d;
+
+            // Do not resize until all buffers have been released
+            for (d = 0; d < window->body->num_buffers; d++)
             {
-                int d;
+                if (window->body->buffer[d].busy)
+                {
+                    do_resize = false;
+                    break;
+                }
+            }
+#if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
+            if (do_resize && !window->application->opt_disable_decorations && !window->fullscreen)
+            {
                 for (d = 0; d < NUM_DECORATIONS; d++)
                 {
-                    if ((window->decoration[d] != NULL) && (window->decoration[d]->buffer.busy))
+                    if ((window->decoration[d] != NULL) && (window->decoration[d]->buffer[0].busy))
                     {
                         do_resize = false;
                         break;
