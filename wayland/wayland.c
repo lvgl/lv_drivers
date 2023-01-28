@@ -40,7 +40,7 @@
  *      DEFINES
  *********************/
 #if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
-#define TITLE_BAR_HEIGHT 34
+#define TITLE_BAR_HEIGHT 24
 #define BORDER_SIZE 2
 #define BUTTON_MARGIN LV_MAX((TITLE_BAR_HEIGHT / 6), BORDER_SIZE)
 #define BUTTON_PADDING LV_MAX((TITLE_BAR_HEIGHT / 8), BORDER_SIZE)
@@ -48,7 +48,7 @@
 #endif
 
 #ifndef LV_WAYLAND_CYCLE_PERIOD
-#define LV_WAYLAND_CYCLE_PERIOD LV_MIN(LV_DISP_DEF_REFR_PERIOD,1)
+#define LV_WAYLAND_CYCLE_PERIOD LV_MIN(LV_DEF_REFR_PERIOD,1)
 #endif
 
 /**********************
@@ -173,7 +173,9 @@ struct application
 #endif
 
     uint32_t format;
+
     struct xkb_context *xkb_context;
+
     struct seat seat;
 
     struct graphic_object *touch_obj;
@@ -191,7 +193,7 @@ struct window
     lv_disp_drv_t lv_disp_drv;
     lv_disp_draw_buf_t lv_disp_draw_buf;
     lv_disp_t *lv_disp;
-    
+
     lv_indev_drv_t lv_indev_drv_pointer;
     lv_indev_t * lv_indev_pointer;
 
@@ -464,7 +466,8 @@ static void pointer_handle_motion(void *data, struct wl_pointer *pointer,
                                   uint32_t time, wl_fixed_t sx, wl_fixed_t sy)
 {
     struct application *app = data;
-    
+    int max_x, max_y;
+
     if (!app->pointer_obj)
     {
         return;
@@ -1165,7 +1168,7 @@ static void xdg_toplevel_handle_close(void *data, struct xdg_toplevel *xdg_tople
 static void xdg_toplevel_handle_configure_bounds(void *data, struct xdg_toplevel *xdg_toplevel,
                                                  int32_t width, int32_t height)
 {
-    //struct window *window = (struct window *)data;
+    struct window *window = (struct window *)data;
     /* Optional: Could set window width/height upper bounds, however, currently
      *           we'll honor the set width/height.
      */
@@ -1193,8 +1196,8 @@ static void handle_global(void *data, struct wl_registry *registry,
     struct application *app = data;
 
     if (strcmp(interface, wl_compositor_interface.name) == 0)
-    { 
-        app->compositor = wl_registry_bind(registry, name, &wl_compositor_interface, 5);
+    {
+        app->compositor = wl_registry_bind(registry, name, &wl_compositor_interface, 1);
     }
     else if (strcmp(interface, wl_subcompositor_interface.name) == 0)
     {
@@ -1252,7 +1255,7 @@ static bool initialize_allocator(struct buffer_allocator *allocator, const char 
     char *name;
 
     // Create file for shared memory allocation
-    name = lv_mem_alloc(strlen(dir) + sizeof(template));
+    name = lv_malloc(strlen(dir) + sizeof(template));
     LV_ASSERT_MSG(name, "cannot allocate memory for name");
     if (!name)
     {
@@ -1265,7 +1268,7 @@ static bool initialize_allocator(struct buffer_allocator *allocator, const char 
     allocator->shm_mem_fd = mkstemp(name);
 
     unlink(name);
-    lv_mem_free(name);
+    lv_free(name);
 
     LV_ASSERT_MSG((allocator->shm_mem_fd >= 0), "cannot create tmpfile");
     if (allocator->shm_mem_fd < 0)
@@ -1333,7 +1336,7 @@ static bool initialize_buffer(struct window *window, struct buffer_hdl *buffer_h
 
     buffer_hdl->base = mmap(NULL, buffer_hdl->size,
                             PROT_READ | PROT_WRITE, MAP_SHARED,
-                            allocator->shm_mem_fd, 
+                            allocator->shm_mem_fd,
                             allocator->shm_mem_size - allocator->shm_file_free_size);
     if (buffer_hdl->base == MAP_FAILED)
     {
@@ -1418,7 +1421,7 @@ static struct graphic_object * create_graphic_obj(struct application *app, struc
 {
     struct graphic_object *obj;
 
-    obj = lv_mem_alloc(sizeof(*obj));
+    obj = lv_malloc(sizeof(*obj));
     LV_ASSERT_MALLOC(obj);
     if (!obj)
     {
@@ -1442,9 +1445,11 @@ static struct graphic_object * create_graphic_obj(struct application *app, struc
 
     return obj;
 
-err_free:
+err_destroy_surface:
     wl_surface_destroy(obj->surface);
-    lv_mem_free(obj);
+
+err_free:
+    lv_free(obj);
 
 err_out:
     return NULL;
@@ -1459,7 +1464,7 @@ static void destroy_graphic_obj(struct graphic_object * obj)
 
     wl_surface_destroy(obj->surface);
 
-    lv_mem_free(obj);
+    lv_free(obj);
 }
 
 #if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
@@ -1521,7 +1526,7 @@ static bool create_decoration(struct window *window,
     {
     case OBJECT_TITLEBAR:
         lv_color_fill((lv_color_t *)buffer->base,
-                      lv_color_make(0xdd, 0xdd, 0xdd), (decoration->width * decoration->height));
+                      lv_color_make(0x66, 0x66, 0x66), (decoration->width * decoration->height));
         break;
     case OBJECT_BUTTON_CLOSE:
         lv_color_fill((lv_color_t *)buffer->base,
@@ -1605,7 +1610,7 @@ static bool attach_decoration(struct window *window, struct graphic_object * dec
 {
     struct buffer_hdl * buffer = &decoration->buffer;
     int pos_x, pos_y;
-    
+    int x, y;
 
     switch (decoration->type)
     {
@@ -1901,7 +1906,7 @@ err_deinit_allocator:
 
 err_free_window:
     _lv_ll_remove(&app->window_ll, window);
-    lv_mem_free(window);
+    lv_free(window);
     return NULL;
 }
 
@@ -2196,8 +2201,6 @@ static void _lv_wayland_keyboard_read(lv_indev_drv_t *drv, lv_indev_data_t *data
 
     data->key = window->body->input.keyboard.key;
     data->state = window->body->input.keyboard.state;
-
-    //LV_LOG_USER("---key:%i, sta: %i\n", data->key, data->state);
 }
 
 static void _lv_wayland_touch_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
@@ -2242,7 +2245,7 @@ void lv_wayland_init(void)
     }
 
     /* Add registry listener and wait for registry reception */
-    application.format = WL_SHM_FORMAT_ARGB8888;
+    application.format = 0xFFFFFFFF;
     application.registry = wl_display_get_registry(application.display);
     wl_registry_add_listener(application.registry, &registry_listener, &application);
     wl_display_dispatch(application.display);
@@ -2371,7 +2374,7 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
     window->close_cb = close_cb;
 
     /* Initialize draw buffer */
-    buf1 = lv_mem_alloc(hor_res * ver_res * sizeof(lv_color_t));
+    buf1 = lv_malloc(hor_res * ver_res * sizeof(lv_color_t));
     if (!buf1)
     {
         LV_LOG_ERROR("failed to allocate draw buffer");
@@ -2388,7 +2391,7 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
     window->lv_disp_drv.ver_res = ver_res;
     window->lv_disp_drv.flush_cb = _lv_wayland_flush;
     window->lv_disp_drv.user_data = window;
-    
+
     /* Register display */
     window->lv_disp = lv_disp_drv_register(&window->lv_disp_drv);
 
@@ -2405,7 +2408,7 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
             lv_group_set_default(group);
         }
     }
-    
+
     /* Register input */
     lv_indev_drv_init(&window->lv_indev_drv_pointer);
     window->lv_indev_drv_pointer.type = LV_INDEV_TYPE_POINTER;
@@ -2426,7 +2429,6 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
     {
         LV_LOG_ERROR("failed to register pointeraxis indev");
     }
-    lv_indev_set_group(window->lv_indev_pointeraxis, group);
 
     lv_indev_drv_init(&window->lv_indev_drv_touch);
     window->lv_indev_drv_touch.type = LV_INDEV_TYPE_POINTER;
@@ -2437,18 +2439,17 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
     {
         LV_LOG_ERROR("failed to register touch indev");
     }
-    
+
     lv_indev_drv_init(&window->lv_indev_drv_keyboard);
     window->lv_indev_drv_keyboard.type = LV_INDEV_TYPE_KEYPAD;
     window->lv_indev_drv_keyboard.read_cb = _lv_wayland_keyboard_read;
     window->lv_indev_drv_keyboard.disp = window->lv_disp;
     window->lv_indev_keyboard = lv_indev_drv_register(&window->lv_indev_drv_keyboard);
-    
     if (!window->lv_indev_keyboard)
     {
         LV_LOG_ERROR("failed to register keyboard indev");
     }
-    /* the keyboard must be set to the group.*/
+    /* for the physical keyboard on x86_64 linux.*/
     lv_indev_set_group(window->lv_indev_keyboard, group);
 
     return window->lv_disp;
