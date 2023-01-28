@@ -40,7 +40,7 @@
  *      DEFINES
  *********************/
 #if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
-#define TITLE_BAR_HEIGHT 24
+#define TITLE_BAR_HEIGHT 34
 #define BORDER_SIZE 2
 #define BUTTON_MARGIN LV_MAX((TITLE_BAR_HEIGHT / 6), BORDER_SIZE)
 #define BUTTON_PADDING LV_MAX((TITLE_BAR_HEIGHT / 8), BORDER_SIZE)
@@ -173,9 +173,7 @@ struct application
 #endif
 
     uint32_t format;
-
     struct xkb_context *xkb_context;
-
     struct seat seat;
 
     struct graphic_object *touch_obj;
@@ -193,7 +191,7 @@ struct window
     lv_disp_drv_t lv_disp_drv;
     lv_disp_draw_buf_t lv_disp_draw_buf;
     lv_disp_t *lv_disp;
-
+    
     lv_indev_drv_t lv_indev_drv_pointer;
     lv_indev_t * lv_indev_pointer;
 
@@ -1476,7 +1474,7 @@ static bool create_decoration(struct window *window,
     {
     case OBJECT_TITLEBAR:
         decoration->width = window_width;
-        decoration->height = TITLE_BAR_HEIGHT+10;
+        decoration->height = TITLE_BAR_HEIGHT;
         break;
     case OBJECT_BUTTON_CLOSE:
         decoration->width = BUTTON_SIZE;
@@ -2247,7 +2245,7 @@ void lv_wayland_init(void)
     application.format = WL_SHM_FORMAT_ARGB8888;
     application.registry = wl_display_get_registry(application.display);
     wl_registry_add_listener(application.registry, &registry_listener, &application);
-    //wl_display_dispatch(application.display);
+    wl_display_dispatch(application.display);
     wl_display_roundtrip(application.display);
 
     LV_ASSERT_MSG(application.compositor, "Wayland compositor not available");
@@ -2450,7 +2448,7 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
     {
         LV_LOG_ERROR("failed to register keyboard indev");
     }
-    /* keybard must be set to the group, otherwise, the physical keys don't work. w.hu*/
+    /* the keyboard must be set to the group.*/
     lv_indev_set_group(window->lv_indev_keyboard, group);
 
     return window->lv_disp;
@@ -2533,11 +2531,6 @@ bool lv_wayland_window_is_flush_pending(lv_disp_t * disp)
     return flush_pending;
 }
 
-int lv_wayland_dispatch(void)
-{
-    return wl_display_dispatch(application.display);
-    
-}
 /**
  * Set/unset window fullscreen mode
  * @param disp LVGL display using window to be set/unset fullscreen
