@@ -119,6 +119,7 @@ struct buffer_hdl
     int size;
     struct wl_buffer *wl_buffer;
     bool busy;
+    bool buffer_feedback;
 };
 
 struct buffer_allocator
@@ -1242,6 +1243,10 @@ static const struct wl_registry_listener registry_listener = {
 static void handle_wl_buffer_release(void *data, struct wl_buffer *wl_buffer)
 {
     struct buffer_hdl *buffer_hdl = (struct buffer_hdl *)data;
+    if (!buffer_hdl->buffer_feedback)
+    {
+        buffer_hdl->buffer_feedback = true;
+    }
     buffer_hdl->busy = false;
 }
 
@@ -1957,6 +1962,11 @@ static void _lv_wayland_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv
 
     const lv_coord_t hres = (disp_drv->rotated == 0) ? (disp_drv->hor_res) : (disp_drv->ver_res);
     const lv_coord_t vres = (disp_drv->rotated == 0) ? (disp_drv->ver_res) : (disp_drv->hor_res);
+
+    if (!buffer->buffer_feedback)
+    {
+        buffer->busy = false;
+    }
 
     /* If private data is not set, it means window has not been initialized */
     if (!window)
