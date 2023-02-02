@@ -7,6 +7,7 @@
  *      INCLUDES
  *********************/
 #include "wayland.h"
+#include "smm.h"
 
 #if USE_WAYLAND
 
@@ -39,6 +40,13 @@
 /*********************
  *      DEFINES
  *********************/
+
+#define BYTES_PER_PIXEL ((LV_COLOR_DEPTH + 7) / 8)
+#define LVGL_DRAW_BUFFER_DIV (8)
+#define DMG_CACHE_CAPACITY (32)
+#define TAG_LOCAL         (0)
+#define TAG_BUFFER_DAMAGE (1)
+
 #if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
 #define TITLE_BAR_HEIGHT 24
 #define BORDER_SIZE 2
@@ -56,7 +64,7 @@
  **********************/
 
 enum object_type {
-    OBJECT_TITLEBAR,
+    OBJECT_TITLEBAR = 0,
     OBJECT_BUTTON_CLOSE,
 #if LV_WAYLAND_XDG_SHELL
     OBJECT_BUTTON_MAXIMIZE,
@@ -66,11 +74,11 @@ enum object_type {
     OBJECT_BORDER_BOTTOM,
     OBJECT_BORDER_LEFT,
     OBJECT_BORDER_RIGHT,
-    FIRST_DECORATION = OBJECT_TITLEBAR,
-    LAST_DECORATION = OBJECT_BORDER_RIGHT,
     OBJECT_WINDOW,
 };
 
+#define FIRST_DECORATION (OBJECT_TITLEBAR)
+#define LAST_DECORATION (OBJECT_BORDER_RIGHT)
 #define NUM_DECORATIONS (LAST_DECORATION-FIRST_DECORATION+1)
 
 struct window;
@@ -113,35 +121,19 @@ struct seat
     } xkb;
 };
 
-struct buffer_hdl
-{
-    void *base;
-    int size;
-    struct wl_buffer *wl_buffer;
-    bool busy;
-};
-
-struct buffer_allocator
-{
-    int shm_mem_fd;
-    int shm_mem_size;
-    int shm_file_free_size;
-    struct wl_shm_pool *shm_pool;
-};
-
 struct graphic_object
 {
     struct window *window;
 
     struct wl_surface *surface;
     bool surface_configured;
+    smm_buffer_t *pending_buffer;
+    smm_group_t *buffer_group;
     struct wl_subsurface *subsurface;
 
     enum object_type type;
     int width;
     int height;
-
-    struct buffer_hdl buffer;
 
     struct input input;
 };
@@ -217,11 +209,16 @@ struct window
 #if LV_WAYLAND_XDG_SHELL
     struct xdg_surface *xdg_surface;
     struct xdg_toplevel *xdg_toplevel;
+    uint32_t wm_capabilities;
 #endif
 
-    struct buffer_allocator allocator;
-
     struct graphic_object * body;
+    struct {
+        lv_area_t cache[DMG_CACHE_CAPACITY];
+        unsigned char start;
+        unsigned char end;
+        unsigned size;
+    } dmg_cache;
 
 #if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
     struct graphic_object * decoration[NUM_DECORATIONS];
@@ -229,7 +226,6 @@ struct window
 
     int width;
     int height;
-    int bits_per_pixel;
 
     bool resize_pending;
     int resize_width;
@@ -295,38 +291,6 @@ static void shm_format(void *data, struct wl_shm *wl_shm, uint32_t format)
     default:
         break;
     }
-}
-
-static int get_shm_format_bits_per_pixel(uint32_t format)
-{
-    int bits_per_pixel = 0;
-    switch (format)
-    {
-#if (LV_COLOR_DEPTH == 32)
-    case WL_SHM_FORMAT_ARGB8888:
-        bits_per_pixel = 32;
-        break;
-    case WL_SHM_FORMAT_XRGB8888:
-        bits_per_pixel = 32;
-        break;
-#elif (LV_COLOR_DEPTH == 16)
-    case WL_SHM_FORMAT_RGB565:
-        bits_per_pixel = 16;
-        break;
-#elif (LV_COLOR_DEPTH == 8)
-    case WL_SHM_FORMAT_RGB332:
-        bits_per_pixel = 8;
-        break;
-#elif (LV_COLOR_DEPTH == 1)
-    case WL_SHM_FORMAT_RGB332:
-        bits_per_pixel = 8;
-        break;
-#endif
-    default:
-        break;
-    }
-
-    return bits_per_pixel;
 }
 
 static const struct wl_shm_listener shm_listener = {
@@ -1115,13 +1079,17 @@ static const struct wl_shell_surface_listener shell_surface_listener = {
 static void xdg_surface_handle_configure(void *data, struct xdg_surface *xdg_surface, uint32_t serial)
 {
     struct window *window = (struct window *)data;
-    struct buffer_hdl *buffer = &window->body->buffer;
+    struct wl_buffer *wl_buf;
 
     xdg_surface_ack_configure(xdg_surface, serial);
 
-    if ((!window->body->surface_configured) && (buffer->busy)) {
-       // Flush occured before surface was configured, so add buffer here
-       wl_surface_attach(window->body->surface, buffer->wl_buffer, 0, 0);
+    if ((!window->body->surface_configured) &&
+        (window->body->pending_buffer != NULL)) {
+       // LVGL flush occured before surface was configured, so attach pending buffer here
+       wl_buf = SMM_BUFFER_PROPERTIES(window->body->pending_buffer)->tag[TAG_LOCAL];
+       window->body->pending_buffer = NULL;
+
+       wl_surface_attach(window->body->surface, wl_buf, 0, 0);
        wl_surface_commit(window->body->surface);
        window->flush_pending = true;
     }
@@ -1174,10 +1142,23 @@ static void xdg_toplevel_handle_configure_bounds(void *data, struct xdg_toplevel
      */
 }
 
+static void xdg_toplevel_handle_wm_capabilities(void *data, struct xdg_toplevel *xdg_toplevel,
+                                                struct wl_array *capabilities)
+{
+    uint32_t *cap;
+    struct window *window = (struct window *)data;
+
+    wl_array_for_each(cap, capabilities) {
+        window->wm_capabilities |= (1 << (*cap));
+        /* TODO: Disable appropriate graphics/capabilities as appropriate */
+    }
+}
+
 static const struct xdg_toplevel_listener xdg_toplevel_listener = {
     .configure = xdg_toplevel_handle_configure,
     .close = xdg_toplevel_handle_close,
-    .configure_bounds = xdg_toplevel_handle_configure_bounds
+    .configure_bounds = xdg_toplevel_handle_configure_bounds,
+    .wm_capabilities = xdg_toplevel_handle_wm_capabilities
 };
 
 static void xdg_wm_base_ping(void *data, struct xdg_wm_base *xdg_wm_base, uint32_t serial)
@@ -1241,178 +1222,246 @@ static const struct wl_registry_listener registry_listener = {
 
 static void handle_wl_buffer_release(void *data, struct wl_buffer *wl_buffer)
 {
-    struct buffer_hdl *buffer_hdl = (struct buffer_hdl *)data;
-    buffer_hdl->busy = false;
+    smm_release((smm_buffer_t *)data);
 }
 
 static const struct wl_buffer_listener wl_buffer_listener = {
     .release = handle_wl_buffer_release,
 };
 
-static bool initialize_allocator(struct buffer_allocator *allocator, const char *dir)
+static void cache_clear(struct window *window)
 {
-    static const char template[] = "/lvgl-wayland-XXXXXX";
-    char *name;
-
-    // Create file for shared memory allocation
-    name = lv_malloc(strlen(dir) + sizeof(template));
-    LV_ASSERT_MSG(name, "cannot allocate memory for name");
-    if (!name)
-    {
-        return false;
-    }
-
-    strcpy(name, dir);
-    strcat(name, template);
-
-    allocator->shm_mem_fd = mkstemp(name);
-
-    unlink(name);
-    lv_free(name);
-
-    LV_ASSERT_MSG((allocator->shm_mem_fd >= 0), "cannot create tmpfile");
-    if (allocator->shm_mem_fd < 0)
-    {
-        return false;
-    }
-
-    allocator->shm_mem_size = 0;
-    allocator->shm_file_free_size = 0;
-
-    return true;
+   window->dmg_cache.start = window->dmg_cache.end;
+   window->dmg_cache.size = 0;
 }
 
-static void deinitialize_allocator(struct buffer_allocator *allocator)
+static void cache_purge(struct window *window, smm_buffer_t *buf)
 {
-    if (allocator->shm_pool)
-    {
-        wl_shm_pool_destroy(allocator->shm_pool);
-    }
+    lv_area_t *next_dmg;
+    smm_buffer_t *next_buf = smm_next(buf);
 
-    if (allocator->shm_mem_fd >= 0)
+    /* Remove all damage areas up until start of next buffers damage */
+    if (next_buf == NULL)
     {
-        close(allocator->shm_mem_fd);
-        allocator->shm_mem_fd = -1;
+        cache_clear(window);
+    }
+    else
+    {
+        next_dmg = SMM_BUFFER_PROPERTIES(next_buf)->tag[TAG_BUFFER_DAMAGE];
+        while ((window->dmg_cache.cache + window->dmg_cache.start) != next_dmg)
+        {
+            window->dmg_cache.start++;
+            window->dmg_cache.start %= DMG_CACHE_CAPACITY;
+            window->dmg_cache.size--;
+        }
     }
 }
 
-static bool initialize_buffer(struct window *window, struct buffer_hdl *buffer_hdl,
-                              int width, int height)
+static void cache_add_area(struct window *window, smm_buffer_t *buf, const lv_area_t *area)
 {
-    struct application *app = window->application;
-    struct buffer_allocator *allocator = &window->allocator;
-    int allocated_size = 0;
-    int ret;
-    long sz = sysconf(_SC_PAGESIZE);
-
-    window->bits_per_pixel = get_shm_format_bits_per_pixel(app->format);
-
-    buffer_hdl->size = (((width * height * window->bits_per_pixel / 8) + sz - 1) / sz) * sz;
-
-    LV_LOG_TRACE("initializing buffer %dx%d (alloc size: %d)",
-                 width, height, buffer_hdl->size);
-
-    if (allocator->shm_file_free_size < buffer_hdl->size)
+    if (SMM_BUFFER_PROPERTIES(buf)->tag[TAG_BUFFER_DAMAGE] == NULL)
     {
-        do
-        {
-            ret = ftruncate(allocator->shm_mem_fd,
-                            allocator->shm_mem_size + (buffer_hdl->size - allocator->shm_file_free_size));
-        }
-        while ((ret < 0) && (errno == EINTR));
-
-        if (ret < 0)
-        {
-            LV_LOG_ERROR("ftruncate failed: %s", strerror(errno));
-            goto err_out;
-        }
-        else
-        {
-            allocated_size = (buffer_hdl->size - allocator->shm_file_free_size);
-        }
-
-        LV_ASSERT_MSG((allocated_size >= 0), "allocated_size is negative");
+        /* Buffer damage beyond cache capacity */
+        goto done;
     }
 
-    buffer_hdl->base = mmap(NULL, buffer_hdl->size,
-                            PROT_READ | PROT_WRITE, MAP_SHARED,
-                            allocator->shm_mem_fd,
-                            allocator->shm_mem_size - allocator->shm_file_free_size);
-    if (buffer_hdl->base == MAP_FAILED)
+    if ((window->dmg_cache.start == window->dmg_cache.end) &&
+        (window->dmg_cache.size))
     {
-        LV_LOG_ERROR("mmap failed: %s", strerror(errno));
-        goto err_inc_free;
+        /* This buffer has more damage then the cache's capacity, so
+         * clear cache and leave buffer damage unrecorded
+         */
+        cache_clear(window);
+        SMM_TAG(buf, TAG_BUFFER_DAMAGE, NULL);
+        goto done;
     }
 
-    if (!allocator->shm_pool)
-    {
-        // Create SHM pool
-        allocator->shm_pool = wl_shm_create_pool(app->shm,
-                                                 allocator->shm_mem_fd,
-                                                 allocator->shm_mem_size + allocated_size);
-        if (!allocator->shm_pool)
-        {
-            LV_LOG_ERROR("cannot create shm pool");
-            goto err_unmap;
-        }
-    }
-    else if (allocated_size > 0)
-    {
-        // Resize SHM pool
-        wl_shm_pool_resize(allocator->shm_pool,
-                           allocator->shm_mem_size + allocated_size);
-    }
+    /* Add damage area to cache */
+    memcpy(window->dmg_cache.cache + window->dmg_cache.end,
+           area,
+           sizeof(lv_area_t));
+    window->dmg_cache.end++;
+    window->dmg_cache.end %= DMG_CACHE_CAPACITY;
+    window->dmg_cache.size++;
 
-    // Create buffer
-    buffer_hdl->wl_buffer = wl_shm_pool_create_buffer(allocator->shm_pool,
-                                                      allocator->shm_mem_size - allocator->shm_file_free_size,
-                                                      width, height,
-                                                      width * window->bits_per_pixel / 8,
-                                                      app->format);
-    if (!buffer_hdl->wl_buffer)
-    {
-        LV_LOG_ERROR("cannot create shm buffer");
-        goto err_unmap;
-    }
-    wl_buffer_add_listener(buffer_hdl->wl_buffer, &wl_buffer_listener, buffer_hdl);
-
-    /* Update size of SHM */
-    allocator->shm_mem_size += allocated_size;
-    allocator->shm_file_free_size = LV_MAX(0, (allocator->shm_file_free_size - buffer_hdl->size));
-
-    lv_memset(buffer_hdl->base, 0x00, buffer_hdl->size);
-
-    return true;
-
-err_unmap:
-    munmap(buffer_hdl->base, buffer_hdl->size);
-
-err_inc_free:
-    allocator->shm_file_free_size += allocated_size;
-
-err_out:
-    return false;
+done:
+   return;
 }
 
-static bool deinitialize_buffer(struct window *window, struct buffer_hdl *buffer_hdl)
+static void cache_apply_areas(struct window *window, void *dest, void *src, smm_buffer_t *src_buf)
 {
-    struct buffer_allocator *allocator = &window->allocator;
+    unsigned long offset;
+    unsigned char start;
+    lv_coord_t y;
+    lv_area_t *dmg;
+    lv_area_t *next_dmg;
+    smm_buffer_t *next_buf = smm_next(src_buf);
+    const struct smm_buffer_properties *props = SMM_BUFFER_PROPERTIES(src_buf);
+    struct graphic_object *obj = SMM_GROUP_PROPERTIES(props->group)->tag[TAG_LOCAL];
 
-    if (buffer_hdl->wl_buffer)
+    if (next_buf == NULL)
     {
-        wl_buffer_destroy(buffer_hdl->wl_buffer);
-        buffer_hdl->wl_buffer = NULL;
+        next_dmg = (window->dmg_cache.cache + window->dmg_cache.end);
+    }
+    else
+    {
+        next_dmg = SMM_BUFFER_PROPERTIES(next_buf)->tag[TAG_BUFFER_DAMAGE];
     }
 
-    if (buffer_hdl->size > 0)
+    /* Apply all buffer damage areas */
+    start = ((lv_area_t *)SMM_BUFFER_PROPERTIES(src_buf)->tag[TAG_BUFFER_DAMAGE] - window->dmg_cache.cache);
+    while ((window->dmg_cache.cache + start) != next_dmg)
     {
-        munmap(buffer_hdl->base, buffer_hdl->size);
-        allocator->shm_file_free_size += buffer_hdl->size;
-        buffer_hdl->base = 0;
-        buffer_hdl->size = 0;
+        /* Copy an area from source to destination (line-by-line) */
+        dmg = (window->dmg_cache.cache + start);
+        for (y = dmg->y1; y <= dmg->y2; y++)
+        {
+            offset = (dmg->x1 + (y * (obj->width * BYTES_PER_PIXEL)));
+            memcpy(((char *)dest) + offset,
+                   ((char *)src) + offset,
+                   ((dmg->x2 - dmg->x1 + 1) * BYTES_PER_PIXEL));
+        }
+
+        start++;
+        start %= DMG_CACHE_CAPACITY;
+    }
+}
+
+static bool sme_new_pool(void *ctx, smm_pool_t *pool)
+{
+    struct wl_shm_pool *wl_pool;
+    struct application *app = ctx;
+    const struct smm_pool_properties *props = SMM_POOL_PROPERTIES(pool);
+
+    wl_pool = wl_shm_create_pool(app->shm,
+                                 props->fd,
+                                 props->size);
+
+    SMM_TAG(pool, TAG_LOCAL, wl_pool);
+    return (wl_pool == NULL);
+}
+
+static void sme_expand_pool(void *ctx, smm_pool_t *pool)
+{
+    const struct smm_pool_properties *props = SMM_POOL_PROPERTIES(pool);
+
+    wl_shm_pool_resize(props->tag[TAG_LOCAL], props->size);
+}
+
+static void sme_free_pool(void *ctx, smm_pool_t *pool)
+{
+    struct wl_shm_pool *wl_pool = SMM_POOL_PROPERTIES(pool)->tag[TAG_LOCAL];
+    wl_shm_pool_destroy(wl_pool);
+}
+
+static bool sme_new_buffer(void *ctx, smm_buffer_t *buf)
+{
+    struct wl_buffer *wl_buf;
+    bool fail_alloc = true;
+    const struct smm_buffer_properties *props = SMM_BUFFER_PROPERTIES(buf);
+    struct wl_shm_pool *wl_pool = SMM_POOL_PROPERTIES(props->pool)->tag[TAG_LOCAL];
+    struct application *app = ctx;
+    struct graphic_object *obj = SMM_GROUP_PROPERTIES(props->group)->tag[TAG_LOCAL];
+
+    wl_buf = wl_shm_pool_create_buffer(wl_pool,
+                                       props->offset,
+                                       obj->width,
+                                       obj->height,
+                                       obj->width * BYTES_PER_PIXEL,
+                                       app->format);
+
+    if (wl_buf != NULL) {
+        wl_buffer_add_listener(wl_buf, &wl_buffer_listener, buf);
+        SMM_TAG(buf, TAG_LOCAL, wl_buf);
+        SMM_TAG(buf, TAG_BUFFER_DAMAGE, NULL);
+        fail_alloc = false;
     }
 
-    return true;
+    return fail_alloc;
+}
+
+static bool sme_init_buffer(void *ctx, smm_buffer_t *buf)
+{
+    smm_buffer_t *src;
+    void *src_base;
+    bool fail_init = true;
+    bool dmg_missing = false;
+    void *buf_base = smm_map(buf);
+    const struct smm_buffer_properties *props = SMM_BUFFER_PROPERTIES(buf);
+    struct graphic_object *obj = SMM_GROUP_PROPERTIES(props->group)->tag[TAG_LOCAL];
+
+    if (buf_base == NULL)
+    {
+        LV_LOG_ERROR("cannot map in buffer to initialize");
+        goto done;
+    }
+
+    /* Determine if all subsequent buffers damage is recorded */
+    for (src = smm_next(buf); src != NULL; src = smm_next(src))
+    {
+        if (SMM_BUFFER_PROPERTIES(src)->tag[TAG_BUFFER_DAMAGE] == NULL)
+        {
+            dmg_missing = true;
+            break;
+        }
+    }
+
+    if ((smm_next(buf) == NULL) || dmg_missing)
+    {
+        /* Missing subsequent buffer damage, initialize by copying the most
+         * recently acquired buffers data
+         */
+        src = smm_latest(props->group);
+        if ((src != NULL) &&
+            (src != buf))
+        {
+            /* Map and copy latest buffer data */
+            src_base = smm_map(src);
+            if (src_base == NULL)
+            {
+                LV_LOG_ERROR("cannot map most recent buffer to copy");
+                goto done;
+            }
+
+            memcpy(buf_base,
+                   src_base,
+                   (obj->width * BYTES_PER_PIXEL) * obj->height);
+        }
+    }
+    else
+    {
+        /* All subsequent buffers damage is recorded, initialize by applying
+         * their damage to this buffer
+         */
+        for (src = smm_next(buf); src != NULL; src = smm_next(src))
+        {
+            src_base = smm_map(src);
+            if (src_base == NULL)
+            {
+                LV_LOG_ERROR("cannot map source buffer to copy from");
+                goto done;
+            }
+
+            cache_apply_areas(obj->window, buf_base, src_base, src);
+        }
+
+        /* Purge out-of-date cached damage (up to and including next buffer) */
+        src = smm_next(buf);
+        if (src == NULL)
+        {
+            cache_purge(obj->window, src);
+        }
+    }
+
+   fail_init = false;
+done:
+   return fail_init;
+}
+
+static void sme_free_buffer(void *ctx, smm_buffer_t *buf)
+{
+    struct wl_buffer *wl_buf = SMM_BUFFER_PROPERTIES(buf)->tag[TAG_LOCAL];
+    wl_buffer_destroy(wl_buf);
 }
 
 static struct graphic_object * create_graphic_obj(struct application *app, struct window *window,
@@ -1430,9 +1479,6 @@ static struct graphic_object * create_graphic_obj(struct application *app, struc
 
     lv_memset(obj, 0x00, sizeof(struct graphic_object));
 
-    obj->window = window;
-    obj->type = type;
-
     obj->surface = wl_compositor_create_surface(app->compositor);
     if (!obj->surface)
     {
@@ -1440,8 +1486,19 @@ static struct graphic_object * create_graphic_obj(struct application *app, struc
         goto err_free;
     }
 
+    obj->buffer_group = smm_create();
+    if (obj->buffer_group == NULL)
+    {
+        LV_LOG_ERROR("cannot create buffer group for graphic object");
+        goto err_destroy_surface;
+    }
+
+    obj->window = window;
+    obj->type = type;
     obj->surface_configured = true;
+    obj->pending_buffer = NULL;
     wl_surface_set_user_data(obj->surface, obj);
+    SMM_TAG(obj->buffer_group, TAG_LOCAL, obj);
 
     return obj;
 
@@ -1463,152 +1520,15 @@ static void destroy_graphic_obj(struct graphic_object * obj)
     }
 
     wl_surface_destroy(obj->surface);
-
+    smm_destroy(obj->buffer_group);
     lv_free(obj);
 }
 
-#if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
-static bool create_decoration(struct window *window,
-                              struct graphic_object * decoration,
-                              int window_width, int window_height)
-{
-    struct buffer_hdl * buffer = &decoration->buffer;
-    int x, y;
-
-    switch (decoration->type)
-    {
-    case OBJECT_TITLEBAR:
-        decoration->width = window_width;
-        decoration->height = TITLE_BAR_HEIGHT;
-        break;
-    case OBJECT_BUTTON_CLOSE:
-        decoration->width = BUTTON_SIZE;
-        decoration->height = BUTTON_SIZE;
-        break;
-#if LV_WAYLAND_XDG_SHELL
-    case OBJECT_BUTTON_MAXIMIZE:
-        decoration->width = BUTTON_SIZE;
-        decoration->height = BUTTON_SIZE;
-        break;
-    case OBJECT_BUTTON_MINIMIZE:
-        decoration->width = BUTTON_SIZE;
-        decoration->height = BUTTON_SIZE;
-        break;
-#endif
-    case OBJECT_BORDER_TOP:
-        decoration->width = window_width + 2 * (BORDER_SIZE);
-        decoration->height = BORDER_SIZE;
-        break;
-    case OBJECT_BORDER_BOTTOM:
-        decoration->width = window_width + 2 * (BORDER_SIZE);
-        decoration->height = BORDER_SIZE;
-        break;
-    case OBJECT_BORDER_LEFT:
-        decoration->width = BORDER_SIZE;
-        decoration->height = window_height + TITLE_BAR_HEIGHT;
-        break;
-    case OBJECT_BORDER_RIGHT:
-        decoration->width = BORDER_SIZE;
-        decoration->height = window_height + TITLE_BAR_HEIGHT;
-        break;
-    default:
-        LV_ASSERT_MSG(0, "Invalid object type");
-        return false;
-    }
-
-    if (!initialize_buffer(window, buffer, decoration->width, decoration->height))
-    {
-        LV_LOG_ERROR("cannot create buffer for decoration");
-        return false;
-    }
-
-    switch (decoration->type)
-    {
-    case OBJECT_TITLEBAR:
-        lv_color_fill((lv_color_t *)buffer->base,
-                      lv_color_make(0x66, 0x66, 0x66), (decoration->width * decoration->height));
-        break;
-    case OBJECT_BUTTON_CLOSE:
-        lv_color_fill((lv_color_t *)buffer->base,
-                      lv_color_make(0xCC, 0xCC, 0xCC), (decoration->width * decoration->height));
-        for (y = 0; y < decoration->height; y++)
-        {
-            for (x = 0; x < decoration->width; x++)
-            {
-                lv_color_t *pixel = ((lv_color_t *)buffer->base + (y * decoration->width) + x);
-                if ((x >= BUTTON_PADDING) && (x < decoration->width - BUTTON_PADDING))
-                {
-                    if ((x == y) || (x == decoration->width - 1 - y))
-                    {
-                        *pixel = lv_color_make(0x33, 0x33, 0x33);
-                    }
-                    else if ((x == y - 1) || (x == decoration->width - y))
-                    {
-                        *pixel = lv_color_make(0x66, 0x66, 0x66);
-                    }
-                }
-            }
-        }
-        break;
-#if LV_WAYLAND_XDG_SHELL
-    case OBJECT_BUTTON_MAXIMIZE:
-        lv_color_fill((lv_color_t *)buffer->base,
-                      lv_color_make(0xCC, 0xCC, 0xCC), (decoration->width * decoration->height));
-        for (y = 0; y < decoration->height; y++)
-        {
-            for (x = 0; x < decoration->width; x++)
-            {
-                lv_color_t *pixel = ((lv_color_t *)buffer->base + (y * decoration->width) + x);
-                if (((x == BUTTON_PADDING) && (y >= BUTTON_PADDING) && (y < decoration->height - BUTTON_PADDING)) ||
-                    ((x == (decoration->width - BUTTON_PADDING)) && (y >= BUTTON_PADDING) && (y <= decoration->height - BUTTON_PADDING)) ||
-                    ((y == BUTTON_PADDING) && (x >= BUTTON_PADDING) && (x < decoration->width - BUTTON_PADDING)) ||
-                    ((y == (BUTTON_PADDING + 1)) && (x >= BUTTON_PADDING) && (x < decoration->width - BUTTON_PADDING)) ||
-                    ((y == (decoration->height - BUTTON_PADDING)) && (x >= BUTTON_PADDING) && (x < decoration->width - BUTTON_PADDING)))
-                {
-                    *pixel = lv_color_make(0x33, 0x33, 0x33);
-                }
-            }
-        }
-        break;
-    case OBJECT_BUTTON_MINIMIZE:
-        lv_color_fill((lv_color_t *)buffer->base,
-                      lv_color_make(0xCC, 0xCC, 0xCC), (decoration->width * decoration->height));
-        for (y = 0; y < decoration->height; y++)
-        {
-            for (x = 0; x < decoration->width; x++)
-            {
-                lv_color_t *pixel = ((lv_color_t *)buffer->base + (y * decoration->width) + x);
-                if ((x >= BUTTON_PADDING) && (x < decoration->width - BUTTON_PADDING) &&
-                    (y > decoration->height - (2 * BUTTON_PADDING)) && (y < decoration->height - BUTTON_PADDING))
-                {
-                    *pixel = lv_color_make(0x33, 0x33, 0x33);
-                }
-            }
-        }
-        break;
-#endif
-    case OBJECT_BORDER_TOP:
-        /* fallthrough */
-    case OBJECT_BORDER_BOTTOM:
-        /* fallthrough */
-    case OBJECT_BORDER_LEFT:
-        /* fallthrough */
-    case OBJECT_BORDER_RIGHT:
-        lv_color_fill((lv_color_t *)buffer->base,
-                      lv_color_make(0x66, 0x66, 0x66), (decoration->width * decoration->height));
-        break;
-    default:
-        LV_ASSERT_MSG(0, "Invalid object type");
-        return false;
-    }
-
-    return true;
-}
-
 static bool attach_decoration(struct window *window, struct graphic_object * decoration,
-                              struct graphic_object * parent)
+                              smm_buffer_t *decoration_buffer, struct graphic_object * parent)
 {
-    struct buffer_hdl * buffer = &decoration->buffer;
+    struct wl_buffer *wl_buf = SMM_BUFFER_PROPERTIES(decoration_buffer)->tag[TAG_LOCAL];
+
     int pos_x, pos_y;
     int x, y;
 
@@ -1665,9 +1585,8 @@ static bool attach_decoration(struct window *window, struct graphic_object * dec
     wl_subsurface_set_desync(decoration->subsurface);
     wl_subsurface_set_position(decoration->subsurface, pos_x, pos_y);
 
-    wl_surface_attach(decoration->surface, buffer->wl_buffer, 0, 0);
+    wl_surface_attach(decoration->surface, wl_buf, 0, 0);
     wl_surface_commit(decoration->surface);
-    buffer->busy = true;
 
     return true;
 
@@ -1676,6 +1595,157 @@ err_destroy_surface:
     decoration->surface = NULL;
 
     return false;
+}
+
+#if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
+static bool create_decoration(struct window *window,
+                              struct graphic_object * decoration,
+                              int window_width, int window_height)
+{
+    smm_buffer_t *buf;
+    void *buf_base;
+    int x, y;
+
+    switch (decoration->type)
+    {
+    case OBJECT_TITLEBAR:
+        decoration->width = window_width;
+        decoration->height = TITLE_BAR_HEIGHT;
+        break;
+    case OBJECT_BUTTON_CLOSE:
+        decoration->width = BUTTON_SIZE;
+        decoration->height = BUTTON_SIZE;
+        break;
+#if LV_WAYLAND_XDG_SHELL
+    case OBJECT_BUTTON_MAXIMIZE:
+        decoration->width = BUTTON_SIZE;
+        decoration->height = BUTTON_SIZE;
+        break;
+    case OBJECT_BUTTON_MINIMIZE:
+        decoration->width = BUTTON_SIZE;
+        decoration->height = BUTTON_SIZE;
+        break;
+#endif
+    case OBJECT_BORDER_TOP:
+        decoration->width = window_width + 2 * (BORDER_SIZE);
+        decoration->height = BORDER_SIZE;
+        break;
+    case OBJECT_BORDER_BOTTOM:
+        decoration->width = window_width + 2 * (BORDER_SIZE);
+        decoration->height = BORDER_SIZE;
+        break;
+    case OBJECT_BORDER_LEFT:
+        decoration->width = BORDER_SIZE;
+        decoration->height = window_height + TITLE_BAR_HEIGHT;
+        break;
+    case OBJECT_BORDER_RIGHT:
+        decoration->width = BORDER_SIZE;
+        decoration->height = window_height + TITLE_BAR_HEIGHT;
+        break;
+    default:
+        LV_ASSERT_MSG(0, "Invalid object type");
+        return false;
+    }
+
+    smm_resize(decoration->buffer_group,
+               (decoration->width * BYTES_PER_PIXEL) * decoration->height);
+
+    buf = smm_acquire(decoration->buffer_group);
+    if (buf == NULL)
+    {
+        LV_LOG_ERROR("cannot allocate buffer for decoration");
+        return false;
+    }
+
+    buf_base = smm_map(buf);
+    if (buf_base == NULL)
+    {
+        LV_LOG_ERROR("cannot map in allocated decoration buffer");
+        smm_release(buf);
+        return false;
+    }
+
+    switch (decoration->type)
+    {
+    case OBJECT_TITLEBAR:
+        lv_color_fill((lv_color_t *)buf_base,
+                      lv_color_make(0x66, 0x66, 0x66), (decoration->width * decoration->height));
+        break;
+    case OBJECT_BUTTON_CLOSE:
+        lv_color_fill((lv_color_t *)buf_base,
+                      lv_color_make(0xCC, 0xCC, 0xCC), (decoration->width * decoration->height));
+        for (y = 0; y < decoration->height; y++)
+        {
+            for (x = 0; x < decoration->width; x++)
+            {
+                lv_color_t *pixel = ((lv_color_t *)buf_base + (y * decoration->width) + x);
+                if ((x >= BUTTON_PADDING) && (x < decoration->width - BUTTON_PADDING))
+                {
+                    if ((x == y) || (x == decoration->width - 1 - y))
+                    {
+                        *pixel = lv_color_make(0x33, 0x33, 0x33);
+                    }
+                    else if ((x == y - 1) || (x == decoration->width - y))
+                    {
+                        *pixel = lv_color_make(0x66, 0x66, 0x66);
+                    }
+                }
+            }
+        }
+        break;
+#if LV_WAYLAND_XDG_SHELL
+    case OBJECT_BUTTON_MAXIMIZE:
+        lv_color_fill((lv_color_t *)buf_base,
+                      lv_color_make(0xCC, 0xCC, 0xCC), (decoration->width * decoration->height));
+        for (y = 0; y < decoration->height; y++)
+        {
+            for (x = 0; x < decoration->width; x++)
+            {
+                lv_color_t *pixel = ((lv_color_t *)buf_base + (y * decoration->width) + x);
+                if (((x == BUTTON_PADDING) && (y >= BUTTON_PADDING) && (y < decoration->height - BUTTON_PADDING)) ||
+                    ((x == (decoration->width - BUTTON_PADDING)) && (y >= BUTTON_PADDING) && (y <= decoration->height - BUTTON_PADDING)) ||
+                    ((y == BUTTON_PADDING) && (x >= BUTTON_PADDING) && (x < decoration->width - BUTTON_PADDING)) ||
+                    ((y == (BUTTON_PADDING + 1)) && (x >= BUTTON_PADDING) && (x < decoration->width - BUTTON_PADDING)) ||
+                    ((y == (decoration->height - BUTTON_PADDING)) && (x >= BUTTON_PADDING) && (x < decoration->width - BUTTON_PADDING)))
+                {
+                    *pixel = lv_color_make(0x33, 0x33, 0x33);
+                }
+            }
+        }
+        break;
+    case OBJECT_BUTTON_MINIMIZE:
+        lv_color_fill((lv_color_t *)buf_base,
+                      lv_color_make(0xCC, 0xCC, 0xCC), (decoration->width * decoration->height));
+        for (y = 0; y < decoration->height; y++)
+        {
+            for (x = 0; x < decoration->width; x++)
+            {
+                lv_color_t *pixel = ((lv_color_t *)buf_base + (y * decoration->width) + x);
+                if ((x >= BUTTON_PADDING) && (x < decoration->width - BUTTON_PADDING) &&
+                    (y > decoration->height - (2 * BUTTON_PADDING)) && (y < decoration->height - BUTTON_PADDING))
+                {
+                    *pixel = lv_color_make(0x33, 0x33, 0x33);
+                }
+            }
+        }
+        break;
+#endif
+    case OBJECT_BORDER_TOP:
+        /* fallthrough */
+    case OBJECT_BORDER_BOTTOM:
+        /* fallthrough */
+    case OBJECT_BORDER_LEFT:
+        /* fallthrough */
+    case OBJECT_BORDER_RIGHT:
+        lv_color_fill((lv_color_t *)buf_base,
+                      lv_color_make(0x66, 0x66, 0x66), (decoration->width * decoration->height));
+        break;
+    default:
+        LV_ASSERT_MSG(0, "Invalid object type");
+        return false;
+    }
+
+    return attach_decoration(window, decoration, buf, window->body);
 }
 
 static void detach_decoration(struct window *window,
@@ -1691,24 +1761,9 @@ static void detach_decoration(struct window *window,
 
 static bool resize_window(struct window *window, int width, int height)
 {
-    struct buffer_hdl *buffer = &window->body->buffer;
+    lv_color_t * buf1 = NULL;
 
     LV_LOG_TRACE("resize window %dx%d", width, height);
-
-    // De-initialize previous buffers
-    if (buffer->busy)
-    {
-        LV_LOG_WARN("Deinitializing busy window buffer...");
-        wl_surface_attach(window->body->surface, NULL, 0, 0);
-        wl_surface_commit(window->body->surface);
-        buffer->busy = false;
-    }
-
-    if (!deinitialize_buffer(window, buffer))
-    {
-        LV_LOG_ERROR("failed to deinitialize window buffer");
-        return false;
-    }
 
 #if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
     int b;
@@ -1717,17 +1772,12 @@ static bool resize_window(struct window *window, int width, int height)
         if (window->decoration[b] != NULL)
         {
             detach_decoration(window, window->decoration[b]);
-            deinitialize_buffer(window, &window->decoration[b]->buffer);
         }
     }
 #endif
 
-    // Initialize backing buffer
-    if (!initialize_buffer(window, buffer, width, height))
-    {
-        LV_LOG_ERROR("failed to initialize window buffer");
-        return false;
-    }
+    /* Update size for newly allocated buffers */
+    smm_resize(window->body->buffer_group, (width * BYTES_PER_PIXEL) * height);
 
     window->width = width;
     window->height = height;
@@ -1745,17 +1795,24 @@ static bool resize_window(struct window *window, int width, int height)
             {
                 LV_LOG_ERROR("failed to create decoration %d", b);
             }
-            else if (!attach_decoration(window, window->decoration[b], window->body))
-            {
-                LV_LOG_ERROR("failed to attach decoration %d", b);
-            }
         }
     }
 #endif
 
     if (window->lv_disp != NULL)
     {
-        // Propagate resize to upper layers
+        /* Resize draw buffer */
+        buf1 = lv_malloc(((width * height) / LVGL_DRAW_BUFFER_DIV) * sizeof(lv_color_t));
+        if (!buf1)
+        {
+            LV_LOG_ERROR("failed to resize draw buffer");
+            return false;
+       }
+
+       lv_free(window->lv_disp_draw_buf.buf1);
+       lv_disp_draw_buf_init(&window->lv_disp_draw_buf, buf1, NULL, (width * height) / LVGL_DRAW_BUFFER_DIV);
+
+        /* Propagate resize to LVGL */
         window->lv_disp_drv.hor_res = width;
         window->lv_disp_drv.ver_res = height;
         lv_disp_drv_update(window->lv_disp, &window->lv_disp_drv);
@@ -1782,19 +1839,12 @@ static struct window *create_window(struct application *app, int width, int heig
 
     window->application = app;
 
-    // Initialize buffer allocator
-    if (!initialize_allocator(&window->allocator, app->xdg_runtime_dir))
-    {
-        LV_LOG_ERROR("cannot init memory allocator");
-        goto err_free_window;
-    }
-
     // Create wayland buffer and surface
     window->body = create_graphic_obj(app, window, OBJECT_WINDOW, NULL);
     if (!window->body)
     {
         LV_LOG_ERROR("cannot create window body");
-        goto err_deinit_allocator;
+        goto err_free_window;
     }
 
     // Create shell surface
@@ -1901,9 +1951,6 @@ err_destroy_shell_surface:
 err_destroy_surface:
     wl_surface_destroy(window->body->surface);
 
-err_deinit_allocator:
-    deinitialize_allocator(&window->allocator);
-
 err_free_window:
     _lv_ll_remove(&app->window_ll, window);
     lv_free(window);
@@ -1937,113 +1984,125 @@ static void destroy_window(struct window *window)
     {
         if (window->decoration[b])
         {
-            deinitialize_buffer(window, &window->decoration[b]->buffer);
             destroy_graphic_obj(window->decoration[b]);
             window->decoration[b] = NULL;
         }
     }
 #endif
 
-    deinitialize_buffer(window, &window->body->buffer);
     destroy_graphic_obj(window->body);
-
-    deinitialize_allocator(&window->allocator);
 }
 
 static void _lv_wayland_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p)
 {
+    unsigned long offset;
+    int32_t x;
+    int32_t y;
+    void *buf_base;
+    struct wl_buffer *wl_buf;
+    lv_coord_t src_width = (area->x2 - area->x1 + 1);
+    lv_coord_t src_height = (area->y2 - area->y1 + 1);
     struct window *window = disp_drv->user_data;
-    struct buffer_hdl *buffer = &window->body->buffer;
+    smm_buffer_t *buf = window->body->pending_buffer;
 
     const lv_coord_t hres = (disp_drv->rotated == 0) ? (disp_drv->hor_res) : (disp_drv->ver_res);
     const lv_coord_t vres = (disp_drv->rotated == 0) ? (disp_drv->ver_res) : (disp_drv->hor_res);
 
-    /* If private data is not set, it means window has not been initialized */
-    if (!window)
+    /* If window has been / is being closed, or is not visible, skip flush */
+    if (window->closed || window->shall_close)
     {
-        LV_LOG_ERROR("please intialize wayland display using lv_wayland_create_window()");
-        return;
+        goto skip;
     }
-    /* If window has been / is being closed, or is not visible, skip rendering */
-    else if (window->closed || window->shall_close)
-    {
-        lv_disp_flush_ready(disp_drv);
-        return;
-    }
-    /* Return if the area is out the screen */
+    /* Skip if the area is out the screen */
     else if ((area->x2 < 0) || (area->y2 < 0) || (area->x1 > hres - 1) || (area->y1 > vres - 1))
     {
-        lv_disp_flush_ready(disp_drv);
-        return;
+        goto skip;
     }
     else if (window->resize_pending)
     {
         LV_LOG_TRACE("skip flush since resize is pending");
-        lv_disp_flush_ready(disp_drv);
-        return;
+        goto skip;
     }
-    else if (buffer->busy)
-    {
-        LV_LOG_WARN("skip flush since wayland backing buffer is busy");
-        lv_disp_flush_ready(disp_drv);
-        return;
-    }
-    
-    if (LV_COLOR_DEPTH == window->bits_per_pixel && LV_COLOR_DEPTH != 1 && LV_COLOR_DEPTH != 8)
-    {
-        int32_t bytes_pre_pixel = window->bits_per_pixel / 8;
-        int32_t x1 = area->x1, x2 = area->x2 <= disp_drv->hor_res - 1 ? area->x2 : disp_drv->hor_res - 1;
-        int32_t y1 = area->y1, y2 = area->y2 <= disp_drv->ver_res - 1 ? area->y2 : disp_drv->ver_res - 1;
-        int32_t act_w = x2 - x1 + 1;
 
-        for (int y = y1; y <= y2; y++)
-        {
-            lv_memcpy((uint8_t *)buffer->base + ((y * disp_drv->hor_res + x1) * bytes_pre_pixel), color_p, act_w * bytes_pre_pixel);
-            color_p += act_w;
-        }
-    }
-    else
+    /* Acquire and map a buffer to attach/commit to surface */
+    if (buf == NULL)
     {
-        int32_t x;
-        int32_t y;
-        for (y = area->y1; y <= area->y2 && y < disp_drv->ver_res; y++)
+        buf = smm_acquire(window->body->buffer_group);
+        if (buf == NULL)
         {
-            for (x = area->x1; x <= area->x2 && x < disp_drv->hor_res; x++)
-            {
-                int offset = (y * disp_drv->hor_res) + x;
-#if (LV_COLOR_DEPTH == 32)
-                uint32_t * const buf = (uint32_t *)buffer->base + offset;
-                *buf = color_p->full;
-#elif (LV_COLOR_DEPTH == 16)
-                uint16_t * const buf = (uint16_t *)buffer->base + offset;
-                *buf = color_p->full;
-#elif (LV_COLOR_DEPTH == 8)
-                uint8_t * const buf = (uint8_t *)buffer->base + offset;
-                *buf = color_p->full;
-#elif (LV_COLOR_DEPTH == 1)
-                uint8_t * const buf = (uint8_t *)buffer->base + offset;
-                *buf = ((0x07 * color_p->ch.red)   << 5) |
+            LV_LOG_ERROR("cannot acquire a window body buffer");
+            goto skip;
+        }
+
+        window->body->pending_buffer = buf;
+        SMM_TAG(buf,
+                TAG_BUFFER_DAMAGE,
+                window->dmg_cache.cache + window->dmg_cache.end);
+    }
+
+    buf_base = smm_map(buf);
+    if (buf_base == NULL)
+    {
+        LV_LOG_ERROR("cannot map in window body buffer");
+        goto skip;
+    }
+
+    /* Modify specified area in buffer */
+    for (y = area->y1; y <= area->y2; y++)
+    {
+        offset = ((area->x1 + (y * disp_drv->hor_res)) * BYTES_PER_PIXEL);
+#if (LV_COLOR_DEPTH == 1)
+        for (x = 0; x < src_width; x++)
+        {
+            uint8_t * const dest = (uint8_t *)buf_base + offset + x;
+            *dest = ((0x07 * color_p->ch.red)   << 5) |
                     ((0x07 * color_p->ch.green) << 2) |
                     ((0x03 * color_p->ch.blue)  << 0);
-#endif
-                color_p++;
-            }
+            color_p++;
         }
+#else
+        memcpy(((char *)buf_base) + offset,
+               color_p,
+               src_width * BYTES_PER_PIXEL);
+        color_p += src_width;
+#endif
     }
 
-    wl_surface_damage(window->body->surface, area->x1, area->y1,
-                      (area->x2 - area->x1 + 1), (area->y2 - area->y1 + 1));
+    /* Mark surface damage */
+    wl_surface_damage(window->body->surface,
+                      area->x1,
+                      area->y1,
+                      src_width,
+                      src_height);
+
+    /* Cache buffer damage for future buffer initializations */
+    cache_add_area(window, buf, area);
 
     if (lv_disp_flush_is_last(disp_drv))
     {
         if (window->body->surface_configured) {
-           wl_surface_attach(window->body->surface, buffer->wl_buffer, 0, 0);
-           wl_surface_commit(window->body->surface);
+            /* Finally, attach buffer and commit to surface */
+            wl_buf = SMM_BUFFER_PROPERTIES(buf)->tag[TAG_LOCAL];
+            wl_surface_attach(window->body->surface, wl_buf, 0, 0);
+            wl_surface_commit(window->body->surface);
+            window->body->pending_buffer = NULL;
         }
-        buffer->busy = true;
+
         window->flush_pending = true;
     }
 
+   goto done;
+skip:
+    if (buf != NULL) {
+        /* Cleanup any intermediate state (in the event that this flush being
+         * skipped is in the middle of a flush sequence)
+         */
+        cache_clear(window);
+        SMM_TAG(buf, TAG_BUFFER_DAMAGE, NULL);
+        smm_release(buf);
+        window->body->pending_buffer = NULL;
+    }
+done:
     lv_disp_flush_ready(disp_drv);
 }
 
@@ -2076,7 +2135,6 @@ static void _lv_wayland_handle_output(void)
         }
         else if (window->shall_close)
         {
-            destroy_window(window);
             window->closed = true;
             window->shall_close = false;
             shall_flush = true;
@@ -2106,25 +2164,11 @@ static void _lv_wayland_handle_output(void)
             {
                 window->application->keyboard_obj = NULL;
             }
+            destroy_window(window);
         }
         else if (window->resize_pending)
         {
-            bool do_resize = !window->body->buffer.busy;
-#if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
-            if (!window->application->opt_disable_decorations && !window->fullscreen)
-            {
-                int d;
-                for (d = 0; d < NUM_DECORATIONS; d++)
-                {
-                    if ((window->decoration[d] != NULL) && (window->decoration[d]->buffer.busy))
-                    {
-                        do_resize = false;
-                        break;
-                    }
-                }
-            }
-#endif
-            if (do_resize && resize_window(window, window->resize_width, window->resize_height))
+            if (resize_window(window, window->resize_width, window->resize_height))
             {
                 window->resize_width = window->width;
                 window->resize_height = window->height;
@@ -2225,6 +2269,16 @@ static void _lv_wayland_touch_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
  */
 void lv_wayland_init(void)
 {
+    struct smm_events evs = {
+        NULL,
+        sme_new_pool,
+        sme_expand_pool,
+        sme_free_pool,
+        sme_new_buffer,
+        sme_init_buffer,
+        sme_free_buffer
+    };
+
     application.xdg_runtime_dir = getenv("XDG_RUNTIME_DIR");
     LV_ASSERT_MSG(application.xdg_runtime_dir, "cannot get XDG_RUNTIME_DIR");
 
@@ -2269,6 +2323,9 @@ void lv_wayland_init(void)
         return;
     }
 
+    smm_init(&evs);
+    smm_setctx(&application);
+
 #ifdef LV_WAYLAND_CLIENT_SIDE_DECORATIONS
     const char * env_disable_decorations = getenv("LV_WAYLAND_DISABLE_WINDOWDECORATION");
     application.opt_disable_decorations = ((env_disable_decorations != NULL) &&
@@ -2277,12 +2334,14 @@ void lv_wayland_init(void)
 
     _lv_ll_init(&application.window_ll, sizeof(struct window));
 
+#ifndef LV_WAYLAND_TIMER_HANDLER
     application.cycle_timer = lv_timer_create(_lv_wayland_cycle, LV_WAYLAND_CYCLE_PERIOD, NULL);
     LV_ASSERT_MSG(application.cycle_timer, "failed to create cycle timer");
     if (!application.cycle_timer)
     {
         return;
     }
+#endif
 }
 
 /**
@@ -2299,6 +2358,8 @@ void lv_wayland_deinit(void)
             destroy_window(window);
         }
     }
+
+    smm_deinit();
 
     if (application.shm)
     {
@@ -2374,7 +2435,7 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
     window->close_cb = close_cb;
 
     /* Initialize draw buffer */
-    buf1 = lv_malloc(hor_res * ver_res * sizeof(lv_color_t));
+    buf1 = lv_malloc(((hor_res * ver_res) / LVGL_DRAW_BUFFER_DIV) * sizeof(lv_color_t));
     if (!buf1)
     {
         LV_LOG_ERROR("failed to allocate draw buffer");
@@ -2382,7 +2443,7 @@ lv_disp_t * lv_wayland_create_window(lv_coord_t hor_res, lv_coord_t ver_res, cha
         return NULL;
     }
 
-    lv_disp_draw_buf_init(&window->lv_disp_draw_buf, buf1, NULL, hor_res * ver_res);
+    lv_disp_draw_buf_init(&window->lv_disp_draw_buf, buf1, NULL, (hor_res * ver_res) / LVGL_DRAW_BUFFER_DIV);
 
     /* Initialize display driver */
     lv_disp_drv_init(&window->lv_disp_drv);
@@ -2482,38 +2543,6 @@ bool lv_wayland_window_is_open(lv_disp_t * disp)
     }
 
    return open;
-}
-
-/**
- * Check if a Wayland flush is outstanding (i.e. data still needs to be sent to
- * the compositor, but the compositor pipe/connection  is unable to take more
- * data at this time) for a window on the specified display. Otherwise (if
- * argument is NULL), check if any window flush is outstanding.
- * @return true if a flush is outstanding, false otherwise
- */
-bool lv_wayland_window_is_flush_pending(lv_disp_t * disp)
-{
-    struct window *window;
-    bool flush_pending = false;
-
-    if (disp == NULL)
-    {
-        _LV_LL_READ(&application.window_ll, window)
-        {
-            if (window->flush_pending)
-            {
-                flush_pending = true;
-                break;
-            }
-        }
-    }
-    else
-    {
-        window = disp->driver->user_data;
-        flush_pending = window->flush_pending;
-    }
-
-    return flush_pending;
 }
 
 /**
@@ -2646,13 +2675,6 @@ uint32_t lv_wayland_timer_handler(void)
     lv_timer_t *input_timer[4];
     uint32_t time_till_next;
 
-    /* Remove cycle timer (as this function is doing its work) */
-    if (application.cycle_timer != NULL)
-    {
-        lv_timer_del(application.cycle_timer);
-        application.cycle_timer = NULL;
-    }
-
     /* Wayland input handling */
     _lv_wayland_handle_input();
 
@@ -2678,6 +2700,20 @@ uint32_t lv_wayland_timer_handler(void)
 
     /* Wayland output handling */
     _lv_wayland_handle_output();
+
+
+    /* Set 'errno' if a Wayland flush is outstanding (i.e. data still needs to
+     * be sent to the compositor, but the compositor pipe/connection is unable
+     * to take more data at this time).
+     */
+    _LV_LL_READ(&application.window_ll, window)
+    {
+        if (window->flush_pending)
+        {
+            errno = EAGAIN;
+            break;
+        }
+    }
 
     return time_till_next;
 }
