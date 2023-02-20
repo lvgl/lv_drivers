@@ -58,6 +58,7 @@
 
 typedef struct _lv_win32_keyboard_queue_item_t
 {
+    SLIST_ENTRY ItemEntry;
     uint32_t key;
     lv_indev_state_t state;
 } lv_win32_keyboard_queue_item_t;
@@ -87,7 +88,7 @@ typedef struct _lv_win32_window_context_t
     lv_indev_drv_t mousewheel_driver;
 
     CRITICAL_SECTION keyboard_mutex;
-    lv_ll_t keyboard_queue;
+    PSLIST_HEADER keyboard_queue;
     uint16_t keyboard_utf16_high_surrogate;
     uint16_t keyboard_utf16_low_surrogate;
     lv_indev_drv_t keyboard_driver;

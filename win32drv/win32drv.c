@@ -12,6 +12,7 @@
 #if USE_WIN32DRV
 
 #include <windowsx.h>
+#include <malloc.h>
 #include <process.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -165,6 +166,25 @@ static LRESULT CALLBACK lv_win32_window_message_callback(
 
 static unsigned int __stdcall lv_win32_window_thread_entrypoint(
     void* raw_parameter);
+
+static void lv_win32_push_key_to_keyboard_queue(
+    lv_win32_window_context_t* context,
+    uint32_t key,
+    lv_indev_state_t state)
+{
+    lv_win32_keyboard_queue_item_t* current =
+        (lv_win32_keyboard_queue_item_t*)(_aligned_malloc(
+            sizeof(lv_win32_keyboard_queue_item_t),
+            MEMORY_ALLOCATION_ALIGNMENT));
+    if (current)
+    {
+        current->key = key;
+        current->state = state;
+        InterlockedPushEntrySList(
+            context->keyboard_queue,
+            &current->ItemEntry);
+    }
+}
 
 /**********************
  *  GLOBAL VARIABLES
@@ -710,14 +730,14 @@ static void lv_win32_keypad_driver_read_callback(
     EnterCriticalSection(&context->keyboard_mutex);
 
     lv_win32_keyboard_queue_item_t* current =
-        (lv_win32_keyboard_queue_item_t*)(_lv_ll_get_head(
-            &context->keyboard_queue));
+        (lv_win32_keyboard_queue_item_t*)(InterlockedPopEntrySList(
+            context->keyboard_queue));
     if (current)
     {
         data->key = current->key;
         data->state = current->state;
 
-        _lv_ll_remove(&context->keyboard_queue, current);
+        _aligned_free(current);
 
         data->continue_reading = true;
     }
@@ -852,9 +872,14 @@ static LRESULT CALLBACK lv_win32_window_message_callback(
         }
 
         InitializeCriticalSection(&context->keyboard_mutex);
-        _lv_ll_init(
-            &context->keyboard_queue,
-            sizeof(lv_win32_keyboard_queue_item_t));
+        context->keyboard_queue = _aligned_malloc(
+            sizeof(SLIST_HEADER),
+            MEMORY_ALLOCATION_ALIGNMENT);
+        if (!context->keyboard_queue)
+        {
+            return -1;
+        }
+        InitializeSListHead(context->keyboard_queue);
         context->keyboard_utf16_high_surrogate = 0;
         context->keyboard_utf16_low_surrogate = 0;
         lv_indev_drv_init(&context->keyboard_driver);
@@ -1027,13 +1052,12 @@ static LRESULT CALLBACK lv_win32_window_message_callback(
 
             if (!skip_translation)
             {
-                lv_win32_keyboard_queue_item_t* current =
-                    (lv_win32_keyboard_queue_item_t*)(_lv_ll_ins_head(
-                        &context->keyboard_queue));
-                current->key = translated_key;
-                current->state = ((uMsg == WM_KEYUP)
-                    ? LV_INDEV_STATE_REL
-                    : LV_INDEV_STATE_PR);
+                lv_win32_push_key_to_keyboard_queue(
+                    context,
+                    translated_key,
+                    ((uMsg == WM_KEYUP)
+                        ? LV_INDEV_STATE_REL
+                        : LV_INDEV_STATE_PR)); 
             }
 
             LeaveCriticalSection(&context->keyboard_mutex);
@@ -1082,21 +1106,14 @@ static LRESULT CALLBACK lv_win32_window_message_callback(
                 uint32_t lvgl_code_point =
                     _lv_txt_unicode_to_encoded(code_point);
 
-                {
-                    lv_win32_keyboard_queue_item_t* current =
-                        (lv_win32_keyboard_queue_item_t*)(_lv_ll_ins_head(
-                            &context->keyboard_queue));
-                    current->key = lvgl_code_point;
-                    current->state = LV_INDEV_STATE_PR;
-                }
-
-                {
-                    lv_win32_keyboard_queue_item_t* current =
-                        (lv_win32_keyboard_queue_item_t*)(_lv_ll_ins_head(
-                            &context->keyboard_queue));
-                    current->key = lvgl_code_point;
-                    current->state = LV_INDEV_STATE_REL;
-                }
+                lv_win32_push_key_to_keyboard_queue(
+                    context,
+                    lvgl_code_point,
+                    LV_INDEV_STATE_PR);
+                lv_win32_push_key_to_keyboard_queue(
+                    context,
+                    lvgl_code_point,
+                    LV_INDEV_STATE_REL);
             }
 
             LeaveCriticalSection(&context->keyboard_mutex);
@@ -1284,7 +1301,20 @@ static LRESULT CALLBACK lv_win32_window_message_callback(
                 context->keyboard_device_object;
             context->keyboard_device_object = NULL;
             lv_indev_delete(keyboard_device_object);
-            _lv_ll_clear(&context->keyboard_queue);
+            do
+            {
+                PSLIST_ENTRY current = InterlockedPopEntrySList(
+                    context->keyboard_queue);
+                if (!current)
+                {
+                    _aligned_free(context->keyboard_queue);
+                    context->keyboard_queue = NULL;
+                    break;
+                }
+
+                _aligned_free(current);
+
+            } while (true);
             DeleteCriticalSection(&context->keyboard_mutex);
 
             free(context);
