@@ -100,6 +100,12 @@ void libinput_init(void);
  */
 void libinput_init_state(libinput_drv_state_t *state, char* path);
 /**
+ * De-initialise a previously initialised driver state and free any dynamically allocated memory. Use this function if you want to
+ * reuse an existing driver state.
+ * @param state driver state to de-initialize
+ */
+void libinput_deinit_state(libinput_drv_state_t *state);
+/**
  * Reconfigure the device file for libinput using the default driver state. Use this function if you only want
  * to connect a single device.
  * @param dev_name input device node path (e.g. /dev/input/event0)
