@@ -74,7 +74,28 @@ static const struct libinput_interface interface = {
  **********************/
 
 /**
- * find connected input device with specific capabilities
+ * Determine the capabilities of a specific libinput device.
+ * @param device the libinput device to query
+ * @return the supported input capabilities
+ */
+libinput_capability libinput_query_capability(struct libinput_device *device) {
+  libinput_capability capability = LIBINPUT_CAPABILITY_NONE;
+  if (libinput_device_has_capability(device, LIBINPUT_DEVICE_CAP_KEYBOARD)
+      && (libinput_device_keyboard_has_key(device, KEY_ENTER) || libinput_device_keyboard_has_key(device, KEY_KPENTER)))
+  {
+    capability |= LIBINPUT_CAPABILITY_KEYBOARD;
+  }
+  if (libinput_device_has_capability(device, LIBINPUT_DEVICE_CAP_POINTER)) {
+    capability |= LIBINPUT_CAPABILITY_POINTER;
+  }
+  if (libinput_device_has_capability(device, LIBINPUT_DEVICE_CAP_TOUCH)) {
+    capability |= LIBINPUT_CAPABILITY_TOUCH;
+  }
+  return capability;
+}
+
+/**
+ * Find connected input device with specific capabilities
  * @param capabilities required device capabilities
  * @param force_rescan erase the device cache (if any) and rescan the file system for available devices
  * @return device node path (e.g. /dev/input/event0) for the first matching device or NULL if no device was found.
@@ -87,7 +108,7 @@ char *libinput_find_dev(libinput_capability capabilities, bool force_rescan) {
 }
 
 /**
- * find connected input devices with specific capabilities
+ * Find connected input devices with specific capabilities
  * @param capabilities required device capabilities
  * @param devices pre-allocated array to store the found device node paths (e.g. /dev/input/event0). The pointers are
  *                safe to use until the next forceful device search.
@@ -296,18 +317,7 @@ static bool rescan_devices(void) {
      * as part of this function, we don't have to increase its reference count to keep it alive.
      * https://wayland.freedesktop.org/libinput/doc/latest/api/group__base.html#gaa797496f0150b482a4e01376bd33a47b */
 
-    libinput_capability capabilities = LIBINPUT_CAPABILITY_NONE;
-    if (libinput_device_has_capability(device, LIBINPUT_DEVICE_CAP_KEYBOARD)
-        && (libinput_device_keyboard_has_key(device, KEY_ENTER) || libinput_device_keyboard_has_key(device, KEY_KPENTER)))
-    {
-      capabilities |= LIBINPUT_CAPABILITY_KEYBOARD;
-    }
-    if (libinput_device_has_capability(device, LIBINPUT_DEVICE_CAP_POINTER)) {
-      capabilities |= LIBINPUT_CAPABILITY_POINTER;
-    }
-    if (libinput_device_has_capability(device, LIBINPUT_DEVICE_CAP_TOUCH)) {
-      capabilities |= LIBINPUT_CAPABILITY_TOUCH;
-    }
+    libinput_capability capabilities = libinput_query_capability(device);
 
     libinput_path_remove_device(device);
 
