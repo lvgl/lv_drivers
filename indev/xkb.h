@@ -61,6 +61,12 @@ bool xkb_init(void);
  */
 bool xkb_init_state(xkb_drv_state_t *state);
 /**
+ * De-initialise a previously initialised driver state and free any dynamically allocated memory. Use this function if you want to
+ * reuse an existing driver state.
+ * @param state XKB driver state to use
+ */
+void xkb_deinit_state(xkb_drv_state_t *state);
+/**
  * Set a new keymap to be used for processing future key events using the default driver state. Use
  * this function if you only want to connect a single device.
  * @param names XKB rule names structure (use NULL components for default values)

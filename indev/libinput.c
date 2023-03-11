@@ -138,8 +138,8 @@ bool libinput_set_file_state(libinput_drv_state_t *state, char* dev_name)
   // citing libinput.h:libinput_path_remove_device:
   // > If no matching device exists, this function does nothing.
   if (state->libinput_device) {
-    state->libinput_device = libinput_device_unref(state->libinput_device);
     libinput_path_remove_device(state->libinput_device);
+    state->libinput_device = libinput_device_unref(state->libinput_device);
   }
 
   state->libinput_device = libinput_path_add_device(state->libinput_context, dev_name);
@@ -193,6 +193,29 @@ void libinput_init_state(libinput_drv_state_t *state, char* path)
 #if USE_XKB
   xkb_init_state(&(state->xkb_state));
 #endif
+}
+
+/**
+ * De-initialise a previously initialised driver state and free any dynamically allocated memory. Use this function if you want to
+ * reuse an existing driver state.
+ * @param state driver state to de-initialize
+ */
+void libinput_deinit_state(libinput_drv_state_t *state)
+{
+  if (state->libinput_device) {
+    libinput_path_remove_device(state->libinput_device);
+    libinput_device_unref(state->libinput_device);
+  }
+
+  if (state->libinput_context) {
+    libinput_unref(state->libinput_context);
+  }
+
+#if USE_XKB
+  xkb_deinit_state(&(state->xkb_state));
+#endif
+
+  lv_memzero(state, sizeof(libinput_drv_state_t));
 }
 
 /**
