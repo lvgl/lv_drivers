@@ -110,6 +110,9 @@
 
 /*Open two windows to test multi display support*/
 #  define SDL_DUAL_DISPLAY            0
+
+/* Window Title  */
+#  define SDL_WINDOW_TITLE "TFT Simulator"
 #endif
 
 /*-------------------
