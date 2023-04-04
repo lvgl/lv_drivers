@@ -60,6 +60,9 @@
 #define KEYBOARD_BUFFER_SIZE SDL_TEXTINPUTEVENT_TEXT_SIZE
 #endif
 
+#ifndef SDL_WINDOW_TITLE
+#define SDL_WINDOW_TITLE "TFT Simulator"
+#endif
 /**********************
  *      TYPEDEFS
  **********************/
