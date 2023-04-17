@@ -60,6 +60,9 @@
 #define KEYBOARD_BUFFER_SIZE SDL_TEXTINPUTEVENT_TEXT_SIZE
 #endif
 
+#ifndef SDL_WINDOW_TITLE
+#define SDL_WINDOW_TITLE "TFT Simulator"
+#endif
 /**********************
  *      TYPEDEFS
  **********************/
@@ -334,7 +337,7 @@ static void window_create(monitor_t * m)
     flag |= SDL_WINDOW_FULLSCREEN;
 #endif
 
-    m->window = SDL_CreateWindow("TFT Simulator",
+    m->window = SDL_CreateWindow(SDL_WINDOW_TITLE,
                               SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                               SDL_HOR_RES * SDL_ZOOM, SDL_VER_RES * SDL_ZOOM, flag);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
 
