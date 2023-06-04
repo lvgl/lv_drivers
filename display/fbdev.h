@@ -51,6 +51,11 @@ void fbdev_get_sizes(uint32_t *width, uint32_t *height, uint32_t *dpi);
  */
 void fbdev_set_offset(uint32_t xoffset, uint32_t yoffset);
 
+/**
+ * Force the display to be refreshed on every change.
+ * Expected to be used with direct_mode or full_refresh.
+ */
+void fbdev_force_refresh(bool enabled);
 
 /**********************
  *      MACROS
