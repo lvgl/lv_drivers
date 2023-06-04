@@ -17,6 +17,7 @@
 #include <stdbool.h>
 #include <dirent.h>
 #include <libinput.h>
+#include <pthread.h>
 
 #if USE_BSD_LIBINPUT
 #include <dev/evdev/input.h>
@@ -42,6 +43,7 @@ struct input_device {
 static bool rescan_devices(void);
 static bool add_scanned_device(char *path, libinput_capability capabilities);
 static void reset_scanned_devices(void);
+static void *libinput_poll_worker(void* data);
 
 static void read_pointer(libinput_drv_state_t *state, struct libinput_event *event);
 static void read_keypad(libinput_drv_state_t *state, struct libinput_event *event);
@@ -55,9 +57,9 @@ static void close_restricted(int fd, void *user_data);
 static struct input_device *devices = NULL;
 static size_t num_devices = 0;
 
-static libinput_drv_state_t default_state = { .most_recent_touch_point = { .x = 0, .y = 0 } };
+static libinput_drv_state_t default_state = { .event_lock = PTHREAD_MUTEX_INITIALIZER, };
 
-static const int timeout = 0; // do not block
+static const int timeout = 100; // ms
 static const nfds_t nfds = 1;
 
 static const struct libinput_interface interface = {
@@ -174,9 +176,6 @@ bool libinput_set_file_state(libinput_drv_state_t *state, char* dev_name)
     return false;
   }
 
-  state->button = LV_INDEV_STATE_REL;
-  state->key_val = 0;
-
   return true;
 }
 
@@ -186,6 +185,7 @@ bool libinput_set_file_state(libinput_drv_state_t *state, char* dev_name)
  */
 void libinput_init(void)
 {
+  memset(&default_state, 0, sizeof(libinput_drv_state_t));
   libinput_init_state(&default_state, LIBINPUT_NAME);
 }
 
@@ -211,6 +211,8 @@ void libinput_init_state(libinput_drv_state_t *state, char* path)
   state->fds[0].events = POLLIN;
   state->fds[0].revents = 0;
 
+  pthread_create(&state->worker_thread, NULL, libinput_poll_worker, state);
+
 #if USE_XKB
   xkb_init_state(&(state->xkb_state));
 #endif
@@ -223,6 +225,21 @@ void libinput_init_state(libinput_drv_state_t *state, char* path)
  */
 void libinput_deinit_state(libinput_drv_state_t *state)
 {
+  if (state->fd)
+    state->deinit = true;
+
+  /* Give worker thread a whole second to quit */
+  for (int i = 0; i < 100; i++) {
+    if (!state->deinit)
+      break;
+    usleep(10000);
+  }
+
+  if (state->deinit) {
+    fprintf(stderr, "libinput worker thread did not quit in time!\n");
+    pthread_cancel(state->worker_thread);
+  }
+
   if (state->libinput_device) {
     libinput_path_remove_device(state->libinput_device);
     libinput_device_unref(state->libinput_device);
@@ -250,6 +267,83 @@ void libinput_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
   libinput_read_state(&default_state, indev_drv, data);
 }
 
+libinput_lv_event_t *get_event(libinput_drv_state_t *state)
+{
+  if (state->start == state->end) {
+    return NULL;
+  }
+
+  libinput_lv_event_t *evt = &state->points[state->start];
+
+  if (++state->start == MAX_EVENTS)
+    state->start = 0;
+
+  return evt;
+}
+
+bool event_pending(libinput_drv_state_t *state)
+{
+  return state->start != state->end;
+}
+
+libinput_lv_event_t *new_event(libinput_drv_state_t *state)
+{
+  libinput_lv_event_t *evt = &state->points[state->end];
+
+  if (++state->end == MAX_EVENTS)
+    state->end = 0;
+
+  /* We have overflowed the buffer, start overwriting
+   * old events.
+   */
+  if (state->end == state->start) {
+    LV_LOG_INFO("libinput: overflowed event buffer!");
+    if (++state->start == MAX_EVENTS)
+      state->start = 0;
+  }
+
+  memset(evt, 0, sizeof(libinput_lv_event_t));
+
+  return evt;
+}
+
+static void *libinput_poll_worker(void* data)
+{
+  libinput_drv_state_t * state = (libinput_drv_state_t *)data;
+  struct libinput_event *event;
+  int rc = 0;
+
+  LV_LOG_INFO("libinput: poll worker started");
+
+  while (true) {
+    rc = poll(state->fds, nfds, timeout);
+    switch (rc){
+      case -1:
+        perror(NULL);
+        __attribute__((fallthrough));
+      case 0:
+        if (state->deinit) {
+          state->deinit = false; /* Signal that we're done */
+          return NULL;
+        }
+        continue;
+      default:
+        break;
+    }
+    libinput_dispatch(state->libinput_context);
+    pthread_mutex_lock(&state->event_lock);
+    while((event = libinput_get_event(state->libinput_context)) != NULL) {
+      read_pointer(state, event);
+      read_keypad(state, event);
+      libinput_event_destroy(event);
+    }
+    pthread_mutex_unlock(&state->event_lock);
+    LV_LOG_INFO("libinput: event read");
+  }
+
+  return NULL;
+}
+
 /**
  * Read available input events via libinput using a specific driver state. Use this function if you want to
  * connect multiple devices.
@@ -259,37 +353,26 @@ void libinput_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
  */
 void libinput_read_state(libinput_drv_state_t * state, lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 {
-  struct libinput_event *event;
-  int rc = 0;
+  LV_UNUSED(indev_drv);
 
-  rc = poll(state->fds, nfds, timeout);
-  switch (rc){
-    case -1:
-      perror(NULL);
-    case 0:
-      goto report_most_recent_state;
-    default:
-      break;
-  }
-  libinput_dispatch(state->libinput_context);
-  while((event = libinput_get_event(state->libinput_context)) != NULL) {
-    switch (indev_drv->type) {
-      case LV_INDEV_TYPE_POINTER:
-        read_pointer(state, event);
-        break;
-      case LV_INDEV_TYPE_KEYPAD:
-        read_keypad(state, event);
-        break;
-      default:
-        break;
-    }
-    libinput_event_destroy(event);
-  }
-report_most_recent_state:
-  data->point.x = state->most_recent_touch_point.x;
-  data->point.y = state->most_recent_touch_point.y;
-  data->state = state->button;
-  data->key = state->key_val;
+  pthread_mutex_lock(&state->event_lock);
+
+  libinput_lv_event_t *evt = get_event(state);
+  data->continue_reading = event_pending(state);
+  if (!evt)
+    evt = &state->last_event;
+  /* indev expects us to report the most recent state */
+  else if (!data->continue_reading)
+    state->last_event = *evt;
+
+  data->point = evt->point;
+  data->state = evt->pressed;
+  data->key = evt->key_val;
+
+  pthread_mutex_unlock(&state->event_lock);
+
+  if (evt)
+    LV_LOG_TRACE("libinput_read: %d//%d: (%04d,%04d): %d continue_reading? %d", state->start, state->end, data->point.x, data->point.y, data->state, data->continue_reading);
 }
 
 
@@ -410,34 +493,51 @@ static void reset_scanned_devices(void) {
 static void read_pointer(libinput_drv_state_t *state, struct libinput_event *event) {
   struct libinput_event_touch *touch_event = NULL;
   struct libinput_event_pointer *pointer_event = NULL;
+  libinput_lv_event_t *evt = NULL;
   enum libinput_event_type type = libinput_event_get_type(event);
+
+  /* We only care about these events */
+  if (type != LIBINPUT_EVENT_TOUCH_MOTION &&
+      type != LIBINPUT_EVENT_TOUCH_DOWN &&
+      type != LIBINPUT_EVENT_TOUCH_UP &&
+      type != LIBINPUT_EVENT_POINTER_MOTION &&
+      type != LIBINPUT_EVENT_POINTER_BUTTON &&
+      type != LIBINPUT_EVENT_POINTER_MOTION_ABSOLUTE)
+    return;
 
   /* We need to read unrotated display dimensions directly from the driver because libinput won't account
    * for any rotation inside of LVGL */
   lv_disp_drv_t *drv = lv_disp_get_default()->driver;
 
+  /* ignore more than 2 fingers as it will only confuse LVGL */
+  touch_event = libinput_event_get_touch_event(event);
+  if (touch_event && libinput_event_touch_get_slot(touch_event) > 1)
+    return;
+
+  evt = new_event(state);
+
   switch (type) {
     case LIBINPUT_EVENT_TOUCH_MOTION:
-    case LIBINPUT_EVENT_TOUCH_DOWN:
-      touch_event = libinput_event_get_touch_event(event);
-      lv_coord_t x_touch = libinput_event_touch_get_x_transformed(touch_event, drv->physical_hor_res > 0 ? drv->physical_hor_res : drv->hor_res) - drv->offset_x;
-      lv_coord_t y_touch = libinput_event_touch_get_y_transformed(touch_event, drv->physical_ver_res > 0 ? drv->physical_ver_res : drv->ver_res) - drv->offset_y;
-      if (x_touch < 0 || x_touch > drv->hor_res || y_touch < 0 || y_touch > drv->ver_res) {
+    case LIBINPUT_EVENT_TOUCH_DOWN: {
+      lv_coord_t x = libinput_event_touch_get_x_transformed(touch_event, drv->physical_hor_res > 0 ? drv->physical_hor_res : drv->hor_res) - drv->offset_x;
+      lv_coord_t y = libinput_event_touch_get_y_transformed(touch_event, drv->physical_ver_res > 0 ? drv->physical_ver_res : drv->ver_res) - drv->offset_y;
+      if (x < 0 || x > drv->hor_res || y < 0 || y > drv->ver_res) {
         break; /* ignore touches that are out of bounds */
       }
-      state->most_recent_touch_point.x = x_touch;
-      state->most_recent_touch_point.y = y_touch;
-      state->button = LV_INDEV_STATE_PR;
+      evt->point.x = x;
+      evt->point.y = y;
+      evt->pressed = LV_INDEV_STATE_PR;
       break;
+    }
     case LIBINPUT_EVENT_TOUCH_UP:
-      state->button = LV_INDEV_STATE_REL;
+      evt->pressed = LV_INDEV_STATE_REL;
       break;
     case LIBINPUT_EVENT_POINTER_MOTION:
       pointer_event = libinput_event_get_pointer_event(event);
-      state->most_recent_touch_point.x += libinput_event_pointer_get_dx(pointer_event);
-      state->most_recent_touch_point.y += libinput_event_pointer_get_dy(pointer_event);
-      state->most_recent_touch_point.x = LV_CLAMP(0, state->most_recent_touch_point.x, drv->hor_res - 1);
-      state->most_recent_touch_point.y = LV_CLAMP(0, state->most_recent_touch_point.y, drv->ver_res - 1);
+      evt->point.x += libinput_event_pointer_get_dx(pointer_event);
+      evt->point.y += libinput_event_pointer_get_dy(pointer_event);
+      evt->point.x = LV_CLAMP(0, evt->point.x, drv->hor_res - 1);
+      evt->point.y = LV_CLAMP(0, evt->point.y, drv->ver_res - 1);
       break;
     case LIBINPUT_EVENT_POINTER_MOTION_ABSOLUTE:
       pointer_event = libinput_event_get_pointer_event(event);
@@ -446,13 +546,13 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
       if (x_pointer < 0 || x_pointer > drv->hor_res || y_pointer < 0 || y_pointer > drv->ver_res) {
         break; /* ignore pointer events that are out of bounds */
       }
-      state->most_recent_touch_point.x = x_pointer;
-      state->most_recent_touch_point.y = y_pointer;
+      evt->point.x = x_pointer;
+      evt->point.y = y_pointer;
       break;
     case LIBINPUT_EVENT_POINTER_BUTTON:
       pointer_event = libinput_event_get_pointer_event(event);
       enum libinput_button_state button_state = libinput_event_pointer_get_button_state(pointer_event); 
-      state->button = button_state == LIBINPUT_BUTTON_STATE_RELEASED ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
+      evt->pressed = button_state == LIBINPUT_BUTTON_STATE_RELEASED ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
       break;
     default:
       break;
@@ -467,50 +567,52 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
 static void read_keypad(libinput_drv_state_t *state, struct libinput_event *event) {
   struct libinput_event_keyboard *keyboard_event = NULL;
   enum libinput_event_type type = libinput_event_get_type(event);
+  libinput_lv_event_t *evt = NULL;
   switch (type) {
     case LIBINPUT_EVENT_KEYBOARD_KEY:
+      evt = new_event(state);
       keyboard_event = libinput_event_get_keyboard_event(event);
       enum libinput_key_state key_state = libinput_event_keyboard_get_key_state(keyboard_event);
       uint32_t code = libinput_event_keyboard_get_key(keyboard_event);
 #if USE_XKB
-      state->key_val = xkb_process_key_state(&(state->xkb_state), code, key_state == LIBINPUT_KEY_STATE_PRESSED);
+      evt->key_val = xkb_process_key_state(&(state->xkb_state), code, key_state == LIBINPUT_KEY_STATE_PRESSED);
 #else
       switch(code) {
         case KEY_BACKSPACE:
-          state->key_val = LV_KEY_BACKSPACE;
+          evt->key_val = LV_KEY_BACKSPACE;
           break;
         case KEY_ENTER:
-          state->key_val = LV_KEY_ENTER;
+          evt->key_val = LV_KEY_ENTER;
           break;
         case KEY_PREVIOUS:
-          state->key_val = LV_KEY_PREV;
+          evt->key_val = LV_KEY_PREV;
           break;
         case KEY_NEXT:
-          state->key_val = LV_KEY_NEXT;
+          evt->key_val = LV_KEY_NEXT;
           break;
         case KEY_UP:
-          state->key_val = LV_KEY_UP;
+          evt->key_val = LV_KEY_UP;
           break;
         case KEY_LEFT:
-          state->key_val = LV_KEY_LEFT;
+          evt->key_val = LV_KEY_LEFT;
           break;
         case KEY_RIGHT:
-          state->key_val = LV_KEY_RIGHT;
+          evt->key_val = LV_KEY_RIGHT;
           break;
         case KEY_DOWN:
-          state->key_val = LV_KEY_DOWN;
+          evt->key_val = LV_KEY_DOWN;
           break;
         case KEY_TAB:
-          state->key_val = LV_KEY_NEXT;
+          evt->key_val = LV_KEY_NEXT;
           break;
         default:
-          state->key_val = 0;
+          evt->key_val = 0;
           break;
       }
 #endif /* USE_XKB */
-      if (state->key_val != 0) {
+      if (evt->key_val != 0) {
         /* Only record button state when actual output is produced to prevent widgets from refreshing */
-        state->button = (key_state == LIBINPUT_KEY_STATE_RELEASED) ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
+        evt->pressed = (key_state == LIBINPUT_KEY_STATE_RELEASED) ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
       }
       break;
     default:
