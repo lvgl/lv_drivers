@@ -420,13 +420,13 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
     case LIBINPUT_EVENT_TOUCH_MOTION:
     case LIBINPUT_EVENT_TOUCH_DOWN:
       touch_event = libinput_event_get_touch_event(event);
-      lv_coord_t x = libinput_event_touch_get_x_transformed(touch_event, drv->physical_hor_res > 0 ? drv->physical_hor_res : drv->hor_res) - drv->offset_x;
-      lv_coord_t y = libinput_event_touch_get_y_transformed(touch_event, drv->physical_ver_res > 0 ? drv->physical_ver_res : drv->ver_res) - drv->offset_y;
-      if (x < 0 || x > drv->hor_res || y < 0 || y > drv->ver_res) {
+      lv_coord_t x_touch = libinput_event_touch_get_x_transformed(touch_event, drv->physical_hor_res > 0 ? drv->physical_hor_res : drv->hor_res) - drv->offset_x;
+      lv_coord_t y_touch = libinput_event_touch_get_y_transformed(touch_event, drv->physical_ver_res > 0 ? drv->physical_ver_res : drv->ver_res) - drv->offset_y;
+      if (x_touch < 0 || x_touch > drv->hor_res || y_touch < 0 || y_touch > drv->ver_res) {
         break; /* ignore touches that are out of bounds */
       }
-      state->most_recent_touch_point.x = x;
-      state->most_recent_touch_point.y = y;
+      state->most_recent_touch_point.x = x_touch;
+      state->most_recent_touch_point.y = y_touch;
       state->button = LV_INDEV_STATE_PR;
       break;
     case LIBINPUT_EVENT_TOUCH_UP:
@@ -438,6 +438,16 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
       state->most_recent_touch_point.y += libinput_event_pointer_get_dy(pointer_event);
       state->most_recent_touch_point.x = LV_CLAMP(0, state->most_recent_touch_point.x, drv->hor_res - 1);
       state->most_recent_touch_point.y = LV_CLAMP(0, state->most_recent_touch_point.y, drv->ver_res - 1);
+      break;
+    case LIBINPUT_EVENT_POINTER_MOTION_ABSOLUTE:
+      pointer_event = libinput_event_get_pointer_event(event);
+      lv_coord_t x_pointer = libinput_event_pointer_get_absolute_x_transformed(pointer_event, drv->physical_hor_res > 0 ? drv->physical_hor_res : drv->hor_res) - drv->offset_x;
+      lv_coord_t y_pointer = libinput_event_pointer_get_absolute_y_transformed(pointer_event, drv->physical_ver_res > 0 ? drv->physical_ver_res : drv->ver_res) - drv->offset_y;
+      if (x_pointer < 0 || x_pointer > drv->hor_res || y_pointer < 0 || y_pointer > drv->ver_res) {
+        break; /* ignore pointer events that are out of bounds */
+      }
+      state->most_recent_touch_point.x = x_pointer;
+      state->most_recent_touch_point.y = y_pointer;
       break;
     case LIBINPUT_EVENT_POINTER_BUTTON:
       pointer_event = libinput_event_get_pointer_event(event);
