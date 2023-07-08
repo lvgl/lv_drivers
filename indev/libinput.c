@@ -363,14 +363,26 @@ void libinput_read_state(libinput_drv_state_t * state, lv_indev_drv_t * indev_dr
   libinput_lv_event_t *evt = get_event(state);
   data->continue_reading = event_pending(state);
   if (!evt)
-    evt = &state->last_event;
-  /* indev expects us to report the most recent state */
-  else if (!data->continue_reading)
-    state->last_event = *evt;
+    evt = &state->last_event; /* indev expects us to report the most recent state */
+
+  /* Rewrite relative pointer click and motion events into absolute ones using the previous event */
+  if (evt->is_relative) {
+    /* We need to read unrotated display dimensions directly from the driver because libinput won't account
+     * for any rotation inside of LVGL */
+    lv_disp_drv_t *drv = lv_disp_get_default()->driver;
+
+    evt->point.x = state->last_event.point.x + evt->point.x;
+    evt->point.y = state->last_event.point.y + evt->point.y;
+    evt->point.x = LV_CLAMP(0, evt->point.x, drv->hor_res - 1);
+    evt->point.y = LV_CLAMP(0, evt->point.y, drv->ver_res - 1);
+    evt->is_relative = false;
+  }
 
   data->point = evt->point;
   data->state = evt->pressed;
   data->key = evt->key_val;
+
+  state->last_event = *evt; /* Remember the last event for the next call */
 
   pthread_mutex_unlock(&state->event_lock);
 
@@ -545,6 +557,7 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
       evt->point.y += libinput_event_pointer_get_dy(pointer_event);
       evt->point.x = LV_CLAMP(0, evt->point.x, drv->hor_res - 1);
       evt->point.y = LV_CLAMP(0, evt->point.y, drv->ver_res - 1);
+      evt->is_relative = true;
       break;
     case LIBINPUT_EVENT_POINTER_MOTION_ABSOLUTE:
       pointer_event = libinput_event_get_pointer_event(event);
@@ -559,6 +572,7 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
     case LIBINPUT_EVENT_POINTER_BUTTON:
       enum libinput_button_state button_state = libinput_event_pointer_get_button_state(pointer_event); 
       evt->pressed = button_state == LIBINPUT_BUTTON_STATE_RELEASED ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
+      evt->is_relative = true;
       break;
     default:
       break;

@@ -54,6 +54,7 @@ typedef struct {
   lv_indev_state_t pressed;
   int key_val;
   lv_point_t point;
+  bool is_relative;
 } libinput_lv_event_t;
 
 #define MAX_EVENTS 32
