@@ -57,7 +57,7 @@ static void close_restricted(int fd, void *user_data);
 static struct input_device *devices = NULL;
 static size_t num_devices = 0;
 
-static libinput_drv_state_t default_state = { .event_lock = PTHREAD_MUTEX_INITIALIZER, };
+static libinput_drv_state_t default_state;
 
 static const int timeout = 100; // ms
 static const nfds_t nfds = 1;
@@ -185,7 +185,6 @@ bool libinput_set_file_state(libinput_drv_state_t *state, char* dev_name)
  */
 void libinput_init(void)
 {
-  memset(&default_state, 0, sizeof(libinput_drv_state_t));
   libinput_init_state(&default_state, LIBINPUT_NAME);
 }
 
@@ -197,7 +196,9 @@ void libinput_init(void)
  */
 void libinput_init_state(libinput_drv_state_t *state, char* path)
 {
-  state->libinput_device = NULL;
+  /* Clear the state */
+  lv_memzero(state, sizeof(libinput_drv_state_t));
+
   state->libinput_context = libinput_path_create_context(&interface, NULL);
 
   if(path == NULL || !libinput_set_file_state(state, path)) {
@@ -211,11 +212,13 @@ void libinput_init_state(libinput_drv_state_t *state, char* path)
   state->fds[0].events = POLLIN;
   state->fds[0].revents = 0;
 
-  pthread_create(&state->worker_thread, NULL, libinput_poll_worker, state);
-
 #if USE_XKB
   xkb_init_state(&(state->xkb_state));
 #endif
+
+  /* Set up thread & lock */
+  pthread_mutex_init(&state->event_lock, NULL);
+  pthread_create(&state->worker_thread, NULL, libinput_poll_worker, state);
 }
 
 /**
