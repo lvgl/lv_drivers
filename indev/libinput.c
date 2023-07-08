@@ -496,21 +496,26 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
   libinput_lv_event_t *evt = NULL;
   enum libinput_event_type type = libinput_event_get_type(event);
 
-  /* We only care about these events */
-  if (type != LIBINPUT_EVENT_TOUCH_MOTION &&
-      type != LIBINPUT_EVENT_TOUCH_DOWN &&
-      type != LIBINPUT_EVENT_TOUCH_UP &&
-      type != LIBINPUT_EVENT_POINTER_MOTION &&
-      type != LIBINPUT_EVENT_POINTER_BUTTON &&
-      type != LIBINPUT_EVENT_POINTER_MOTION_ABSOLUTE)
-    return;
+  switch (type) {
+    case LIBINPUT_EVENT_TOUCH_MOTION:
+    case LIBINPUT_EVENT_TOUCH_DOWN:
+    case LIBINPUT_EVENT_TOUCH_UP:
+      touch_event = libinput_event_get_touch_event(event);
+      break;
+    case LIBINPUT_EVENT_POINTER_MOTION:
+    case LIBINPUT_EVENT_POINTER_BUTTON:
+    case LIBINPUT_EVENT_POINTER_MOTION_ABSOLUTE:
+      pointer_event = libinput_event_get_pointer_event(event);
+      break;
+    default:
+      return; /* We don't care about this events */
+  }
 
   /* We need to read unrotated display dimensions directly from the driver because libinput won't account
    * for any rotation inside of LVGL */
   lv_disp_drv_t *drv = lv_disp_get_default()->driver;
 
   /* ignore more than 2 fingers as it will only confuse LVGL */
-  touch_event = libinput_event_get_touch_event(event);
   if (touch_event && libinput_event_touch_get_slot(touch_event) > 1)
     return;
 
@@ -533,7 +538,6 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
       evt->pressed = LV_INDEV_STATE_REL;
       break;
     case LIBINPUT_EVENT_POINTER_MOTION:
-      pointer_event = libinput_event_get_pointer_event(event);
       evt->point.x += libinput_event_pointer_get_dx(pointer_event);
       evt->point.y += libinput_event_pointer_get_dy(pointer_event);
       evt->point.x = LV_CLAMP(0, evt->point.x, drv->hor_res - 1);
@@ -550,7 +554,6 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
       evt->point.y = y_pointer;
       break;
     case LIBINPUT_EVENT_POINTER_BUTTON:
-      pointer_event = libinput_event_get_pointer_event(event);
       enum libinput_button_state button_state = libinput_event_pointer_get_button_state(pointer_event); 
       evt->pressed = button_state == LIBINPUT_BUTTON_STATE_RELEASED ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
       break;
