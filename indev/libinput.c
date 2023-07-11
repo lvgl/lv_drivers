@@ -284,6 +284,15 @@ libinput_lv_event_t *get_event(libinput_drv_state_t *state)
   return evt;
 }
 
+libinput_lv_event_t *peek_event(libinput_drv_state_t *state)
+{
+  if (state->start == state->end) {
+    return NULL;
+  }
+
+  return &state->points[state->start];
+}
+
 bool event_pending(libinput_drv_state_t *state)
 {
   return state->start != state->end;
@@ -360,8 +369,8 @@ void libinput_read_state(libinput_drv_state_t * state, lv_indev_drv_t * indev_dr
 
   pthread_mutex_lock(&state->event_lock);
 
-  libinput_lv_event_t *evt = get_event(state);
-  data->continue_reading = event_pending(state);
+  /* We may want to send this event twice so only peek it for now */
+  libinput_lv_event_t *evt = peek_event(state);
   if (!evt)
     evt = &state->last_event; /* indev expects us to report the most recent state */
 
@@ -376,18 +385,51 @@ void libinput_read_state(libinput_drv_state_t * state, lv_indev_drv_t * indev_dr
     evt->point.x = LV_CLAMP(0, evt->point.x, drv->hor_res - 1);
     evt->point.y = LV_CLAMP(0, evt->point.y, drv->ver_res - 1);
     evt->is_relative = false;
+  } else if (evt->pressed == LV_INDEV_STATE_REL && evt->slot == 0
+    && state->slots[1].pressed == LV_INDEV_STATE_PR && !state->doing_mtouch_dummy_event) {
+    /*
+     * We don't support "multitouch", but libinput does. To make fast typing with two thumbs
+     * on a keyboard feel good, it's necessary to handle two fingers individually. The edge
+     * case here is if you press a key with one finger and then press a second key with another
+     * finger. No matter which finger you release, it will count as the second finger releasing
+     * and ignore the first.
+     *
+     * To work around this, detect the case where a finger is releasing while the other finger is
+     * still pressed and insert a dummy press event for the finger which is still pressed.
+     */
+
+    /* evt won't be consumed so it will be re-sent on the next call */
+    evt->pressed = LV_INDEV_STATE_PR;
+    evt->point = state->slots[0].point;
+    state->doing_mtouch_dummy_event = 1;
+
+    /* slot 1 will become slot 0 when slot 0 is released */
+    state->slots[1].pressed = LV_INDEV_STATE_REL;
+  } else if (state->doing_mtouch_dummy_event == 1) {
+    /* Now that the position is definitely correct, send the release */
+    evt->pressed = LV_INDEV_STATE_REL;
+    state->doing_mtouch_dummy_event++;
+  } else if (state->doing_mtouch_dummy_event == 2) {
+    /* Finally, update the position to the remaining finger and send a press */
+    evt->pressed = LV_INDEV_STATE_PR;
+    evt->point = state->slots[1].point; /* Wherever slot 1 most recently pressed */
+    state->doing_mtouch_dummy_event = 0;
+  } else {
+    /* Consume the event */
+    get_event(state);
   }
 
   data->point = evt->point;
   data->state = evt->pressed;
   data->key = evt->key_val;
 
+  data->continue_reading = event_pending(state);
   state->last_event = *evt; /* Remember the last event for the next call */
 
   pthread_mutex_unlock(&state->event_lock);
 
   if (evt)
-    LV_LOG_TRACE("libinput_read: %d//%d: (%04d,%04d): %d continue_reading? %d", state->start, state->end, data->point.x, data->point.y, data->state, data->continue_reading);
+    LV_LOG_TRACE("libinput_read: %d (%04d, %04d): %d continue_reading? %d", evt->slot, data->point.x, data->point.y, data->state, data->continue_reading);
 }
 
 
@@ -510,6 +552,7 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
   struct libinput_event_pointer *pointer_event = NULL;
   libinput_lv_event_t *evt = NULL;
   enum libinput_event_type type = libinput_event_get_type(event);
+  int slot;
 
   switch (type) {
     case LIBINPUT_EVENT_TOUCH_MOTION:
@@ -531,7 +574,7 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
   lv_disp_drv_t *drv = lv_disp_get_default()->driver;
 
   /* ignore more than 2 fingers as it will only confuse LVGL */
-  if (touch_event && libinput_event_touch_get_slot(touch_event) > 1)
+  if (touch_event && (slot = libinput_event_touch_get_slot(touch_event)) > 1)
     return;
 
   evt = new_event(state);
@@ -547,10 +590,15 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
       evt->point.x = x;
       evt->point.y = y;
       evt->pressed = LV_INDEV_STATE_PR;
+      evt->slot = slot;
+      state->slots[slot].point = evt->point;
+      state->slots[slot].pressed = evt->pressed;
       break;
     }
     case LIBINPUT_EVENT_TOUCH_UP:
       evt->pressed = LV_INDEV_STATE_REL;
+      state->slots[slot].pressed = evt->pressed;
+      evt->slot = slot;
       break;
     case LIBINPUT_EVENT_POINTER_MOTION:
       evt->point.x += libinput_event_pointer_get_dx(pointer_event);
@@ -559,8 +607,7 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
       evt->point.y = LV_CLAMP(0, evt->point.y, drv->ver_res - 1);
       evt->is_relative = true;
       break;
-    case LIBINPUT_EVENT_POINTER_MOTION_ABSOLUTE:
-      pointer_event = libinput_event_get_pointer_event(event);
+    case LIBINPUT_EVENT_POINTER_MOTION_ABSOLUTE: {
       lv_coord_t x_pointer = libinput_event_pointer_get_absolute_x_transformed(pointer_event, drv->physical_hor_res > 0 ? drv->physical_hor_res : drv->hor_res) - drv->offset_x;
       lv_coord_t y_pointer = libinput_event_pointer_get_absolute_y_transformed(pointer_event, drv->physical_ver_res > 0 ? drv->physical_ver_res : drv->ver_res) - drv->offset_y;
       if (x_pointer < 0 || x_pointer > drv->hor_res || y_pointer < 0 || y_pointer > drv->ver_res) {
@@ -569,11 +616,13 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
       evt->point.x = x_pointer;
       evt->point.y = y_pointer;
       break;
-    case LIBINPUT_EVENT_POINTER_BUTTON:
+    }
+    case LIBINPUT_EVENT_POINTER_BUTTON: {
       enum libinput_button_state button_state = libinput_event_pointer_get_button_state(pointer_event); 
       evt->pressed = button_state == LIBINPUT_BUTTON_STATE_RELEASED ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
       evt->is_relative = true;
       break;
+    }
     default:
       break;
   }
