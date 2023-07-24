@@ -409,12 +409,13 @@ void libinput_read_state(libinput_drv_state_t * state, lv_indev_drv_t * indev_dr
     /* Now that the position is definitely correct, send the release */
     evt->pressed = LV_INDEV_STATE_REL;
     state->doing_mtouch_dummy_event++;
-  } else if (state->doing_mtouch_dummy_event == 2) {
-    /* Finally, update the position to the remaining finger and send a press */
-    evt->pressed = LV_INDEV_STATE_PR;
-    evt->point = state->slots[1].point; /* Wherever slot 1 most recently pressed */
-    state->doing_mtouch_dummy_event = 0;
   } else {
+    if (state->doing_mtouch_dummy_event == 2) {
+      /* Finally, update the position to the remaining finger and send a press */
+      evt->pressed = LV_INDEV_STATE_PR;
+      evt->point = state->slots[1].point; /* Wherever slot 1 most recently pressed */
+      state->doing_mtouch_dummy_event = 0;
+    }
     /* Consume the event */
     get_event(state);
   }
@@ -600,11 +601,15 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
       state->slots[slot].pressed = evt->pressed;
       evt->slot = slot;
       break;
+    case LIBINPUT_EVENT_POINTER_BUTTON: {
+      enum libinput_button_state button_state = libinput_event_pointer_get_button_state(pointer_event); 
+      state->pointer_button_down = button_state == LIBINPUT_BUTTON_STATE_RELEASED ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
+      __attribute__((fallthrough));
+    }
     case LIBINPUT_EVENT_POINTER_MOTION:
-      evt->point.x += libinput_event_pointer_get_dx(pointer_event);
-      evt->point.y += libinput_event_pointer_get_dy(pointer_event);
-      evt->point.x = LV_CLAMP(0, evt->point.x, drv->hor_res - 1);
-      evt->point.y = LV_CLAMP(0, evt->point.y, drv->ver_res - 1);
+      evt->point.x = libinput_event_pointer_get_dx(pointer_event);
+      evt->point.y = libinput_event_pointer_get_dy(pointer_event);
+      evt->pressed = state->pointer_button_down;
       evt->is_relative = true;
       break;
     case LIBINPUT_EVENT_POINTER_MOTION_ABSOLUTE: {
@@ -615,12 +620,6 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
       }
       evt->point.x = x_pointer;
       evt->point.y = y_pointer;
-      break;
-    }
-    case LIBINPUT_EVENT_POINTER_BUTTON: {
-      enum libinput_button_state button_state = libinput_event_pointer_get_button_state(pointer_event); 
-      evt->pressed = button_state == LIBINPUT_BUTTON_STATE_RELEASED ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
-      evt->is_relative = true;
       break;
     }
     default:

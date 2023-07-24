@@ -66,6 +66,7 @@ typedef struct {
   /* The points array is implemented as a circular LIFO queue */
   libinput_lv_event_t points[MAX_EVENTS]; /* Event buffer */
   libinput_lv_event_t slots[2]; /* Realtime state of up to 2 fingers to handle multitouch */
+  bool pointer_button_down;
   int doing_mtouch_dummy_event;
   int start; /* Index of start of event queue */
   int end; /* Index of end of queue*/
