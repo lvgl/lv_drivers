@@ -374,18 +374,7 @@ void libinput_read_state(libinput_drv_state_t * state, lv_indev_drv_t * indev_dr
   if (!evt)
     evt = &state->last_event; /* indev expects us to report the most recent state */
 
-  /* Rewrite relative pointer click and motion events into absolute ones using the previous event */
-  if (evt->is_relative) {
-    /* We need to read unrotated display dimensions directly from the driver because libinput won't account
-     * for any rotation inside of LVGL */
-    lv_disp_drv_t *drv = lv_disp_get_default()->driver;
-
-    evt->point.x = state->last_event.point.x + evt->point.x;
-    evt->point.y = state->last_event.point.y + evt->point.y;
-    evt->point.x = LV_CLAMP(0, evt->point.x, drv->hor_res - 1);
-    evt->point.y = LV_CLAMP(0, evt->point.y, drv->ver_res - 1);
-    evt->is_relative = false;
-  } else if (evt->pressed == LV_INDEV_STATE_REL && evt->slot == 0
+  if (evt->pressed == LV_INDEV_STATE_REL && evt->slot == 0
     && state->slots[1].pressed == LV_INDEV_STATE_PR && !state->doing_mtouch_dummy_event) {
     /*
      * We don't support "multitouch", but libinput does. To make fast typing with two thumbs
@@ -601,16 +590,14 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
       state->slots[slot].pressed = evt->pressed;
       evt->slot = slot;
       break;
-    case LIBINPUT_EVENT_POINTER_BUTTON: {
-      enum libinput_button_state button_state = libinput_event_pointer_get_button_state(pointer_event); 
-      state->pointer_button_down = button_state == LIBINPUT_BUTTON_STATE_RELEASED ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
-      __attribute__((fallthrough));
-    }
     case LIBINPUT_EVENT_POINTER_MOTION:
-      evt->point.x = libinput_event_pointer_get_dx(pointer_event);
-      evt->point.y = libinput_event_pointer_get_dy(pointer_event);
+      state->pointer_position.x += libinput_event_pointer_get_dx(pointer_event);
+      state->pointer_position.y += libinput_event_pointer_get_dy(pointer_event);
+      state->pointer_position.x = LV_CLAMP(0, state->pointer_position.x, drv->hor_res - 1);
+      state->pointer_position.y = LV_CLAMP(0, state->pointer_position.y, drv->ver_res - 1);
+      evt->point.x = state->pointer_position.x;
+      evt->point.y = state->pointer_position.y;
       evt->pressed = state->pointer_button_down;
-      evt->is_relative = true;
       break;
     case LIBINPUT_EVENT_POINTER_MOTION_ABSOLUTE: {
       lv_coord_t x_pointer = libinput_event_pointer_get_absolute_x_transformed(pointer_event, drv->physical_hor_res > 0 ? drv->physical_hor_res : drv->hor_res) - drv->offset_x;
@@ -621,6 +608,13 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
       evt->point.x = x_pointer;
       evt->point.y = y_pointer;
       break;
+    }
+    case LIBINPUT_EVENT_POINTER_BUTTON: {
+      enum libinput_button_state button_state = libinput_event_pointer_get_button_state(pointer_event); 
+      state->pointer_button_down = button_state == LIBINPUT_BUTTON_STATE_RELEASED ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
+      evt->point.x = state->pointer_position.x;
+      evt->point.y = state->pointer_position.y;
+      evt->pressed = state->pointer_button_down;
     }
     default:
       break;
