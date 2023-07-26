@@ -607,6 +607,7 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
       }
       evt->point.x = x_pointer;
       evt->point.y = y_pointer;
+      evt->pressed = state->pointer_button_down;
       break;
     }
     case LIBINPUT_EVENT_POINTER_BUTTON: {
