@@ -54,7 +54,6 @@ typedef struct {
   lv_indev_state_t pressed;
   int key_val;
   lv_point_t point;
-  int slot : 4;
 } libinput_lv_event_t;
 
 #define MAX_EVENTS 32
@@ -70,7 +69,6 @@ typedef struct {
   lv_point_t pointer_position;
   bool pointer_button_down;
 
-  int doing_mtouch_dummy_event;
   int start; /* Index of start of event queue */
   int end; /* Index of end of queue*/
   libinput_lv_event_t last_event; /* Report when no new events
