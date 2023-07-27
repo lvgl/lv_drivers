@@ -541,21 +541,21 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
       break;
     }
     case LIBINPUT_EVENT_TOUCH_UP:
+      /*
+       * We don't support "multitouch", but libinput does. To make fast typing with two thumbs
+       * on a keyboard feel good, it's necessary to handle two fingers individually. The edge
+       * case here is if you press a key with one finger and then press a second key with another
+       * finger. No matter which finger you release, it will count as the second finger releasing
+       * and ignore the first because LVGL only stores a single (the latest) pressed state.
+       *
+       * To work around this, we detect the case where one finger is released while the other is
+       * still pressed and insert dummy events so that both release events trigger at the correct
+       * position.
+       */
       if (slot == 0 && state->slots[1].pressed == LV_INDEV_STATE_PR) {
-        /*
-        * We don't support "multitouch", but libinput does. To make fast typing with two thumbs
-        * on a keyboard feel good, it's necessary to handle two fingers individually. The edge
-        * case here is if you press a key with one finger and then press a second key with another
-        * finger. No matter which finger you release, it will count as the second finger releasing
-        * and ignore the first because LVGL only stores a single (the latest) pressed state.
-        *
-        * To work around this, detect the case where the first finger is releasing while the second is
-        * still pressed and insert dummy press events for the first and second finger around the
-        * release event for the first finger.
-        *
-        * In other words, P1 > P2 > R1 > R2 becomes P1 > P2 > (P1) > R1 > (P2) > R2 where P and R
-        * mean press and release, respectively, and the parentheses denote the dummy events.
-        */
+        /* The first finger is released while the second finger is still pressed.
+         * We turn P1 > P2 > R1 > R2 into P1 > P2 > (P1) > R1 > (P2) > R2.
+         */
 
         /* Inject the dummy press event for the first finger */
         libinput_lv_event_t *synth_evt = evt;
@@ -570,6 +570,18 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
         synth_evt = new_event(state);
         synth_evt->pressed = LV_INDEV_STATE_PR;
         synth_evt->point = state->slots[1].point;
+      } else if (slot == 1 && state->slots[0].pressed == LV_INDEV_STATE_PR) {
+        /* The second finger is released while the first finger is still pressed.
+         * We turn P1 > P2 > R2 > R1 into P1 > P2 > R2 > (P1) > R1.
+         */
+
+        /* Append the real release event for the second finger */
+        evt->pressed = LV_INDEV_STATE_REL;
+
+        /* Inject the dummy press event for the first finger */
+        libinput_lv_event_t *synth_evt = new_event(state);
+        synth_evt->pressed = LV_INDEV_STATE_PR;
+        synth_evt->point = state->slots[0].point;
       } else {
         evt->pressed = LV_INDEV_STATE_REL;
       }
