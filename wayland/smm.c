@@ -2,6 +2,8 @@
  * @file smm.c
  *
  */
+#if USE_WAYLAND
+
 #include <stddef.h>
 #include <errno.h>
 #include <stdio.h>
@@ -646,3 +648,5 @@ void free_buffer(struct smm_buffer *buf)
    LL_REMOVE(&buf_pool->allocd, buf, pool);
    free(buf);
 }
+
+#endif
