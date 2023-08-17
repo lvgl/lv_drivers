@@ -368,7 +368,7 @@ static void window_update(monitor_t * m)
 #endif
     SDL_RenderClear(m->renderer);
     lv_disp_t * d = _lv_refr_get_disp_refreshing();
-    if(d->driver->screen_transp) {
+    if(d && d->driver->screen_transp) {
         SDL_SetRenderDrawColor(m->renderer, 0xff, 0, 0, 0xff);
         SDL_Rect r;
         r.x = 0; r.y = 0; r.w = SDL_HOR_RES; r.h = SDL_VER_RES;
