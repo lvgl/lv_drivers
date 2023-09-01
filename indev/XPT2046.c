@@ -55,9 +55,9 @@ void xpt2046_init(void)
 /**
  * Get the current position and state of the touchpad
  * @param data store the read data here
- * @return false: because no ore data to be read
+ * @return void
  */
-bool xpt2046_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
+void xpt2046_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 {
     static int16_t last_x = 0;
     static int16_t last_y = 0;
@@ -105,7 +105,7 @@ bool xpt2046_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
     data->point.x = x;
     data->point.y = y;
 
-    return false;
+    data->continue_reading = false;    /* No more data to be read */
 }
 
 /**********************
