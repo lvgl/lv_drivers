@@ -41,7 +41,7 @@ extern "C" {
  * GLOBAL PROTOTYPES
  **********************/
 void xpt2046_init(void);
-bool xpt2046_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
+void xpt2046_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data);
 
 /**********************
  *      MACROS
