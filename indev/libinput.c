@@ -565,6 +565,7 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
         /* Append the real release event for the first finger */
         evt = new_event(state);
         evt->pressed = LV_INDEV_STATE_REL;
+        evt->point = state->slots[0].point;
 
         /* Inject the dummy press event for the second finger */
         synth_evt = new_event(state);
@@ -577,6 +578,7 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
 
         /* Append the real release event for the second finger */
         evt->pressed = LV_INDEV_STATE_REL;
+        evt->point = state->slots[1].point;
 
         /* Inject the dummy press event for the first finger */
         libinput_lv_event_t *synth_evt = new_event(state);
@@ -584,6 +586,7 @@ static void read_pointer(libinput_drv_state_t *state, struct libinput_event *eve
         synth_evt->point = state->slots[0].point;
       } else {
         evt->pressed = LV_INDEV_STATE_REL;
+        evt->point = state->slots[slot].point;
       }
 
       state->slots[slot].pressed = evt->pressed;
