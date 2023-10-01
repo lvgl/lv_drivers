@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12.4)
+cmake_minimum_required(VERSION 3.13)
 
 project(lv_drivers HOMEPAGE_URL https://github.com/lvgl/lv_drivers/)
 
