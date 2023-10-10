@@ -44,7 +44,6 @@ void drm_init(void);
 void drm_get_sizes(lv_coord_t *width, lv_coord_t *height, uint32_t *dpi);
 void drm_exit(void);
 void drm_flush(lv_disp_drv_t * drv, const lv_area_t * area, lv_color_t * color_p);
-void drm_wait_vsync(lv_disp_drv_t * drv);
 
 
 /**********************

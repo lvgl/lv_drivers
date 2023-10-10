@@ -9,19 +9,14 @@
 #include "drm.h"
 #if USE_DRM
 
-#include <unistd.h>
-#include <pthread.h>
-#include <time.h>
-#include <sys/time.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <poll.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <errno.h>
 #include <sys/mman.h>
-#include <inttypes.h>
+#include <unistd.h>
 
 #include <xf86drm.h>
 #include <xf86drmMode.h>
@@ -41,7 +36,7 @@ struct drm_buffer {
 	uint32_t pitch;
 	uint32_t offset;
 	unsigned long int size;
-	void * map;
+	uint8_t * map;
 	uint32_t fb_handle;
 };
 
@@ -66,7 +61,8 @@ struct drm_dev {
 	drmModePropertyPtr crtc_props[128];
 	drmModePropertyPtr conn_props[128];
 	struct drm_buffer drm_bufs[2]; /* DUMB buffers */
-	struct drm_buffer *cur_bufs[2]; /* double buffering handling */
+	uint8_t active_drm_buf_idx; /* double buffering handling */
+	bool inactive_drm_buf_dirty;
 } drm_dev;
 
 static uint32_t get_plane_property_id(const char *name)
@@ -684,35 +680,24 @@ static int drm_setup_buffers(void)
 	if (ret)
 		return ret;
 
-	/* Set buffering handling */
-	drm_dev.cur_bufs[0] = NULL;
-	drm_dev.cur_bufs[1] = &drm_dev.drm_bufs[0];
-
 	return 0;
 }
 
-void drm_wait_vsync(lv_disp_drv_t *disp_drv)
+static void drm_wait_vsync()
 {
-	LV_UNUSED(disp_drv);
+	struct pollfd pfd;
+	pfd.fd = drm_dev.fd;
+	pfd.events = POLLIN;
 
 	int ret;
-	fd_set fds;
-	FD_ZERO(&fds);
-	FD_SET(drm_dev.fd, &fds);
-
 	do {
-		ret = select(drm_dev.fd + 1, &fds, NULL, NULL, NULL);
+		ret = poll(&pfd, 1, -1);
 	} while (ret == -1 && errno == EINTR);
 
-	if (ret < 0) {
-		err("select failed: %s", strerror(errno));
-		drmModeAtomicFree(drm_dev.req);
-		drm_dev.req = NULL;
-		return;
-	}
-
-	if (FD_ISSET(drm_dev.fd, &fds))
+	if(ret > 0)
 		drmHandleEvent(drm_dev.fd, &drm_dev.drm_event_ctx);
+	else
+		err("poll failed: %s", strerror(errno));
 
 	drmModeAtomicFree(drm_dev.req);
 	drm_dev.req = NULL;
@@ -720,40 +705,40 @@ void drm_wait_vsync(lv_disp_drv_t *disp_drv)
 
 void drm_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p)
 {
-	struct drm_buffer *fbuf = drm_dev.cur_bufs[1];
-	uint32_t w = (area->x2 - area->x1 + 1);
-	uint32_t h = (area->y2 - area->y1 + 1);
+	struct drm_buffer *fbuf = &drm_dev.drm_bufs[!drm_dev.active_drm_buf_idx];
+	uint32_t w = (area->x2 - area->x1) + 1;
+	uint32_t h = (area->y2 - area->y1) + 1;
 	int i, y;
 
 	dbg("x %d:%d y %d:%d w %d h %d", area->x1, area->x2, area->y1, area->y2, w, h);
 
-	/* Partial update */
-	if ((w != drm_dev.width || h != drm_dev.height) && drm_dev.cur_bufs[0])
-		memcpy(fbuf->map, drm_dev.cur_bufs[0]->map, fbuf->size);
+	/*Prepare background buffer for partial update*/
+	if(drm_dev.inactive_drm_buf_dirty && (area->x1 != 0 || area->y1 != 0 || w != drm_dev.width || h != drm_dev.height))
+		memcpy(fbuf->map, drm_dev.drm_bufs[drm_dev.active_drm_buf_idx].map, fbuf->size);
+	drm_dev.inactive_drm_buf_dirty = false;
 
+	/*Flush to background buffer*/
 	for (y = 0, i = area->y1 ; i <= area->y2 ; ++i, ++y) {
-                memcpy((uint8_t *)fbuf->map + (area->x1 * (LV_COLOR_SIZE/8)) + (fbuf->pitch * i),
-                       (uint8_t *)color_p + (w * (LV_COLOR_SIZE/8) * y),
+		memcpy(fbuf->map + (area->x1 * (LV_COLOR_SIZE/8)) + (fbuf->pitch * i),
+		       (uint8_t *)color_p + (w * (LV_COLOR_SIZE/8) * y),
 		       w * (LV_COLOR_SIZE/8));
 	}
 
-	if (drm_dev.req)
-		drm_wait_vsync(disp_drv);
+	/*Swap buffers*/
+	if(lv_disp_flush_is_last(disp_drv)) {
+		if(drm_dev.req)
+			drm_wait_vsync();
 
-	/* show fbuf plane */
-	if (drm_dmabuf_set_plane(fbuf)) {
-		err("Flush fail");
-		return;
+		if(drm_dmabuf_set_plane(fbuf)) {
+			err("Flush fail");
+			return;
+		}
+		else
+			dbg("Flush done");
+
+		drm_dev.active_drm_buf_idx = !drm_dev.active_drm_buf_idx;
+		drm_dev.inactive_drm_buf_dirty = true;
 	}
-	else
-		dbg("Flush done");
-
-	if (!drm_dev.cur_bufs[0])
-		drm_dev.cur_bufs[1] = &drm_dev.drm_bufs[1];
-	else
-		drm_dev.cur_bufs[1] = drm_dev.cur_bufs[0];
-
-	drm_dev.cur_bufs[0] = fbuf;
 
 	lv_disp_flush_ready(disp_drv);
 }
