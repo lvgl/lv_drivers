@@ -27,6 +27,13 @@ find_package(PkgConfig)
 pkg_check_modules(PKG_WAYLAND wayland-client wayland-cursor wayland-protocols xkbcommon)
 target_link_libraries(lv_drivers PUBLIC lvgl ${PKG_WAYLAND_LIBRARIES})
 
+option( LV_DRIVERS_USE_SDL "Use SDL2 libraries" OFF )
+
+if( LV_DRIVERS_USE_SDL )
+  find_package( SDL2 REQUIRED )
+  target_link_libraries( lv_drivers PRIVATE SDL2::SDL2 )
+endif( LV_DRIVERS_USE_SDL )
+
 if("${LIB_INSTALL_DIR}" STREQUAL "")
   set(LIB_INSTALL_DIR "lib")
 endif()
