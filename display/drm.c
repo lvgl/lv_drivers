@@ -62,8 +62,6 @@ struct drm_dev {
 	drmModePropertyPtr conn_props[128];
 	struct drm_buffer drm_bufs[2]; /*DUMB buffers*/
 	uint8_t active_drm_buf_idx; /*Double buffering handling*/
-	uint8_t * intermediate_buffer;
-	unsigned long int intermediate_buffer_size;
 	lv_disp_draw_buf_t draw_buf;
 } drm_dev;
 
@@ -120,7 +118,13 @@ static void page_flip_handler(int fd, unsigned int sequence, unsigned int tv_sec
 	LV_UNUSED(tv_sec);
 	LV_UNUSED(tv_usec);
 	LV_UNUSED(user_data);
+
 	dbg("flip");
+
+	if(drm_dev.req) {
+		drmModeAtomicFree(drm_dev.req);
+		drm_dev.req = NULL;
+	}
 }
 
 static int drm_get_plane_props(void)
@@ -681,63 +685,47 @@ static int drm_setup_buffers(void)
 	if (ret)
 		return ret;
 
-	/*Allocate third buffer that flushes go into*/
-	drm_dev.intermediate_buffer_size = drm_dev.width * drm_dev.height * (LV_COLOR_SIZE / 8);
-	drm_dev.intermediate_buffer = malloc(drm_dev.intermediate_buffer_size);
-	LV_ASSERT_MALLOC(drm_dev.intermediate_buffer);
-	lv_memset(drm_dev.intermediate_buffer, 0, drm_dev.intermediate_buffer_size);
-
 	return 0;
 }
 
 void drm_wait_vsync(lv_disp_drv_t * disp_drv)
 {
-	/*Backwards compatibility: No wait in disp_drv->wait_cb needed*/
-	LV_UNUSED(disp_drv);
-}
+	while(drm_dev.req) {
+		struct pollfd pfd;
+		pfd.fd = drm_dev.fd;
+		pfd.events = POLLIN;
 
-static void drm_really_wait_vsync()
-{
-	struct pollfd pfd;
-	pfd.fd = drm_dev.fd;
-	pfd.events = POLLIN;
+		int ret;
+		do {
+			ret = poll(&pfd, 1, -1);
+		} while (ret == -1 && errno == EINTR);
 
-	int ret;
-	do {
-		ret = poll(&pfd, 1, -1);
-	} while (ret == -1 && errno == EINTR);
+		if(ret > 0)
+			drmHandleEvent(drm_dev.fd, &drm_dev.drm_event_ctx);
+		else {
+			err("poll failed: %s", strerror(errno));
+			return;
+		}
+	}
 
-	if(ret > 0)
-		drmHandleEvent(drm_dev.fd, &drm_dev.drm_event_ctx);
-	else
-		err("poll failed: %s", strerror(errno));
-
-	drmModeAtomicFree(drm_dev.req);
-	drm_dev.req = NULL;
+	lv_disp_flush_ready(disp_drv);
 }
 
 void drm_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
 	struct drm_buffer *fbuf = &drm_dev.drm_bufs[drm_dev.active_drm_buf_idx ^ 1];
 
-	if((uint8_t *)color_p != drm_dev.intermediate_buffer) {
-		/*Backwards compatibility: Non-direct flush to intermediate buffer*/
+	if(!disp_drv->direct_mode) {
+		/*Backwards compatibility: Non-direct flush */
 		uint32_t w = (area->x2 - area->x1) + 1;
 		for (int y = 0, i = area->y1; i <= area->y2 ; ++i, ++y) {
-			lv_memcpy(drm_dev.intermediate_buffer + (area->x1 * (LV_COLOR_SIZE / 8)) + (fbuf->pitch * i),
+			lv_memcpy(fbuf->map + (area->x1 * (LV_COLOR_SIZE / 8)) + (fbuf->pitch * i),
 			          (uint8_t *)color_p + (w * (LV_COLOR_SIZE / 8) * y),
 			          w * (LV_COLOR_SIZE / 8));
 		}
 	}
 
 	if(lv_disp_flush_is_last(disp_drv)) {
-		/*Wait for last requested buffer swap to complete*/
-		if(drm_dev.req)
-			drm_really_wait_vsync();
-
-		/*Update background buffer from intermediate buffer*/
-		lv_memcpy(fbuf->map, drm_dev.intermediate_buffer, drm_dev.intermediate_buffer_size);
-
 		/*Request buffer swap*/
 		if(drm_dmabuf_set_plane(fbuf)) {
 			err("Flush fail");
@@ -748,8 +736,6 @@ void drm_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * co
 
 		drm_dev.active_drm_buf_idx ^= 1;
 	}
-
-	lv_disp_flush_ready(disp_drv);
 }
 
 #if LV_COLOR_DEPTH == 32
@@ -802,12 +788,13 @@ int drm_disp_drv_init(lv_disp_drv_t * disp_drv)
 	int ret = drm_init();
 	if(ret) return ret;
 
-	lv_disp_draw_buf_init(&drm_dev.draw_buf, drm_dev.intermediate_buffer, NULL, drm_dev.width * drm_dev.height);
+	lv_disp_draw_buf_init(&drm_dev.draw_buf, drm_dev.drm_bufs[1].map, drm_dev.drm_bufs[0].map, drm_dev.width * drm_dev.height);
 	disp_drv->draw_buf = &drm_dev.draw_buf;
 	disp_drv->direct_mode = true;
 	disp_drv->hor_res = drm_dev.width;
 	disp_drv->ver_res = drm_dev.height;
 	disp_drv->flush_cb = drm_flush;
+	disp_drv->wait_cb = drm_wait_vsync;
 	return 0;
 }
 
