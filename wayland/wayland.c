@@ -29,12 +29,8 @@
 #include <wayland-cursor.h>
 #include <xkbcommon/xkbcommon.h>
 
-#if !(LV_WAYLAND_XDG_SHELL || LV_WAYLAND_WL_SHELL)
-#error "Please select at least one shell integration for Wayland driver"
-#endif
-
 #if LV_WAYLAND_XDG_SHELL
-#include "protocols/wayland-xdg-shell-client-protocol.h"
+#include "wayland-xdg-shell-client-protocol.h"
 #endif
 
 /*********************
