@@ -20,6 +20,7 @@ target_include_directories(lv_drivers SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 find_package(PkgConfig)
 pkg_check_modules(PKG_WAYLAND wayland-client wayland-cursor wayland-protocols xkbcommon)
+pkg_check_modules(PKG_LVGL lvgl)
 target_link_libraries(lv_drivers PUBLIC lvgl ${PKG_WAYLAND_LIBRARIES})
 
 if("${LIB_INSTALL_DIR}" STREQUAL "")
@@ -38,7 +39,16 @@ install(
   PATTERN ".git*" EXCLUDE
   PATTERN "CMakeFiles" EXCLUDE
   PATTERN "docs" EXCLUDE
-  PATTERN "lib" EXCLUDE)
+  PATTERN "lib" EXCLUDE
+  PATTERN "*.pc.in" EXCLUDE)
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${PKG_LVGL_CFLAGS}")
+
+configure_file("${CMAKE_SOURCE_DIR}/lv-drivers.pc.in" lv-drivers.pc @ONLY)
+
+install(
+  FILES "${CMAKE_BINARY_DIR}/lv-drivers.pc"
+  DESTINATION "${LIB_INSTALL_DIR}/pkgconfig/")
 
 file(GLOB LV_DRIVERS_PUBLIC_HEADERS "${CMAKE_SOURCE_DIR}/lv_drv_conf.h")
 
