@@ -677,6 +677,19 @@ static void read_keypad(libinput_drv_state_t *state, struct libinput_event *even
       if (evt->key_val != 0) {
         /* Only record button state when actual output is produced to prevent widgets from refreshing */
         evt->pressed = (key_state == LIBINPUT_KEY_STATE_RELEASED) ? LV_INDEV_STATE_REL : LV_INDEV_STATE_PR;
+
+        // just release the key immediatly after it got pressed.
+        // but don't handle special keys where holding a key makes sense
+        if (evt->key_val != LV_KEY_BACKSPACE &&
+            evt->key_val != LV_KEY_UP &&
+            evt->key_val != LV_KEY_LEFT &&
+            evt->key_val != LV_KEY_RIGHT &&
+            evt->key_val != LV_KEY_DOWN &&
+            key_state == LIBINPUT_KEY_STATE_PRESSED) {
+          libinput_lv_event_t *release_evt = new_event(state);
+          release_evt->pressed = LV_INDEV_STATE_REL;
+          release_evt->key_val = evt->key_val;
+        }
       }
       break;
     default:
