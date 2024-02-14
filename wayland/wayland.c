@@ -1524,6 +1524,7 @@ static void destroy_graphic_obj(struct graphic_object * obj)
     lv_free(obj);
 }
 
+#if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
 static bool attach_decoration(struct window *window, struct graphic_object * decoration,
                               smm_buffer_t *decoration_buffer, struct graphic_object * parent)
 {
@@ -1597,7 +1598,6 @@ err_destroy_surface:
     return false;
 }
 
-#if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
 static bool create_decoration(struct window *window,
                               struct graphic_object * decoration,
                               int window_width, int window_height)
