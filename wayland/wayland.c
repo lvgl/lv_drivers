@@ -1158,7 +1158,9 @@ static const struct xdg_toplevel_listener xdg_toplevel_listener = {
     .configure = xdg_toplevel_handle_configure,
     .close = xdg_toplevel_handle_close,
     .configure_bounds = xdg_toplevel_handle_configure_bounds,
-    .wm_capabilities = xdg_toplevel_handle_wm_capabilities
+#ifndef LV_WAYLAND_WESTON_COMPAT
+    .wm_capabilities = xdg_toplevel_handle_wm_capabilities /* This requires newer wayland headers */
+#endif
 };
 
 static void xdg_wm_base_ping(void *data, struct xdg_wm_base *xdg_wm_base, uint32_t serial)
@@ -1763,6 +1765,11 @@ static bool resize_window(struct window *window, int width, int height)
 {
     lv_color_t * buf1 = NULL;
 
+#if LV_WAYLAND_WESTON_COMPAT
+    static struct smm_buffer_t *body_buf1;
+    static struct smm_buffer_t *body_buf2;
+#endif
+
     LV_LOG_TRACE("resize window %dx%d", width, height);
 
 #if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
@@ -1777,13 +1784,38 @@ static bool resize_window(struct window *window, int width, int height)
 #endif
 
     /* Update size for newly allocated buffers */
-    smm_resize(window->body->buffer_group, (width * BYTES_PER_PIXEL) * height);
 
     window->width = width;
     window->height = height;
 
     window->body->width = width;
     window->body->height = height;
+
+#if LV_WAYLAND_WESTON_COMPAT
+    smm_resize(window->body->buffer_group, ((width * BYTES_PER_PIXEL) * height) * 2);
+
+    if (body_buf1 == NULL && body_buf2 == NULL) {
+        /* Pre-allocate two buffers for the window body here */
+        /* This is done to avoid calling resize from flush */
+        body_buf1 = smm_acquire(window->body->buffer_group);
+        body_buf2 = smm_acquire(window->body->buffer_group);
+
+        if (smm_map(body_buf2) == NULL) {
+            LV_LOG_ERROR("Cannot pre-allocate backing buffers for window body");
+        }
+
+        /* Moves the buffers to the unused list of the group */
+        smm_release(body_buf1);
+        smm_release(body_buf2);
+
+    } else {
+
+        wl_surface_destroy(window->body->surface);
+        return;
+    }
+#else
+    smm_resize(window->body->buffer_group, ((width * BYTES_PER_PIXEL) * height));
+#endif
 
 #if LV_WAYLAND_CLIENT_SIDE_DECORATIONS
     if (!window->application->opt_disable_decorations && !window->fullscreen)
@@ -2027,6 +2059,10 @@ static void _lv_wayland_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv
     /* Acquire and map a buffer to attach/commit to surface */
     if (buf == NULL)
     {
+        /* On weston 10.0.2 w/pixman backend, if buffers are not pre-allocated */
+        /* beforehand the call below emits a resize request and a crash occurs */
+        /* The solution is to pre-allocate two buffers at the very start */
+        /* before the first flush occurs */
         buf = smm_acquire(window->body->buffer_group);
         if (buf == NULL)
         {
