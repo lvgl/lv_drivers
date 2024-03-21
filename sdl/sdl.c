@@ -47,6 +47,10 @@
 # define SDL_FULLSCREEN        0
 #endif
 
+#ifndef SDL_HIGHDPI
+# define SDL_HIGHDPI        0
+#endif
+
 #include "sdl_common_internal.h"
 #include <stdlib.h>
 #include <stdbool.h>
@@ -335,6 +339,9 @@ static void window_create(monitor_t * m)
     int flag = 0;
 #if SDL_FULLSCREEN
     flag |= SDL_WINDOW_FULLSCREEN;
+#endif
+#if SDL_HIGHDPI
+    flag |= SDL_WINDOW_ALLOW_HIGHDPI;
 #endif
 
     m->window = SDL_CreateWindow(SDL_WINDOW_TITLE,
