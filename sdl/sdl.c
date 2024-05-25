@@ -48,7 +48,7 @@
 #endif
 
 #ifndef SDL_HIGHDPI
-# define SDL_HIGHDPI        0
+#define SDL_HIGHDPI SDL_VERSION_ATLEAST(2, 0, 1)
 #endif
 
 #include "sdl_common_internal.h"
