@@ -30,6 +30,7 @@ extern "C" {
 #endif
 
 #include <poll.h>
+#include <pthread.h>
 
 #if USE_XKB
 #include "xkb.h"
@@ -50,12 +51,32 @@ typedef enum {
 } libinput_capability;
 
 typedef struct {
+  lv_indev_state_t pressed;
+  int key_val;
+  lv_point_t point;
+} libinput_lv_event_t;
+
+#define MAX_EVENTS 32
+typedef struct {
   int fd;
   struct pollfd fds[1];
 
-  int button;
-  int key_val;
-  lv_point_t most_recent_touch_point;
+  /* The points array is implemented as a circular LIFO queue */
+  libinput_lv_event_t points[MAX_EVENTS]; /* Event buffer */
+  libinput_lv_event_t slots[2]; /* Realtime state of up to 2 fingers to handle multitouch */
+
+  /* Pointer devices work a bit differently in libinput which requires us to store their last known state */
+  lv_point_t pointer_position;
+  bool pointer_button_down;
+
+  int start; /* Index of start of event queue */
+  int end; /* Index of end of queue*/
+  libinput_lv_event_t last_event; /* Report when no new events
+                                   * to keep indev state consistent
+                                   */
+  bool deinit; /* Tell worker thread to quit */
+  pthread_mutex_t event_lock;
+  pthread_t worker_thread;
 
   struct libinput *libinput_context;
   struct libinput_device *libinput_device;

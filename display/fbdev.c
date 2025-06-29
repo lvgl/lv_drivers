@@ -75,6 +75,7 @@ static struct fb_fix_screeninfo finfo;
 static char *fbp = 0;
 static long int screensize = 0;
 static int fbfd = 0;
+static bool force_refresh = false;
 
 /**********************
  *      MACROS
@@ -159,6 +160,10 @@ void fbdev_init(void)
 
     LV_LOG_INFO("The framebuffer device was mapped to memory successfully");
 
+}
+
+void fbdev_force_refresh(bool enabled) {
+    force_refresh = enabled;
 }
 
 void fbdev_exit(void)
@@ -263,8 +268,12 @@ void fbdev_flush(lv_disp_drv_t * drv, const lv_area_t * area, lv_color_t * color
         /*Not supported bit per pixel*/
     }
 
-    //May be some direct update command is required
-    //ret = ioctl(state->fd, FBIO_UPDATE, (unsigned long)((uintptr_t)rect));
+    if (force_refresh) {
+        vinfo.activate |= FB_ACTIVATE_NOW | FB_ACTIVATE_FORCE;
+        if (ioctl(fbfd, FBIOPUT_VSCREENINFO, &vinfo) == -1) {
+            perror("Error setting var screen info");
+        }
+    }
 
     lv_disp_flush_ready(drv);
 }
